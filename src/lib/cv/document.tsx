@@ -41,15 +41,22 @@ const styles = StyleSheet.create({
     lineHeight: MESURES.interligne,
   },
 
+  // Chaque bloc dont la taille de police diffère de celle de la page porte
+  // son propre `lineHeight`. React-PDF fige l'interligne hérité en points à
+  // partir de la taille de la page : hérité tel quel, un titre de 15 pt
+  // recevait une hauteur de ligne calculée pour 8,5 pt et se superposait à la
+  // ligne suivante.
   nom: {
     fontFamily: "Helvetica-Bold",
     fontSize: MESURES.tailleNom,
+    lineHeight: MESURES.interligne,
     textAlign: "center",
     letterSpacing: 1.2,
     marginBottom: MESURES.margeApresNom,
   },
   titreCv: {
     fontSize: MESURES.tailleTitre,
+    lineHeight: MESURES.interligne,
     textAlign: "center",
     letterSpacing: 0.8,
     color: ENCRE_DOUCE,
@@ -57,6 +64,7 @@ const styles = StyleSheet.create({
   },
   contact: {
     fontSize: MESURES.tailleContact,
+    lineHeight: MESURES.interligne,
     textAlign: "center",
     color: ENCRE_DOUCE,
     marginBottom: MESURES.margeApresEntete,
@@ -66,14 +74,13 @@ const styles = StyleSheet.create({
   titreSection: {
     fontFamily: "Helvetica-Bold",
     fontSize: MESURES.tailleSection,
+    lineHeight: MESURES.interligne,
     letterSpacing: 0.6,
     borderBottomWidth: 0.5,
     borderBottomColor: FILET,
     paddingBottom: MESURES.paddingTitreSection,
     marginBottom: MESURES.margeApresTitreSection,
   },
-
-  accroche: { lineHeight: MESURES.interligneAccroche, textAlign: "justify" },
 
   experience: { marginTop: MESURES.margeAvantExperience },
   ligneEntete: {
@@ -135,7 +142,7 @@ export function DocumentCV({ modele }: { modele: ModeleCV }) {
 
         {modele.accroche && (
           <Section titre="PROFIL">
-            <Text style={styles.accroche}>{modele.accroche}</Text>
+            <Text>{modele.accroche}</Text>
           </Section>
         )}
 

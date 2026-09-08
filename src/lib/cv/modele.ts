@@ -71,6 +71,24 @@ function ligneLangue(l: {
   return suite ? `${l.langue} – ${suite}` : l.langue;
 }
 
+/**
+ * Le pays n'est affiché que s'il apporte quelque chose.
+ * « Le Mans, France » sur un CV lu en France est du bruit ; « Fès, Maroc »
+ * situe utilement l'expérience.
+ */
+function paysAffichable(pays: string | null): string | null {
+  if (!pays) return null;
+  return normaliserPays(pays) === "france" ? null : pays;
+}
+
+function normaliserPays(pays: string): string {
+  return pays
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 /** « Excel (niveau avancé) : TCD, RECHERCHEV » si une précision existe. */
 function ligneCompetence(c: { libelle: string; precision: string | null }) {
   return c.precision ? `${c.libelle} : ${c.precision}` : c.libelle;
@@ -106,7 +124,7 @@ export function construireModele(
         contrat:
           LIBELLES_CONTRAT[experience.typeContrat] ?? experience.typeContrat,
         employeur: nettoyer(
-          [experience.entreprise, experience.ville, experience.pays],
+          [experience.entreprise, experience.ville, paysAffichable(experience.pays)],
           "  |  "
         ),
         missions: missions.map((m) => ({

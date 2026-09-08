@@ -86,11 +86,15 @@ export async function genererCV(formData: FormData) {
   try {
     await genererCVPourOffre(id);
   } catch (e) {
+    // Une ErreurCV porte un message écrit pour toi. Toute autre exception est
+    // un défaut technique : on en remonte le texte brut plutôt qu'un message
+    // rassurant qui obligerait à ouvrir les journaux Vercel pour comprendre.
     const message =
       e instanceof ErreurCV
         ? e.message
-        : "La composition du CV a échoué. Réessaie, et si cela persiste, " +
-          "vérifie que le profil du volet est complet.";
+        : `La composition du CV a échoué : ${
+            e instanceof Error ? e.message : String(e)
+          }`.slice(0, 400);
     redirect(`/offre/${id}?cv=erreur&message=${encodeURIComponent(message)}`);
   }
 

@@ -264,6 +264,43 @@ export function noterCompetence(
   return { note: 0, motif: "Non réclamée par l'offre." };
 }
 
+/**
+ * Nombre d'outils listés sur la ligne qui leur est consacrée.
+ * Au-delà, la ligne passe sur deux lignes composées et le gain disparaît.
+ */
+const MAX_OUTILS_GROUPES = 6;
+
+/**
+ * Regroupe les outils et logiciels sur une seule ligne.
+ *
+ * Le rattrapage par famille avait un effet de bord : sur une offre de contrôle
+ * de gestion, toutes les compétences de la famille passaient devant, et le CV
+ * sortait sans Excel, sans Power BI et sans le moindre ERP — exactement ce
+ * qu'un analyseur cherche en premier. Une ligne leur est donc réservée, et
+ * elle en porte six au lieu d'un : c'est aussi ce que faisaient les deux CV
+ * d'origine.
+ *
+ * La précision du meilleur outil est conservée entre parenthèses : « TCD,
+ * RECHERCHEV » sont des mots-clés, pas de la décoration.
+ */
+function grouperOutils(outils: CompetenceRetenue[]): CompetenceRetenue | null {
+  if (outils.length === 0) return null;
+  const retenus = outils.slice(0, MAX_OUTILS_GROUPES);
+  const [premier, ...suivants] = retenus;
+
+  const libelle = [
+    premier.precision ? `${premier.libelle} (${premier.precision})` : premier.libelle,
+    ...suivants.map((o) => o.libelle),
+  ].join(", ");
+
+  return {
+    ...premier,
+    libelle,
+    precision: null,
+    motif: `Outils regroupés : ${retenus.map((o) => o.libelle).join(", ")}.`,
+  };
+}
+
 function comparerCompetences(
   a: CompetenceRetenue,
   b: CompetenceRetenue
@@ -301,10 +338,21 @@ export function selectionner(
     return { experience, missions };
   });
 
-  const competences = donnees.competences
+  const notees = donnees.competences
     .map((c) => ({ ...c, ...noterCompetence(c, offre) }))
-    .sort(comparerCompetences)
-    .slice(0, niveau.nbCompetences);
+    .sort(comparerCompetences);
+
+  const ligneOutils = grouperOutils(notees.filter((c) => c.categorie === "outil"));
+
+  // La ligne d'outils occupe une place dans le bloc ; le reste va aux
+  // compétences métier, dans l'ordre du classement.
+  const metier = notees
+    .filter((c) => c.categorie !== "outil")
+    .slice(0, niveau.nbCompetences - (ligneOutils ? 1 : 0));
+
+  const competences = (ligneOutils ? [...metier, ligneOutils] : metier).sort(
+    comparerCompetences
+  );
 
   return {
     niveau,
