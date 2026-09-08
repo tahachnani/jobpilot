@@ -54,7 +54,7 @@ export const MESURES = {
    * police. Mesuré sur du français courant : 0,50 pour du texte mixte.
    * À ajuster.
    */
-  largeurCaractere: 0.505,
+  largeurCaractere: 0.452,
 
   /**
    * La coupure se fait aux mots, jamais au caractère près : une ligne perd en
