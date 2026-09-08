@@ -85,12 +85,12 @@ export default async function TableauDeBord() {
 
       <Carte className="mt-8 border-dashed">
         <p className="text-sm font-medium text-ardoise-700">
-          Étape 1 terminée : le socle est en ligne
+          Étape 3 en ligne : analyse et scoring
         </p>
         <p className="mt-2 text-sm text-ardoise-500">
-          Connexion, base de données, sécurité et navigation fonctionnent.
-          L&apos;étape 2 constitue ta base professionnelle à partir de tes deux
-          CV, avec validation ligne par ligne.
+          Ajout d&apos;offre, extraction et score de compatibilité expliqué sont
+          opérationnels sur les deux volets. L&apos;étape 4 génère les CV
+          personnalisés en PDF à partir de ces analyses.
         </p>
       </Carte>
     </>

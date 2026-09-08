@@ -9,30 +9,28 @@ formulations et des visibilités propres à chacun.
 
 ---
 
-## État du projet — Étape 1 sur 6
+## État du projet — Étape 4 sur 6
 
-L'étape 1 livre le socle : base de données, sécurité, connexion, navigation.
+L'étape 4 livre la génération des CV personnalisés.
 
 ### En place
 
-- **17 tables**, 7 types énumérés, contraintes de cohérence des dates
-- **Row Level Security active sur les 17 tables** : chaque ligne n'est lisible
-  que par son propriétaire
-- Bucket de stockage `documents` **privé**, accessible uniquement par URL signée
-- Historisation automatique des changements de statut d'offre
-- Barème de scoring version 1 et coefficients d'ancienneté enregistrés
-  (alternance 1,00 · stage 0,50)
-- Connexion par lien magique, une seule adresse autorisée, contrôle côté serveur
-- Middleware redirigeant toute page non publique vers la connexion
-- Navigation responsive : ordinateur, tablette, téléphone
+- **18 tables**, Row Level Security active partout, bucket `documents` privé
+- Connexion par email et mot de passe, une seule adresse autorisée
+- Base professionnelle validée ligne par ligne, deux volets, formulations
+  propres à chacun
+- Ajout d'offre par texte, PDF ou URL, extraction par Claude Haiku,
+  anti-doublon par empreinte SHA-256
+- Score de compatibilité **déterministe**, barème version 2, détail du calcul
+  affichable, recalcul gratuit sans appel IA
+- **Génération de CV en React-PDF** : sélection déterministe des missions,
+  emprunts encadrés à l'autre volet, une seule page garantie, versions
+  empilées et conservées
 
 ### À venir
 
 | Fonction | Étape |
 |---|---|
-| Base professionnelle extraite des CV, validée ligne par ligne | 2 |
-| Ajout et analyse d'offres, score de compatibilité expliqué | 3 |
-| Génération des CV personnalisés en PDF | 4 |
 | Lettre de motivation et emails de candidature | 5 |
 | Statuts, historique, statistiques, export | 6 |
 | Marché caché (API publiques françaises) | V1.1 |

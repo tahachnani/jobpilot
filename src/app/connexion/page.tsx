@@ -1,18 +1,24 @@
 import { creerClientServeur } from "@/lib/supabase/server";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Envoi du lien magique.
- * Le contrôle de l'adresse autorisée est fait ici, côté serveur :
- * il n'est donc pas contournable depuis le navigateur.
+ * Connexion par email + mot de passe.
+ *
+ * Choix assumé : pas de lien magique. Le lien par email dépendait du service
+ * d'envoi de Supabase (limité à quelques messages par heure sur l'offre
+ * gratuite) et d'un cookie de vérification lié au navigateur et au domaine.
+ * Deux fragilités supprimées d'un coup.
+ *
+ * L'adresse autorisée est contrôlée ici, côté serveur, avant même l'appel à
+ * Supabase : une autre adresse ne déclenche aucune tentative.
  */
-async function envoyerLien(formData: FormData) {
+async function connecter(formData: FormData) {
   "use server";
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const motDePasse = String(formData.get("motdepasse") ?? "");
   const autorise = (process.env.EMAIL_AUTORISE ?? "").trim().toLowerCase();
 
   const echec = (message: string) =>
@@ -24,23 +30,25 @@ async function envoyerLien(formData: FormData) {
   if (email !== autorise) {
     echec("Cette adresse n'est pas autorisée.");
   }
-
-  const origine =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    `https://${headers().get("host") ?? "localhost:3000"}`;
+  if (motDePasse.length === 0) {
+    echec("Mot de passe requis.");
+  }
 
   const supabase = creerClientServeur();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: `${origine}/auth/callback`,
-    },
+    password: motDePasse,
   });
 
-  if (error) echec(error.message);
+  if (error) {
+    echec(
+      error.message === "Invalid login credentials"
+        ? "Mot de passe incorrect."
+        : error.message
+    );
+  }
 
-  redirect("/connexion?envoye=1");
+  redirect("/");
 }
 
 export default function Connexion({
@@ -59,7 +67,7 @@ export default function Connexion({
         </div>
 
         <form
-          action={envoyerLien}
+          action={connecter}
           className="rounded-xl border border-ardoise-200 bg-white p-6 shadow-sm"
         >
           <label
@@ -73,24 +81,33 @@ export default function Connexion({
             name="email"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="username"
             inputMode="email"
-            placeholder="ton@email.fr"
+            className="mt-2 w-full rounded-lg border border-ardoise-200 px-3 py-2.5 text-sm outline-none focus:border-ardoise-500"
+          />
+
+          <label
+            htmlFor="motdepasse"
+            className="mt-4 block text-sm font-medium text-ardoise-700"
+          >
+            Mot de passe
+          </label>
+          <input
+            id="motdepasse"
+            name="motdepasse"
+            type="password"
+            required
+            autoComplete="current-password"
             className="mt-2 w-full rounded-lg border border-ardoise-200 px-3 py-2.5 text-sm outline-none focus:border-ardoise-500"
           />
 
           <button
             type="submit"
-            className="mt-4 w-full rounded-lg bg-ardoise-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-ardoise-800"
+            className="mt-5 w-full rounded-lg bg-ardoise-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-ardoise-800"
           >
-            Recevoir un lien de connexion
+            Se connecter
           </button>
 
-          {searchParams.envoye && (
-            <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              Lien envoyé. Ouvre ta boîte mail et clique sur le lien reçu.
-            </p>
-          )}
           {searchParams.erreur && (
             <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
               {searchParams.erreur}
@@ -99,8 +116,8 @@ export default function Connexion({
         </form>
 
         <p className="mt-4 text-center text-xs text-ardoise-400">
-          Pas de mot de passe à retenir : la connexion se fait par un lien
-          envoyé à ton adresse.
+          Ton navigateur peut enregistrer ces identifiants : la connexion
+          devient alors immédiate.
         </p>
       </div>
     </main>
