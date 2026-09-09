@@ -24,6 +24,34 @@ export interface CompetenceManquante {
   categorieSuggeree: string;
 }
 
+/**
+ * Met un libellé d'annonce en état de figurer sur un CV.
+ *
+ * Les offres écrivent « logiciels comptabilité », « maîtrise d'Excel »,
+ * « connaissance des normes IFRS ». Repris tels quels, ces libellés font
+ * négligés entre deux lignes soignées. On retire les tournures d'annonce et on
+ * capitalise — sans toucher aux sigles, qui restent en majuscules.
+ */
+export function nettoyerLibelle(brut: string): string {
+  let t = brut.trim().replace(/\s+/g, " ");
+
+  t = t.replace(
+    /^(bonne\s+|solide\s+|très\s+bonne\s+)?(maitrise|maîtrise|connaissance|connaissances|pratique|usage|utilisation)\s*(d'|de\s+la\s+|de\s+l'|des\s+|du\s+|de\s+|en\s+|sur\s+)?/i,
+    ""
+  );
+  t = t.replace(/\s*\(.*?\)\s*$/, "");
+  t = t.replace(/[.,;:]+$/, "");
+
+  if (!t) return brut.trim();
+
+  // Un sigle reste un sigle ; le reste prend une majuscule initiale.
+  const premier = t.split(" ")[0];
+  const estSigle = premier === premier.toUpperCase() && /\p{Lu}/u.test(premier);
+  if (!estSigle) t = t.charAt(0).toUpperCase() + t.slice(1);
+
+  return t;
+}
+
 /** Trop court ou trop générique pour valoir une ligne de CV. */
 function digneDInteret(libelle: string): boolean {
   const t = libelle.trim();
@@ -71,14 +99,14 @@ export async function competencesManquantes(
 
   for (const c of offre.competences) {
     candidates.push({
-      libelle: c.libelle,
+      libelle: nettoyerLibelle(c.libelle),
       origine: c.caractere === "indispensable" ? "indispensable" : "souhaitee",
       categorieSuggeree: familleDuVolet,
     });
   }
   for (const o of offre.outils) {
     candidates.push({
-      libelle: o,
+      libelle: nettoyerLibelle(o),
       origine: "outil",
       categorieSuggeree: "outil",
     });

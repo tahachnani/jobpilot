@@ -286,15 +286,17 @@ const MAX_OUTILS_GROUPES = 6;
 function grouperOutils(outils: CompetenceRetenue[]): CompetenceRetenue | null {
   if (outils.length === 0) return null;
   const retenus = outils.slice(0, MAX_OUTILS_GROUPES);
-  const [premier, ...suivants] = retenus;
 
-  const libelle = [
-    premier.precision ? `${premier.libelle} (${premier.precision})` : premier.libelle,
-    ...suivants.map((o) => o.libelle),
-  ].join(", ");
+  // La précision suit son outil, où qu'il soit dans la liste. La première
+  // version ne gardait que celle du premier : le jour où un nouvel outil est
+  // passé devant Excel, « TCD, RECHERCHEV, modèles de reporting » a disparu du
+  // CV — trois mots-clés perdus par un détail de rang.
+  const libelle = retenus
+    .map((o) => (o.precision ? `${o.libelle} (${o.precision})` : o.libelle))
+    .join(", ");
 
   return {
-    ...premier,
+    ...retenus[0],
     libelle,
     precision: null,
     motif: `Outils regroupés : ${retenus.map((o) => o.libelle).join(", ")}.`,
