@@ -21,6 +21,8 @@ export interface MissionCV {
   voletFormulation: CodeVolet;
   /** Vraie si la formulation vient de l'autre volet. */
   empruntee: boolean;
+  /** Vraie si la formulation a été adaptée à l'offre en cours. */
+  adaptee: boolean;
   codes: string[];
   contientChiffre: boolean;
   pertinence: number;
@@ -107,18 +109,40 @@ type Ligne = Record<string, unknown>;
  */
 function formulationDuVolet(
   formulations: Ligne[],
-  volet: CodeVolet
-): { texte: string } | null {
-  const candidates = formulations
-    .filter((f) => f.volet === volet && !f.offre_id)
-    .sort((a, b) => Number(b.validee === true) - Number(a.validee === true));
-  const retenue = candidates[0];
-  if (!retenue) return null;
-  const texte = String(retenue.texte ?? "").trim();
-  return texte ? { texte } : null;
+  volet: CodeVolet,
+  offreId: string | null
+): { texte: string; adaptee: boolean } | null {
+  const duVolet = formulations.filter((f) => f.volet === volet);
+
+  // Une formulation adaptée à CETTE offre l'emporte, à condition d'avoir été
+  // validée. Une proposition en attente n'entre jamais dans un CV.
+  const adaptee = offreId
+    ? duVolet.find((f) => f.offre_id === offreId && f.validee === true)
+    : undefined;
+  if (adaptee) {
+    const texte = String(adaptee.texte ?? "").trim();
+    if (texte) return { texte, adaptee: true };
+  }
+
+  // À défaut, la formulation générique du volet. Les formulations rattachées à
+  // une autre offre sont ignorées : une reformulation écrite pour une annonce
+  // ne contamine pas une autre candidature.
+  const generique = duVolet
+    .filter((f) => !f.offre_id)
+    .sort((a, b) => Number(b.validee === true) - Number(a.validee === true))[0];
+  if (!generique) return null;
+  const texte = String(generique.texte ?? "").trim();
+  return texte ? { texte, adaptee: false } : null;
 }
 
-export async function chargerDonneesCV(volet: CodeVolet): Promise<DonneesCV> {
+/**
+ * @param offreId Offre pour laquelle le CV est composé. Les formulations
+ * adaptées à cette offre et validées prennent alors le pas sur les génériques.
+ */
+export async function chargerDonneesCV(
+  volet: CodeVolet,
+  offreId: string | null = null
+): Promise<DonneesCV> {
   const supabase = creerClientServeur();
   const autre: CodeVolet = volet === "cdg" ? "compta" : "cdg";
   const champVisible = volet === "cdg" ? "visible_cdg" : "visible_compta";
@@ -168,8 +192,10 @@ export async function chargerDonneesCV(volet: CodeVolet): Promise<DonneesCV> {
         .filter((m) => m.actif !== false)
         .map((m) => {
           const fs = (m.mission_formulations as Ligne[]) ?? [];
-          const native = formulationDuVolet(fs, volet);
-          const empruntable = native ? null : formulationDuVolet(fs, autre);
+          const native = formulationDuVolet(fs, volet, offreId);
+          const empruntable = native
+            ? null
+            : formulationDuVolet(fs, autre, offreId);
           const retenue = native ?? empruntable;
           if (!retenue) return null;
 
@@ -180,6 +206,7 @@ export async function chargerDonneesCV(volet: CodeVolet): Promise<DonneesCV> {
             texte: retenue.texte,
             voletFormulation: empruntee ? autre : volet,
             empruntee,
+            adaptee: retenue.adaptee,
             codes: (m.activites_codes as string[]) ?? [],
             contientChiffre: m.contient_chiffre === true,
             // La pertinence suit la formulation retenue : une mission

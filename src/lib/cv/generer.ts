@@ -4,8 +4,9 @@ import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { NIVEAUX, selectionner, type Selection } from "@/lib/cv/selection";
+import { choisirNiveau } from "@/lib/cv/compacite";
 import { construireModele, modeleEnTexte, type ModeleCV } from "@/lib/cv/modele";
-import { estimerHauteur, tientSurUnePage } from "@/lib/cv/encombrement";
+import { estimerHauteur } from "@/lib/cv/encombrement";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 
 export class ErreurCV extends Error {}
@@ -16,30 +17,6 @@ export interface CVGenere {
   modele: ModeleCV;
   pages: number;
   stocke: boolean;
-}
-
-/**
- * Choisit le niveau de compacité.
- *
- * On descend d'un cran tant que l'estimation annonce un débordement. Le
- * dernier niveau est retenu par défaut : la spécification impose une page,
- * pas un contenu complet.
- */
-function choisirNiveau(
-  donnees: Awaited<ReturnType<typeof chargerDonneesCV>>,
-  offre: OffreExtraite,
-  volet: CodeVolet
-): { selection: Selection; modele: ModeleCV } {
-  let dernier: { selection: Selection; modele: ModeleCV } | null = null;
-
-  for (const niveau of NIVEAUX) {
-    const selection = selectionner(donnees, offre, niveau);
-    const modele = construireModele(donnees, selection, volet);
-    dernier = { selection, modele };
-    if (tientSurUnePage(modele)) return dernier;
-  }
-
-  return dernier!;
 }
 
 /**
@@ -83,7 +60,8 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
 
   const analyse = (analyseBrute as { resultat: OffreExtraite }).resultat;
 
-  const donnees = await chargerDonneesCV(offre.volet);
+  // Les formulations validées pour cette offre priment sur les génériques.
+  const donnees = await chargerDonneesCV(offre.volet, offreId);
   if (donnees.experiences.length === 0) {
     throw new ErreurCV(
       `Aucune expérience n'est visible dans le volet ${offre.volet}. ` +

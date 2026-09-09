@@ -373,14 +373,22 @@ export default async function DetailOffre({
             </p>
           </div>
 
-          <form action={genererCV}>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/offre/${params.id}/formulations`}
+              className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+            >
+              Adapter les formulations
+            </Link>
+            <form action={genererCV}>
             <input type="hidden" name="id" value={params.id} />
             <BoutonSoumettre
               libelle={dernierCV ? "Régénérer le CV" : "Générer le CV"}
               libelleEnCours="Composition…"
               className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
-            />
-          </form>
+              />
+            </form>
+          </div>
         </div>
 
         {dernierCV && (
