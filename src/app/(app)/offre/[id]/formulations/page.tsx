@@ -70,24 +70,35 @@ export default async function Formulations({
 
   // L'original, c'est la formulation générique du volet : celle que le CV
   // emploierait sans adaptation.
+  // Sans restriction de volet : une mission empruntée à l'autre volet n'a pas
+  // de formulation générique dans celui-ci, et l'écran affichait « Remplace :
+  // — » au lieu du texte que la reformulation remplace réellement.
   const { data: originauxBruts } = await supabase
     .from("mission_formulations")
-    .select("mission_id, texte, validee, missions ( experiences ( entreprise ) )")
-    .eq("volet", offre.volet)
+    .select("mission_id, volet, texte, validee, missions ( experiences ( entreprise ) )")
     .is("offre_id", null)
     .in("mission_id", adaptees.map((a) => a.mission_id).concat("00000000-0000-0000-0000-000000000000"));
 
-  const originaux = new Map<string, { texte: string; entreprise: string }>();
+  const originaux = new Map<
+    string,
+    { texte: string; entreprise: string; empruntee: boolean }
+  >();
   for (const o of (originauxBruts ?? []) as unknown as {
     mission_id: string;
+    volet: CodeVolet;
     texte: string;
     validee: boolean;
     missions: { experiences: { entreprise: string } | null } | null;
   }[]) {
     if (!o.validee) continue;
+    // La formulation du volet courant l'emporte ; celle de l'autre volet ne
+    // sert que si la mission est empruntée.
+    const dejaVue = originaux.get(o.mission_id);
+    if (dejaVue && !dejaVue.empruntee) continue;
     originaux.set(o.mission_id, {
       texte: o.texte,
       entreprise: o.missions?.experiences?.entreprise ?? "",
+      empruntee: o.volet !== offre.volet,
     });
   }
 
@@ -140,9 +151,9 @@ export default async function Formulations({
           />
         </form>
         <p className="mt-2 text-xs text-ardoise-400">
-          Seule action payante du CV : un appel à Claude Haiku pour toutes les
-          missions retenues. Les propositions déjà validées ne sont pas
-          retouchées.
+          Seule action payante du CV : un appel à Claude Sonnet pour toutes les
+          missions retenues — de la rédaction, pas de l&apos;extraction. Les
+          propositions déjà validées ne sont pas retouchées.
         </p>
       </Carte>
 
@@ -331,16 +342,34 @@ export default async function Formulations({
                     <p className="text-sm text-ardoise-900">{f.texte}</p>
                     <p className="mt-1 text-xs text-ardoise-400">
                       Remplace : {originaux.get(f.mission_id)?.texte ?? "—"}
+                      {originaux.get(f.mission_id)?.empruntee && (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900">
+                          mission empruntée à l&apos;autre volet
+                        </span>
+                      )}
                     </p>
-                    <form action={adopterCommeReference} className="mt-3">
-                      <input type="hidden" name="offreId" value={params.id} />
-                      <input type="hidden" name="id" value={f.id} />
-                      <BoutonSoumettre
-                        libelle="Adopter comme formulation du volet"
-                        libelleEnCours="Adoption…"
-                        className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700"
-                      />
-                    </form>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <form action={adopterCommeReference}>
+                        <input type="hidden" name="offreId" value={params.id} />
+                        <input type="hidden" name="id" value={f.id} />
+                        <BoutonSoumettre
+                          libelle="Adopter comme formulation du volet"
+                          libelleEnCours="Adoption…"
+                          className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700"
+                        />
+                      </form>
+                      <form action={deciderFormulation}>
+                        <input type="hidden" name="offreId" value={params.id} />
+                        <input type="hidden" name="id" value={f.id} />
+                        <input type="hidden" name="action" value="retirer" />
+                        <BoutonSoumettre
+                          libelle="Retirer"
+                          libelleEnCours="Retrait…"
+                          className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700"
+                        />
+                      </form>
+                    </div>
                   </Carte>
                 ))}
               </div>

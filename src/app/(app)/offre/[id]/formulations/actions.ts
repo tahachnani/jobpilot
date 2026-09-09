@@ -51,7 +51,10 @@ export async function deciderFormulation(formData: FormData) {
 
   const supabase = creerClientServeur();
 
-  if (action === "refuser") {
+  // « retirer » vaut pour une formulation déjà validée : elle sort du CV et la
+  // formulation d'origine reprend sa place. Sans ce bouton, une reformulation
+  // acceptée à tort ne pouvait plus être défaite depuis l'application.
+  if (action === "refuser" || action === "retirer") {
     await supabase.from("mission_formulations").delete().eq("id", id);
   } else if (action === "accepter") {
     await supabase
