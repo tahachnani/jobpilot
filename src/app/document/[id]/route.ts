@@ -1,9 +1,24 @@
 import { creerClientServeur } from "@/lib/supabase/server";
 import { rendreDepuisSelection } from "@/lib/cv/generer";
+import { rendreLettre, type ModeleLettre } from "@/lib/lettre/document";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Extrait les octets d'un Buffer Node vers un ArrayBuffer autonome.
+ *
+ * Node alloue les Buffer dans un tampon mutualisé : `buffer.buffer` contient
+ * bien plus que les octets voulus. La découpe est donc nécessaire, et pas
+ * seulement pour satisfaire le typage.
+ */
+function enTamponSimple(donnees: Buffer): ArrayBuffer {
+  return donnees.buffer.slice(
+    donnees.byteOffset,
+    donnees.byteOffset + donnees.byteLength
+  ) as ArrayBuffer;
+}
 
 /** Retire accents et ponctuation pour composer un nom de fichier sobre. */
 function pourNomDeFichier(s: string): string {
@@ -39,6 +54,7 @@ export async function GET(
   }
 
   const doc = data as unknown as {
+    type: string;
     volet: CodeVolet;
     version: number;
     storage_path: string | null;
@@ -46,31 +62,38 @@ export async function GET(
     offres: { intitule: string | null; entreprise: string | null } | null;
   };
 
-  let octets: Uint8Array | null = null;
+  // Un ArrayBuffer plutôt qu'un Uint8Array : `Response` refuse
+  // `Uint8Array<ArrayBufferLike>`, dont le tampon pourrait en théorie être
+  // partagé. L'ArrayBuffer lève l'ambiguïté à la source.
+  let octets: ArrayBuffer | null = null;
 
   if (doc.storage_path) {
     const { data: fichier } = await supabase.storage
       .from("documents")
       .download(doc.storage_path);
-    if (fichier) octets = new Uint8Array(await fichier.arrayBuffer());
+    if (fichier) octets = await fichier.arrayBuffer();
   }
 
   // Repli : le fichier n'est pas dans le bucket, on recompose à partir du
   // modèle stocké. Le résultat est le même, la sélection étant figée.
   if (!octets) {
-    const recompose = await rendreDepuisSelection(doc.selection);
+    const stocke = doc.selection as { modele?: unknown } | null;
+    const recompose =
+      doc.type === "lettre" && stocke?.modele
+        ? await rendreLettre(stocke.modele as ModeleLettre)
+        : await rendreDepuisSelection(doc.selection);
     if (!recompose) {
       return new Response(
         "Le fichier est introuvable et ne peut pas être recomposé.",
         { status: 410 }
       );
     }
-    octets = new Uint8Array(recompose);
+    octets = enTamponSimple(recompose);
   }
 
   const nom = pourNomDeFichier(
     [
-      "CV_Taha_Chnani",
+      doc.type === "lettre" ? "Lettre_Taha_Chnani" : "CV_Taha_Chnani",
       VOLETS[doc.volet]?.nomCourt ?? doc.volet,
       doc.offres?.entreprise ?? doc.offres?.intitule ?? "",
       `v${doc.version}`,
@@ -81,7 +104,7 @@ export async function GET(
 
   const enPieceJointe = requete.nextUrl.searchParams.get("telecharger") === "1";
 
-  return new Response(octets.buffer as ArrayBuffer, {
+  return new Response(octets, {
     headers: {
       "content-type": "application/pdf",
       "content-disposition": `${

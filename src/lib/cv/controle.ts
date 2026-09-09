@@ -24,7 +24,7 @@ export const RALLONGEMENT_MAX = 1.2;
  * Tous les nombres d'un texte : « 18000 », « 5-10 % », « N/N-1 ».
  * On ne garde que la suite de chiffres, la ponctuation autour varie trop.
  */
-function nombres(texte: string): Set<string> {
+export function nombres(texte: string): Set<string> {
   const trouves = texte.match(/\d+(?:[.,]\d+)?/g) ?? [];
   return new Set(trouves.map((n) => n.replace(",", ".")));
 }
@@ -36,7 +36,7 @@ function nombres(texte: string): Set<string> {
  * ne commencent pas une phrase. Approximatif par construction — mais l'erreur
  * penche vers le rejet, ce qui est le bon sens de l'erreur.
  */
-function nomsPropres(texte: string): Set<string> {
+export function nomsPropres(texte: string): Set<string> {
   const mots = texte.split(/\s+/);
   const trouves = new Set<string>();
   let debutDePhrase = true;

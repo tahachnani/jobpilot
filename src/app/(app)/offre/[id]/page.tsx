@@ -492,12 +492,29 @@ export default async function DetailOffre({
         )}
       </Carte>
 
+      <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+        Lettre et email
+      </h2>
+
+      <Carte>
+        <p className="text-sm text-ardoise-600">
+          La lettre s&apos;appuie sur tout ton parcours, pas seulement sur ce
+          que le CV a pu contenir. L&apos;email de candidature est rédigé dans
+          la foulée.
+        </p>
+        <Link
+          href={`/offre/${params.id}/lettre`}
+          className={`mt-4 inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
+        >
+          Rédiger la lettre
+        </Link>
+      </Carte>
+
       <Carte className="mt-4 border-dashed">
         <p className="text-sm text-ardoise-500">
-          La lettre de motivation arrive à l&apos;étape 5, avec l&apos;accroche
-          personnalisée par offre. Le changement de statut et le bouton
-          « Marquer comme envoyée » arrivent à l&apos;étape 6 : générer un CV ne
-          modifie pas le statut de cette offre.
+          Le changement de statut et le bouton « Marquer comme envoyée »
+          arrivent à l&apos;étape 6 : générer un document ne modifie pas le
+          statut de cette offre.
         </p>
       </Carte>
     </>
