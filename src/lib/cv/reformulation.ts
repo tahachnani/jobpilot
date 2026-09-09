@@ -1,5 +1,5 @@
 import { creerClientServeur } from "@/lib/supabase/server";
-import { appelIA, ErreurIA, MODELE_EXTRACTION } from "@/lib/anthropic";
+import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
@@ -15,28 +15,34 @@ import { ErreurCV } from "@/lib/cv/generer";
  * sous les yeux de Taha. Rien n'entre dans un CV sans les deux.
  */
 
-const SYSTEME = `Tu adaptes le vocabulaire de missions de CV à une offre d'emploi précise.
+const SYSTEME = `Tu es un rédacteur de CV spécialisé en contrôle de gestion et en comptabilité. Tu adaptes des missions déjà vécues au vocabulaire et au contexte d'une offre précise.
 
-RÈGLE ABSOLUE : tu redis exactement la même chose avec les mots de l'annonce. Tu n'ajoutes JAMAIS :
+CE QUE TU PRODUIS
+Une phrase de professionnel du métier, pas une paraphrase molle. Concrètement :
+- un verbe d'action précis en tête, jamais "participé à" ni "contribué à" quand un verbe plus juste existe
+- le vocabulaire exact du secteur et de l'annonce : si l'offre dit "atterrissage", "OPEX", "réestimé", "clôture", emploie ces mots-là
+- le résultat ou l'objet avant la méthode : ce qui a été obtenu compte plus que l'outil employé
+- une syntaxe qui se lit d'une traite, sans enfilade de compléments
+- le registre de l'annonce : une PME industrielle et un bailleur social ne parlent pas pareil
+
+RÈGLE ABSOLUE
+Tu redis exactement la même chose. Tu n'ajoutes JAMAIS :
 - un chiffre, un pourcentage, un volume, une durée
 - un logiciel, un outil, un ERP, un sigle
 - une responsabilité, un périmètre, une taille d'équipe
 - une compétence ou une réalisation
 
-qui ne soit déjà présent dans la mission d'origine. Tu ne retires aucun chiffre non plus.
+qui ne soit déjà dans la mission d'origine. Tu ne retires aucun chiffre non plus. Une phrase plus flatteuse que la réalité est un mensonge sur un document signé : elle sera rejetée.
 
-Ce que tu peux faire, et rien d'autre :
-- remplacer un terme par le terme équivalent employé par l'annonce
-- réordonner la phrase pour mettre en avant ce que l'annonce réclame
-- remplacer une tournure vague par la formulation métier consacrée, à contenu identique
+Ce que tu peux faire : choisir de meilleurs mots, réordonner, remplacer une tournure vague par la formulation métier consacrée à contenu strictement identique.
 
-Contraintes de forme :
+FORME
 - français professionnel, une seule phrase par mission
-- longueur au plus égale à celle de l'original, jamais plus de 20 % au-dessus
-- pas de première personne, pas de superlatif, pas de "notamment" ni "activement"
+- longueur au plus égale à l'original, jamais plus de 20 % au-dessus
+- pas de première personne, pas de superlatif, ni "notamment", "activement", "rigoureux", "diverses"
 - conserve le temps grammatical de l'original
 
-Si une mission n'a rien à gagner à être reformulée, renvoie exactement le texte d'origine : il sera écarté.
+Si une mission n'a rien à gagner, renvoie exactement le texte d'origine : il sera écarté.
 
 Tu réponds UNIQUEMENT par un tableau JSON, sans préambule ni balises de code :
 [{"id": "<identifiant fourni>", "texte": "<reformulation>"}]`;
@@ -57,7 +63,7 @@ export interface ResultatReformulation {
 }
 
 /** Décrit l'offre au modèle, sans lui livrer l'annonce brute. */
-function contexteOffre(offre: OffreExtraite): string {
+function contexteOffre(offre: OffreExtraite, annonce: string | null): string {
   const missions = offre.missions
     .map((m) => `- ${m.texte} (importance ${m.importance})`)
     .join("\n");
@@ -65,7 +71,13 @@ function contexteOffre(offre: OffreExtraite): string {
     .map((c) => `- ${c.libelle} (${c.caractere})`)
     .join("\n");
 
+  // L'annonce brute en plus de l'analyse : l'extraction normalise le
+  // vocabulaire et perd les tournures exactes, précisément celles qu'il faut
+  // reprendre. Le ton, le secteur et le registre ne sont nulle part ailleurs.
+  const brute = (annonce ?? "").trim().slice(0, 8000);
+
   return [
+    brute ? `ANNONCE INTÉGRALE :\n${brute}\n` : "",
     "MISSIONS ATTENDUES PAR L'OFFRE :",
     missions || "- (aucune)",
     "",
@@ -74,7 +86,9 @@ function contexteOffre(offre: OffreExtraite): string {
     "",
     `OUTILS CITÉS : ${offre.outils.join(", ") || "(aucun)"}`,
     `MOTS-CLÉS ATS : ${offre.mots_cles_ats.join(", ") || "(aucun)"}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export async function reformulerPourOffre(
@@ -84,11 +98,15 @@ export async function reformulerPourOffre(
 
   const { data: offreBrute } = await supabase
     .from("offres")
-    .select("id, volet")
+    .select("id, volet, contenu_brut")
     .eq("id", offreId)
     .maybeSingle();
   if (!offreBrute) throw new ErreurCV("Offre introuvable.");
-  const offre = offreBrute as { id: string; volet: CodeVolet };
+  const offre = offreBrute as {
+    id: string;
+    volet: CodeVolet;
+    contenu_brut: string | null;
+  };
 
   const { data: analyseBrute } = await supabase
     .from("offre_analyses")
@@ -125,17 +143,17 @@ export async function reformulerPourOffre(
   }
 
   const message = [
-    contexteOffre(analyse),
+    contexteOffre(analyse, offre.contenu_brut),
     "",
     "MISSIONS À ADAPTER :",
     ...aTraiter.map((m) => `[${m.id}] ${m.texte}`),
   ].join("\n");
 
   const reponse = await appelIA({
-    modele: MODELE_EXTRACTION,
+    modele: MODELE_REDACTION,
     systeme: SYSTEME,
     message,
-    maxTokens: 3000,
+    maxTokens: 4000,
     tache: "reformulation_missions",
     offreId,
   });

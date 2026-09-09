@@ -124,3 +124,59 @@ export async function adopterCommeReference(formData: FormData) {
   revalidatePath("/profil");
   redirect(`/offre/${offreId}/formulations?etat=adoptee`);
 }
+
+/**
+ * Réponse à une compétence réclamée par l'offre et absente de la base.
+ *
+ * « Je la maîtrise » l'ajoute au profil avec le niveau choisi : elle servira
+ * dès lors à toutes les offres, pas seulement à celle-ci. « Je ne la maîtrise
+ * pas » l'enregistre au niveau zéro et invisible — elle ne paraîtra sur aucun
+ * CV et ne sera plus reproposée.
+ *
+ * Dans les deux cas c'est Taha qui répond. L'offre ne décide jamais de ce
+ * qu'il sait faire.
+ */
+export async function repondreCompetence(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  const libelle = String(formData.get("libelle") ?? "").trim();
+  const action = String(formData.get("action") ?? "");
+  const categorie = String(formData.get("categorie") ?? "transversale");
+  const niveau = Number(formData.get("niveau") ?? 2);
+  if (!offreId || !libelle) return;
+
+  const supabase = creerClientServeur();
+
+  const { data: offre } = await supabase
+    .from("offres")
+    .select("volet")
+    .eq("id", offreId)
+    .maybeSingle();
+  const volet = (offre as { volet: string } | null)?.volet ?? "cdg";
+
+  const maitrisee = action === "maitrisee";
+
+  const codeNormalise = libelle
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+
+  await supabase.from("competences").insert({
+    libelle,
+    code_normalise: codeNormalise,
+    categorie,
+    niveau: maitrisee ? Math.min(3, Math.max(1, niveau)) : 0,
+    // Une compétence non maîtrisée reste en base uniquement pour ne plus être
+    // reproposée. Invisible dans les deux volets, elle n'atteint aucun CV.
+    visible_cdg: maitrisee && volet === "cdg",
+    visible_compta: maitrisee && volet === "compta",
+    ordre: 900,
+    origine: "offre",
+  });
+
+  revalidatePath(`/offre/${offreId}/formulations`);
+  revalidatePath("/profil");
+  redirect(`/offre/${offreId}/formulations?etat=competence`);
+}

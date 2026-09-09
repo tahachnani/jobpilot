@@ -6,7 +6,10 @@ import {
   adopterCommeReference,
   deciderFormulation,
   lancerReformulation,
+  repondreCompetence,
 } from "./actions";
+import { competencesManquantes } from "@/lib/cv/competences-manquantes";
+import type { OffreExtraite } from "@/lib/extraction-offre";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -42,6 +45,20 @@ export default async function Formulations({
     entreprise: string | null;
   };
   const volet = VOLETS[offre.volet];
+
+  // Ce que l'offre réclame et que la base ne connaît pas encore.
+  const { data: analyseBrute } = await supabase
+    .from("offre_analyses")
+    .select("resultat")
+    .eq("offre_id", params.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const analyse = (analyseBrute as { resultat: OffreExtraite } | null)?.resultat;
+  const manquantes = analyse
+    ? await competencesManquantes(analyse, offre.volet)
+    : [];
 
   const { data: adapteesBrutes } = await supabase
     .from("mission_formulations")
@@ -128,6 +145,87 @@ export default async function Formulations({
           retouchées.
         </p>
       </Carte>
+
+      {manquantes.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+            Réclamé par l&apos;offre, absent de ton profil ({manquantes.length})
+          </h2>
+          <Carte>
+            <p className="mb-4 text-sm text-ardoise-600">
+              Ces compétences apparaissent dans l&apos;annonce mais nulle part
+              dans ta base. Si tu les maîtrises, ajoute-les : elles serviront à
+              toutes tes offres, pas seulement à celle-ci. Sinon, écarte-les et
+              elles ne reviendront plus. L&apos;application n&apos;en ajoute
+              jamais d&apos;elle-même.
+            </p>
+
+            <div className="space-y-4">
+              {manquantes.map((c) => (
+                <form
+                  key={c.libelle}
+                  action={repondreCompetence}
+                  className="border-t border-ardoise-100 pt-3"
+                >
+                  <input type="hidden" name="offreId" value={params.id} />
+                  <input type="hidden" name="libelle" value={c.libelle} />
+
+                  <p className="text-sm font-medium text-ardoise-800">
+                    {c.libelle}
+                    <span className="ml-2 text-xs font-normal text-ardoise-400">
+                      {c.origine === "indispensable"
+                        ? "exigée par l'offre"
+                        : c.origine === "outil"
+                        ? "outil cité"
+                        : "souhaitée"}
+                    </span>
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <select
+                      name="categorie"
+                      defaultValue={c.categorieSuggeree}
+                      className="rounded-lg border border-ardoise-300 px-2 py-1.5 text-xs"
+                    >
+                      <option value="cdg">Contrôle de gestion</option>
+                      <option value="compta">Comptabilité</option>
+                      <option value="outil">Outil / logiciel</option>
+                      <option value="transversale">Transversale</option>
+                    </select>
+
+                    <select
+                      name="niveau"
+                      defaultValue="2"
+                      className="rounded-lg border border-ardoise-300 px-2 py-1.5 text-xs"
+                    >
+                      <option value="1">Notions</option>
+                      <option value="2">Opérationnel</option>
+                      <option value="3">Maîtrisé</option>
+                    </select>
+
+                    <button
+                      type="submit"
+                      name="action"
+                      value="maitrisee"
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white ${volet.classeAccent}`}
+                    >
+                      Je la maîtrise
+                    </button>
+                    <button
+                      type="submit"
+                      name="action"
+                      value="ecartee"
+                      className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700"
+                    >
+                      Non, écarter
+                    </button>
+                  </div>
+                </form>
+              ))}
+            </div>
+          </Carte>
+        </section>
+      )}
 
       {adaptees.length === 0 ? (
         <EtatVide
