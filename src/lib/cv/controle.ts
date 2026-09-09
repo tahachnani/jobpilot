@@ -56,6 +56,28 @@ function nomsPropres(texte: string): Set<string> {
 }
 
 /**
+ * Une mission qui commençait par un participe passé ne doit pas commencer par
+ * un substantif.
+ *
+ * « Piloté les KPI » vaut mieux que « Pilotage des KPI » sur un CV : le verbe
+ * dit ce qui a été fait, le substantif décrit un domaine. Le modèle nominalise
+ * spontanément ; on le lui interdit par le calcul.
+ *
+ * Les missions dont l'original est déjà nominal ne sont pas concernées.
+ */
+function nominalise(original: string, proposition: string): boolean {
+  const premier = (t: string) =>
+    normaliser(t.trim().split(/\s+/)[0] ?? "");
+  const o = premier(original);
+  const p = premier(proposition);
+  if (!o || !p) return false;
+
+  const participePasse = /(e|es|is|it|u|us)$/.test(o) && o.length > 3;
+  const substantif = /(tion|sion|ment|age|ance|ence|ure)$/.test(p);
+  return participePasse && substantif;
+}
+
+/**
  * Vérifie qu'une proposition n'ajoute ni ne retire de fait par rapport à
  * l'original.
  *
@@ -99,11 +121,24 @@ export function controler(
   }
 
   const propresOriginal = nomsPropres(original);
-  const propresAjoutes = [...nomsPropres(texte)].filter(
+  const propresProposition = nomsPropres(texte);
+
+  const propresAjoutes = [...propresProposition].filter(
     (m) => !propresOriginal.has(m)
   );
   if (propresAjoutes.length > 0) {
     motifs.push(`Nom propre absent de l'original : ${propresAjoutes.join(", ")}.`);
+  }
+
+  // Le contrôle doit être symétrique. La première version ne surveillait que
+  // les ajouts, et laissait passer « les KPI destinés au CODIR » devenu
+  // « les indicateurs destinés au management » : deux sigles effacés, soit
+  // exactement les termes qu'un analyseur de CV cherche.
+  const propresPerdus = [...propresOriginal].filter(
+    (m) => !propresProposition.has(m)
+  );
+  if (propresPerdus.length > 0) {
+    motifs.push(`Sigle ou nom propre de l'original perdu : ${propresPerdus.join(", ")}.`);
   }
 
   // Un outil peut se glisser sans majuscule ; on le cherche nommément.
@@ -118,6 +153,24 @@ export function controler(
     );
   if (outilsGlisses.length > 0) {
     motifs.push(`Outil absent de l'original : ${outilsGlisses.join(", ")}.`);
+  }
+
+  const outilsPerdus = outilsConnus
+    .map(normaliser)
+    .filter((o) => o.length >= 3)
+    .filter(
+      (o) =>
+        normalisedOriginal.includes(o) && !normalisedProposition.includes(o)
+    );
+  if (outilsPerdus.length > 0) {
+    motifs.push(`Outil de l'original perdu : ${outilsPerdus.join(", ")}.`);
+  }
+
+  if (nominalise(original, texte)) {
+    motifs.push(
+      "Le verbe d'action initial est devenu un substantif : " +
+        "« Piloté » ne doit pas devenir « Pilotage »."
+    );
   }
 
   return { accepte: motifs.length === 0, motifs };

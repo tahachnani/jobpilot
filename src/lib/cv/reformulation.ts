@@ -34,6 +34,13 @@ Tu redis exactement la même chose. Tu n'ajoutes JAMAIS :
 
 qui ne soit déjà dans la mission d'origine. Tu ne retires aucun chiffre non plus. Une phrase plus flatteuse que la réalité est un mensonge sur un document signé : elle sera rejetée.
 
+Tu ne RETIRES rien non plus :
+- tous les sigles et noms propres de l'original doivent se retrouver dans ta phrase : KPI reste KPI, CODIR reste CODIR, ULIS reste ULIS. Ne les remplace jamais par un terme générique.
+- tu ne supprimes aucun élément d'une énumération : "par période, agence et catégorie" garde ses trois termes
+- tu ne supprimes aucun qualificatif de périmètre : "coûts de production" ne devient pas "coûts", "management opérationnel" ne devient pas "management"
+
+Tu ne NOMINALISES pas. Si l'original commence par un participe passé, ta phrase aussi : "Piloté" ne devient pas "Pilotage", "Optimisé" ne devient pas "Optimisation". Si l'original est déjà nominal, garde-le nominal.
+
 Ce que tu peux faire : choisir de meilleurs mots, réordonner, remplacer une tournure vague par la formulation métier consacrée à contenu strictement identique.
 
 FORME
