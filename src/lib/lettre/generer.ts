@@ -70,6 +70,20 @@ export interface ResultatLettre {
   coutUsd: number;
 }
 
+/**
+ * Isole l'objet JSON d'une réponse.
+ *
+ * On prend de la première accolade à la dernière, au lieu de retirer des
+ * balises de code : le modèle peut préfixer une phrase, changer de balisage,
+ * ou n'en mettre aucun. Chercher les accolades survit à ces variations.
+ */
+function extraireJson(texte: string): string {
+  const debut = texte.indexOf("{");
+  const fin = texte.lastIndexOf("}");
+  if (debut === -1 || fin <= debut) return texte.trim();
+  return texte.slice(debut, fin + 1);
+}
+
 function nettoyer(parties: (string | null | undefined)[], sep: string) {
   return parties
     .map((p) => (p ?? "").trim())
@@ -242,7 +256,11 @@ export async function genererLettrePourOffre(
     modele: MODELE_REDACTION,
     systeme: SYSTEME,
     message,
-    maxTokens: 3000,
+    // Une lettre de quatre paragraphes et un email, en JSON avec ses
+    // échappements, dépassent largement 3000 jetons : la réponse était coupée
+    // en plein milieu et le JSON illisible. Le premier essai a coûté deux
+    // appels facturés pour rien.
+    maxTokens: 8000,
     tache: "lettre_motivation",
     offreId,
   });
@@ -257,14 +275,15 @@ export async function genererLettrePourOffre(
     email: { objet: string; corps: string };
   };
   try {
-    const nettoye = reponse.texte
-      .trim()
-      .replace(/^```(?:json)?|```$/g, "")
-      .trim();
-    brut = JSON.parse(nettoye);
+    brut = JSON.parse(extraireJson(reponse.texte));
     if (!brut.lettre?.paragraphes?.length) throw new Error("format");
   } catch {
-    throw new ErreurIA("La réponse du modèle n'était pas exploitable. Réessaie.");
+    // Le début de la réponse brute est remonté : sans lui, il faut aller
+    // fouiller les journaux pour comprendre, comme cela s'est produit.
+    throw new ErreurIA(
+      "La réponse du modèle n'était pas exploitable. Début reçu : " +
+        reponse.texte.trim().slice(0, 200)
+    );
   }
 
   const p = parcours.profil;
