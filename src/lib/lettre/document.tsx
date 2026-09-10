@@ -49,11 +49,17 @@ const styles = StyleSheet.create({
   },
   entetes: { flexDirection: "row", justifyContent: "space-between" },
   colonne: { width: "45%" },
-  ligne: { lineHeight: 1.3 },
-  nom: { fontFamily: "Helvetica-Bold", lineHeight: 1.3 },
-  lieuDate: { marginTop: 28, textAlign: "right" },
-  objet: { marginTop: 28, fontFamily: "Helvetica-Bold" },
-  appel: { marginTop: 22 },
+
+  // Aucune surcharge d'interligne : React-PDF résout mal un `lineHeight`
+  // propre à un bloc quand la page en porte un autre — l'en-tête sortait à
+  // 23 pt par ligne là où le corps est à 14,5. On resserre par la taille de
+  // police, pas par l'interligne.
+  ligne: { fontSize: 9.5 },
+  colonneDroite: { width: "45%", textAlign: "right" },
+
+  lieuDate: { marginTop: 22, textAlign: "right" },
+  objet: { marginTop: 24, fontFamily: "Helvetica-Bold" },
+  appel: { marginTop: 20 },
   paragraphe: { marginTop: 12, textAlign: "justify" },
   politesse: { marginTop: 18, textAlign: "justify" },
   signature: { marginTop: 26, textAlign: "right", color: ENCRE_DOUCE },
@@ -71,14 +77,14 @@ export function DocumentLettre({ modele }: { modele: ModeleLettre }) {
         <View style={styles.entetes}>
           <View style={styles.colonne}>
             {modele.expediteur.map((l, i) => (
-              <Text key={i} style={i === 0 ? styles.nom : styles.ligne}>
+              <Text key={i} style={styles.ligne}>
                 {l}
               </Text>
             ))}
           </View>
-          <View style={styles.colonne}>
+          <View style={styles.colonneDroite}>
             {modele.destinataire.map((l, i) => (
-              <Text key={i} style={i === 0 ? styles.nom : styles.ligne}>
+              <Text key={i} style={styles.ligne}>
                 {l}
               </Text>
             ))}
