@@ -26,6 +26,9 @@ const SYSTEME = `Tu rédiges une lettre de motivation et un email de candidature
 CE QUE TU PEUX INVENTER
 L'intérêt pour l'entreprise, le secteur, le poste, le projet professionnel. Aucune donnée ne les porte, c'est à toi de les écrire — à partir de ce que dit l'annonce, et de rien d'autre.
 
+LA DATE
+La date du jour t'est donnée. Tu en tires les temps : une expérience achevée se raconte au passé, jamais au présent. N'écris jamais "actuellement en poste" pour un contrat déjà terminé. Déduis la disponibilité de la date du jour et de la fin du dernier contrat.
+
 CE QUE TU NE PEUX PAS INVENTER
 - aucun chiffre, volume, pourcentage, durée qui ne soit dans le parcours fourni
 - aucun employeur, école, diplôme, logiciel, outil, certification qui n'y soit
@@ -33,11 +36,14 @@ CE QUE TU NE PEUX PAS INVENTER
 - aucun trait de caractère présenté comme démontré par un fait absent
 
 CE QUE TU PRODUIS
-Une lettre de trois à quatre paragraphes, une page maximum :
-1. pourquoi cette offre et cette entreprise, à partir de l'annonce
-2. ce que le parcours apporte de précis à ces missions-là, avec un ou deux faits tirés du parcours
-3. ce qui distingue le candidat : un angle, une expérience, une double compétence
-4. optionnellement, disponibilité et projet
+Une lettre de quatre paragraphes, une page maximum, qui progresse. Elle ne commence JAMAIS par "Votre annonce", "Votre offre" ni par une description de l'entreprise : on se présente avant de commenter autrui.
+
+1. QUI EST LE CANDIDAT, et pourquoi ce poste précisément. Une phrase d'ouverture qui pose le profil — formation, ancrage métier, situation — puis le lien avec le poste visé. On part de soi, on arrive à l'offre.
+2. CE QUE LE PARCOURS APPORTE à ces missions-là, avec deux faits précis tirés des expériences. C'est le cœur, le paragraphe le plus dense.
+3. CE QUI DISTINGUE : un angle, une double compétence, une expérience que d'autres candidats n'auront pas. C'est ici que la lettre dit ce que le CV ne peut pas dire.
+4. DISPONIBILITÉ ET PROJET, bref, tourné vers la suite.
+
+Chaque paragraphe doit être plus engageant que le précédent. Le dernier appelle un entretien sans le quémander.
 
 Exigences de fond :
 - pas de généralités interchangeables : chaque phrase doit être invalide pour une autre offre
@@ -232,7 +238,20 @@ export async function genererLettrePourOffre(
 
   const parcours = await contexteParcours(offre.volet);
 
+  // Sans la date du jour, le modèle a écrit « actuellement en poste jusqu'en
+  // juin 2026 » trois mois après la fin du contrat. Il ne pouvait pas le
+  // savoir : rien ne le lui disait.
+  const aujourdhui = new Date().toLocaleDateString("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   const message = [
+    `DATE DU JOUR : ${aujourdhui}`,
+    "",
     `ANNONCE INTÉGRALE :\n${(offre.contenu_brut ?? "").slice(0, 8000)}`,
     "",
     `POSTE VISÉ : ${offre.intitule ?? ""} chez ${offre.entreprise ?? ""}`,
@@ -297,15 +316,24 @@ export async function genererLettrePourOffre(
       p.telephone ?? "",
       p.email ?? "",
     ].filter(Boolean),
+    // Sans nom d'entreprise, on adresse le service plutôt que la ville : une
+    // lettre dont l'en-tête ne portait que « Troyes » ne ressemblait à rien.
     destinataire: [
-      offre.entreprise ?? "",
+      offre.entreprise?.trim() || "Service recrutement",
       offre.contact_nom ?? "",
       offre.contact_adresse ?? "",
       ville,
     ].filter(Boolean),
+    // Fuseau explicite : le serveur travaille en UTC, et une lettre rédigée
+    // après minuit affichait la veille.
     lieuDate: `${villeExpediteur || "France"}, le ${new Date().toLocaleDateString(
       "fr-FR",
-      { day: "numeric", month: "long", year: "numeric" }
+      {
+        timeZone: "Europe/Paris",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }
     )}`,
     objet: brut.lettre.objet,
     // Si le destinataire est connu, on s'adresse à lui ; sinon la formule
@@ -427,4 +455,92 @@ export async function enregistrerLettreCorrigee(
       storage_path: chemin,
     })
     .eq("id", documentId);
+}
+
+const SYSTEME_EMAIL = `Tu rédiges l'email qui accompagne une candidature déjà rédigée.
+
+Cinq à huit lignes, sobres. Il annonce la candidature et les pièces jointes, donne une raison de lire la lettre, sans la répéter ni la résumer. Aucun fait qui ne soit dans la lettre fournie.
+
+Registre professionnel français, vouvoiement, pas de "n'hésitez pas", pas de superlatif.
+
+Tu réponds UNIQUEMENT par un objet JSON :
+{"objet": "...", "corps": "..."}`;
+
+/**
+ * Réécrit le seul email, sans retoucher la lettre.
+ *
+ * Souvent la lettre convient et l'email tombe à côté. Tout régénérer coûterait
+ * un appel complet et ferait perdre une lettre validée.
+ */
+export async function regenererEmailPourOffre(offreId: string): Promise<void> {
+  const supabase = creerClientServeur();
+
+  const { data: offreBrute } = await supabase
+    .from("offres")
+    .select("volet, intitule, entreprise")
+    .eq("id", offreId)
+    .maybeSingle();
+  if (!offreBrute) throw new ErreurCV("Offre introuvable.");
+  const offre = offreBrute as {
+    volet: CodeVolet;
+    intitule: string | null;
+    entreprise: string | null;
+  };
+
+  const { data: lettreBrute } = await supabase
+    .from("documents")
+    .select("contenu_texte, version")
+    .eq("offre_id", offreId)
+    .eq("type", "lettre")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const lettre = lettreBrute as { contenu_texte: string; version: number } | null;
+  if (!lettre) {
+    throw new ErreurCV("Rédige d'abord la lettre : l'email s'appuie dessus.");
+  }
+
+  const reponse = await appelIA({
+    modele: MODELE_REDACTION,
+    systeme: SYSTEME_EMAIL,
+    message: [
+      `POSTE : ${offre.intitule ?? ""} chez ${offre.entreprise ?? "l'entreprise"}`,
+      "",
+      "LETTRE JOINTE :",
+      lettre.contenu_texte,
+    ].join("\n"),
+    maxTokens: 1200,
+    tache: "email_candidature",
+    offreId,
+  });
+
+  let email: { objet: string; corps: string };
+  try {
+    email = JSON.parse(extraireJson(reponse.texte));
+    if (!email.corps) throw new Error("format");
+  } catch {
+    throw new ErreurIA(
+      "La réponse du modèle n'était pas exploitable. Début reçu : " +
+        reponse.texte.trim().slice(0, 200)
+    );
+  }
+
+  const { data: derniere } = await supabase
+    .from("documents")
+    .select("version")
+    .eq("offre_id", offreId)
+    .eq("type", "email")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase.from("documents").insert({
+    offre_id: offreId,
+    type: "email",
+    volet: offre.volet,
+    version: ((derniere as { version: number } | null)?.version ?? 0) + 1,
+    contenu_texte: `${email.objet}\n\n${email.corps}`,
+    selection: { email },
+    cout_usd: reponse.coutUsd,
+  });
 }

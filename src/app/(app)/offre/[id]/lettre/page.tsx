@@ -4,7 +4,13 @@ import { VOLETS, type CodeVolet } from "@/config/volets";
 import { creerClientServeur } from "@/lib/supabase/server";
 import type { ModeleLettre } from "@/lib/lettre/document";
 import type { Ancrage } from "@/lib/lettre/ancrage";
-import { corrigerLettre, genererLettre } from "./actions";
+import {
+  corrigerLettre,
+  enregistrerContact,
+  genererLettre,
+  regenererEmail,
+} from "./actions";
+import BoutonCopier from "@/components/BoutonCopier";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -21,7 +27,7 @@ export default async function Lettre({
 
   const { data: offreBrute } = await supabase
     .from("offres")
-    .select("id, volet, intitule, entreprise, contact_nom")
+    .select("id, volet, intitule, entreprise, contact_nom, contact_adresse")
     .eq("id", params.id)
     .maybeSingle();
   if (!offreBrute) notFound();
@@ -31,6 +37,7 @@ export default async function Lettre({
     intitule: string | null;
     entreprise: string | null;
     contact_nom: string | null;
+    contact_adresse: string | null;
   };
   const volet = VOLETS[offre.volet];
 
@@ -91,6 +98,19 @@ export default async function Lettre({
           <p className="text-sm text-emerald-900">{searchParams.message}</p>
         </Carte>
       )}
+      {searchParams.etat === "contact" && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">
+            Destinataire enregistré. Rédige une nouvelle version pour qu&apos;il
+            apparaisse.
+          </p>
+        </Carte>
+      )}
+      {searchParams.etat === "email" && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">Email réécrit.</p>
+        </Carte>
+      )}
       {searchParams.etat === "corrigee" && (
         <Carte className="mb-4 border-emerald-200 bg-emerald-50">
           <p className="text-sm text-emerald-900">
@@ -98,6 +118,46 @@ export default async function Lettre({
           </p>
         </Carte>
       )}
+
+      <Carte className="mb-4">
+        <details open={!offre.entreprise}>
+          <summary className="cursor-pointer text-sm font-medium text-ardoise-700">
+            Destinataire de la lettre
+          </summary>
+          <p className="mt-2 text-xs text-ardoise-500">
+            Facultatif, mais une lettre nommément adressée se remarque. Sans
+            nom d&apos;entreprise, l&apos;en-tête indique « Service recrutement »
+            et la formule d&apos;appel reste générique.
+          </p>
+          <form action={enregistrerContact} className="mt-3 space-y-2">
+            <input type="hidden" name="offreId" value={params.id} />
+            <input
+              name="entreprise"
+              defaultValue={offre.entreprise ?? ""}
+              placeholder="Nom de l'entreprise"
+              className="w-full rounded-lg border border-ardoise-300 px-3 py-2 text-sm"
+            />
+            <input
+              name="contactNom"
+              defaultValue={offre.contact_nom ?? ""}
+              placeholder="Destinataire — Madame Dupont, Responsable RH"
+              className="w-full rounded-lg border border-ardoise-300 px-3 py-2 text-sm"
+            />
+            <textarea
+              name="contactAdresse"
+              defaultValue={offre.contact_adresse ?? ""}
+              placeholder="Adresse postale"
+              rows={2}
+              className="w-full rounded-lg border border-ardoise-300 px-3 py-2 text-sm"
+            />
+            <BoutonSoumettre
+              libelle="Enregistrer le destinataire"
+              libelleEnCours="Enregistrement…"
+              className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700"
+            />
+          </form>
+        </details>
+      </Carte>
 
       <Carte className="mb-6">
         <p className="text-sm text-ardoise-600">
@@ -208,9 +268,22 @@ export default async function Lettre({
               <p className="mt-2 whitespace-pre-wrap text-sm text-ardoise-700">
                 {email.corps}
               </p>
-              <p className="mt-3 text-xs text-ardoise-400">
-                Il annonce les pièces jointes sans redire la lettre.
-                Sélectionne le texte pour le copier dans ton client mail.
+              <div className="mt-4 flex flex-wrap gap-2">
+                <BoutonCopier
+                  texte={`${email.objet}\n\n${email.corps}`}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${volet.classeAccent}`}
+                />
+                <form action={regenererEmail}>
+                  <input type="hidden" name="offreId" value={params.id} />
+                  <BoutonSoumettre
+                    libelle="Réécrire l'email"
+                    libelleEnCours="Rédaction…"
+                    className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700"
+                  />
+                </form>
+              </div>
+              <p className="mt-2 text-xs text-ardoise-400">
+                Réécrire l&apos;email ne touche pas à la lettre.
               </p>
             </Carte>
           )}

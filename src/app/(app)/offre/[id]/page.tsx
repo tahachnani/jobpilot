@@ -106,18 +106,21 @@ export default async function DetailOffre({
         .maybeSingle(),
       supabase
         .from("documents")
-        .select("id, version, created_at, selection")
+        .select("id, version, created_at, selection, type")
         .eq("offre_id", params.id)
-        .eq("type", "cv")
+        .in("type", ["cv", "lettre"])
         .order("version", { ascending: false }),
     ]);
 
-  const cvs = ((cvBruts ?? []) as {
+  const tousDocuments = (cvBruts ?? []) as {
     id: string;
     version: number;
     created_at: string;
+    type: string;
     selection: { modele?: ModeleCV; pages?: number } | null;
-  }[]).map((d) => ({
+  }[];
+
+  const cvs = tousDocuments.filter((d) => d.type === "cv").map((d) => ({
     id: d.id,
     version: d.version,
     date: new Date(d.created_at).toLocaleDateString("fr-FR", {
@@ -132,6 +135,9 @@ export default async function DetailOffre({
   }));
 
   const dernierCV = cvs[0] ?? null;
+
+  const lettres = tousDocuments.filter((d) => d.type === "lettre");
+  const derniereLettre = lettres[0] ?? null;
 
   const score = (scoreBrut as { detail: Resultat } | null)?.detail ?? null;
   const analyse =
@@ -497,17 +503,52 @@ export default async function DetailOffre({
       </h2>
 
       <Carte>
-        <p className="text-sm text-ardoise-600">
+        <p className="text-sm font-medium text-ardoise-800">
+          {derniereLettre
+            ? `Version ${derniereLettre.version} rédigée le ${new Date(
+                derniereLettre.created_at
+              ).toLocaleDateString("fr-FR", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}`
+            : "Aucune lettre rédigée pour cette offre"}
+        </p>
+        <p className="mt-1 text-sm text-ardoise-500">
           La lettre s&apos;appuie sur tout ton parcours, pas seulement sur ce
           que le CV a pu contenir. L&apos;email de candidature est rédigé dans
           la foulée.
         </p>
-        <Link
-          href={`/offre/${params.id}/lettre`}
-          className={`mt-4 inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
-        >
-          Rédiger la lettre
-        </Link>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href={`/offre/${params.id}/lettre`}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
+          >
+            {derniereLettre ? "Relire et corriger" : "Rédiger la lettre"}
+          </Link>
+
+          {derniereLettre && (
+            <>
+              <a
+                href={`/document/${derniereLettre.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+              >
+                Ouvrir le PDF
+              </a>
+              <a
+                href={`/document/${derniereLettre.id}?telecharger=1`}
+                className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+              >
+                Télécharger
+              </a>
+            </>
+          )}
+        </div>
       </Carte>
 
       <Carte className="mt-4 border-dashed">

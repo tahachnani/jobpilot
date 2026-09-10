@@ -5,7 +5,9 @@ import { ErreurIA } from "@/lib/anthropic";
 import {
   enregistrerLettreCorrigee,
   genererLettrePourOffre,
+  regenererEmailPourOffre,
 } from "@/lib/lettre/generer";
+import { creerClientServeur } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -60,4 +62,46 @@ export async function corrigerLettre(formData: FormData) {
 
   revalidatePath(`/offre/${offreId}/lettre`);
   redirect(`/offre/${offreId}/lettre?etat=corrigee`);
+}
+
+/** Enregistre le destinataire et l'adresse, quand ils sont connus. */
+export async function enregistrerContact(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  if (!offreId) return;
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({
+      contact_nom: String(formData.get("contactNom") ?? "").trim() || null,
+      contact_adresse: String(formData.get("contactAdresse") ?? "").trim() || null,
+      entreprise: String(formData.get("entreprise") ?? "").trim() || null,
+    })
+    .eq("id", offreId);
+
+  revalidatePath(`/offre/${offreId}/lettre`);
+  redirect(`/offre/${offreId}/lettre?etat=contact`);
+}
+
+/** Réécrit le seul email, la lettre restant en l'état. */
+export async function regenererEmail(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  if (!offreId) return;
+
+  try {
+    await regenererEmailPourOffre(offreId);
+  } catch (e) {
+    const message =
+      e instanceof ErreurCV || e instanceof ErreurIA
+        ? e.message
+        : `La rédaction de l'email a échoué : ${e instanceof Error ? e.message : String(e)}`;
+    redirect(
+      `/offre/${offreId}/lettre?etat=erreur&message=${encodeURIComponent(
+        message.slice(0, 300)
+      )}`
+    );
+  }
+
+  revalidatePath(`/offre/${offreId}/lettre`);
+  redirect(`/offre/${offreId}/lettre?etat=email`);
 }
