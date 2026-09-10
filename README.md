@@ -9,9 +9,9 @@ formulations et des visibilités propres à chacun.
 
 ---
 
-## État du projet — Étape 4 sur 6
+## État du projet — Étape 5 sur 6
 
-L'étape 4 livre la génération des CV personnalisés.
+Les étapes 4 et 5 livrent la génération des CV, des lettres et des emails.
 
 ### En place
 
@@ -26,6 +26,10 @@ L'étape 4 livre la génération des CV personnalisés.
 - **Génération de CV en React-PDF** : sélection déterministe des missions,
   emprunts encadrés à l'autre volet, une seule page garantie, versions
   empilées et conservées
+- **Reformulation des missions par offre**, sous contrôle arithmétique et
+  validation ligne par ligne
+- **Lettre de motivation et email de candidature**, avec contrôle d'ancrage de
+  chaque fait avancé
 
 ### À venir
 
