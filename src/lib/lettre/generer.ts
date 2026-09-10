@@ -29,7 +29,9 @@ L'intérêt pour l'entreprise, le secteur, le poste, le projet professionnel. Au
 LA DATE ET LA DISPONIBILITÉ
 La date du jour t'est donnée. Tu en tires les temps : une expérience achevée se raconte au passé, jamais au présent. N'écris jamais "actuellement en poste" pour un contrat déjà terminé.
 
-Pour la disponibilité, écris "disponible immédiatement" si le dernier contrat est terminé. N'écris pas "disponible depuis la fin de mon contrat en juin" : c'est vrai, mais cela met en avant l'intervalle écoulé sans rien apporter. Si un contrat est en cours, donne sa date de fin.
+Pour la disponibilité, si le dernier contrat est terminé, tu écris exactement l'idée "disponible immédiatement" et RIEN D'AUTRE sur le sujet. La phrase de disponibilité ne nomme ni la date de fin du dernier contrat, ni son employeur, ni sa nature. Interdit : "Mon CDD chez X s'est achevé en juin 2026, je suis disponible immédiatement." Attendu : "Disponible immédiatement, je ...". La date de fin figure sur le CV ; la répéter dans la lettre ne fait que souligner l'intervalle écoulé.
+
+Si un contrat est en cours, alors seulement tu donnes sa date de fin.
 
 À VÉRITÉ ÉGALE, CHOISIS LA FORMULATION QUI SERT
 Quand plusieurs façons de dire sont également exactes, retiens celle qui sert la candidature. Taire un détail sans intérêt n'est pas mentir ; l'inventer, si.
