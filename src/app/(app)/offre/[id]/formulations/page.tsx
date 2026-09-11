@@ -9,6 +9,7 @@ import {
   repondreCompetence,
 } from "./actions";
 import { competencesManquantes } from "@/lib/cv/competences-manquantes";
+import { LIBELLES_POTENTIEL, type Potentiel } from "@/lib/cv/ecart";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -59,6 +60,19 @@ export default async function Formulations({
   const manquantes = analyse
     ? await competencesManquantes(analyse, offre.volet)
     : [];
+
+  // Le potentiel calculé au dernier CV : il dit si payer une reformulation
+  // vaut la peine, avant de cliquer.
+  const { data: cvBrut } = await supabase
+    .from("documents")
+    .select("selection")
+    .eq("offre_id", params.id)
+    .eq("type", "cv")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const potentiel = (cvBrut as { selection: { potentiel?: Potentiel } } | null)
+    ?.selection?.potentiel;
 
   const { data: adapteesBrutes } = await supabase
     .from("mission_formulations")
@@ -138,6 +152,34 @@ export default async function Formulations({
           le font, avant même de te les montrer. Rien n&apos;entre dans un CV
           sans ton accord.
         </p>
+        {potentiel && (
+          <div
+            className={`mt-4 rounded-lg p-3 ${
+              potentiel.niveau === "faible"
+                ? "bg-emerald-50"
+                : potentiel.niveau === "moyen"
+                ? "bg-amber-50"
+                : "bg-rose-50"
+            }`}
+          >
+            <p className="text-sm font-medium text-ardoise-800">
+              {LIBELLES_POTENTIEL[potentiel.niveau]} — {potentiel.couverture} %
+              du vocabulaire de l&apos;annonce est déjà présent
+            </p>
+            {potentiel.manquants.length > 0 && (
+              <p className="mt-1 text-xs text-ardoise-600">
+                Absent du CV : {potentiel.manquants.join(" · ")}
+              </p>
+            )}
+            {potentiel.niveau === "faible" && (
+              <p className="mt-1 text-xs text-ardoise-500">
+                Tu peux postuler tel quel : la reformulation ne gagnerait
+                presque rien.
+              </p>
+            )}
+          </div>
+        )}
+
         <form action={lancerReformulation} className="mt-4">
           <input type="hidden" name="offreId" value={params.id} />
           <BoutonSoumettre

@@ -7,6 +7,7 @@ import { NIVEAUX, selectionner, type Selection } from "@/lib/cv/selection";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { construireModele, modeleEnTexte, type ModeleCV } from "@/lib/cv/modele";
 import { estimerHauteur } from "@/lib/cv/encombrement";
+import { comparerAuReference, potentielAdaptation } from "@/lib/cv/ecart";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 
 export class ErreurCV extends Error {}
@@ -127,6 +128,10 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     contenu_texte: modeleEnTexte(modele),
     selection: {
       modele,
+      // Calculés ici parce que la composition est gratuite et déterministe :
+      // les écrans les relisent au lieu de recharger toute la base.
+      ecart: comparerAuReference(donnees, analyse, selection.niveau, selection),
+      potentiel: potentielAdaptation(analyse, selection),
       hauteurEstimee: Math.round(estimerHauteur(modele)),
       pages,
       niveau: modele.meta.niveau,

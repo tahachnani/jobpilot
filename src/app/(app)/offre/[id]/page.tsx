@@ -8,6 +8,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import BoutonSoumettre from "@/components/BoutonSoumettre";
 import type { ModeleCV } from "@/lib/cv/modele";
+import {
+  LIBELLES_POTENTIEL,
+  type Ecart,
+  type Potentiel,
+} from "@/lib/cv/ecart";
 import { supprimerOffre, recalculerScore, genererCV } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +122,12 @@ export default async function DetailOffre({
     version: number;
     created_at: string;
     type: string;
-    selection: { modele?: ModeleCV; pages?: number } | null;
+    selection: {
+      modele?: ModeleCV;
+      pages?: number;
+      ecart?: Ecart;
+      potentiel?: Potentiel;
+    } | null;
   }[];
 
   const cvs = tousDocuments.filter((d) => d.type === "cv").map((d) => ({
@@ -132,6 +142,8 @@ export default async function DetailOffre({
     }),
     modele: d.selection?.modele ?? null,
     pages: d.selection?.pages ?? null,
+    ecart: d.selection?.ecart ?? null,
+    potentiel: d.selection?.potentiel ?? null,
   }));
 
   const dernierCV = cvs[0] ?? null;
@@ -377,6 +389,23 @@ export default async function DetailOffre({
                 ? dernierCV.modele.meta.niveauLibelle
                 : "La sélection des missions est déterministe et n'appelle pas l'IA : générer ne coûte rien."}
             </p>
+
+            {dernierCV?.potentiel && (
+              <p
+                className={`mt-2 inline-block rounded px-2 py-1 text-xs font-medium ${
+                  dernierCV.potentiel.niveau === "faible"
+                    ? "bg-emerald-100 text-emerald-900"
+                    : dernierCV.potentiel.niveau === "moyen"
+                    ? "bg-amber-100 text-amber-900"
+                    : "bg-rose-100 text-rose-900"
+                }`}
+              >
+                Potentiel d&apos;adaptation{" "}
+                {dernierCV.potentiel.niveau} —{" "}
+                {dernierCV.potentiel.couverture} % du vocabulaire de
+                l&apos;annonce déjà présent
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -454,6 +483,67 @@ export default async function DetailOffre({
                       {dernierCV.modele.competences.join(" · ")}
                     </p>
                   </div>
+
+                  {dernierCV.ecart && (
+                    <div className="rounded-lg bg-ardoise-50 p-3">
+                      <p className="text-xs font-medium text-ardoise-700">
+                        Écart avec ton CV de référence :{" "}
+                        {dernierCV.ecart.partModifiee} % des lignes
+                      </p>
+                      <p className="mt-1 text-xs text-ardoise-500">
+                        Le CV de référence est celui que ce volet produirait
+                        sans tenir compte de l&apos;offre. Il n&apos;existe pas
+                        comme document, il sert d&apos;étalon.
+                      </p>
+
+                      {dernierCV.ecart.missionsMisesEnAvant.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-emerald-800">
+                            Remontées par cette offre
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {dernierCV.ecart.missionsMisesEnAvant.map((t, i) => (
+                              <li key={i} className="text-xs text-ardoise-600">
+                                • {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {dernierCV.ecart.missionsEcartees.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-ardoise-500">
+                            Écartées au profit des précédentes
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {dernierCV.ecart.missionsEcartees.map((t, i) => (
+                              <li key={i} className="text-xs text-ardoise-400">
+                                • {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {(dernierCV.ecart.competencesAjoutees.length > 0 ||
+                        dernierCV.ecart.competencesRetirees.length > 0) && (
+                        <p className="mt-2 text-xs text-ardoise-600">
+                          Compétences : {dernierCV.ecart.competencesAjoutees.length}{" "}
+                          ajoutée
+                          {dernierCV.ecart.competencesAjoutees.length > 1 ? "s" : ""},{" "}
+                          {dernierCV.ecart.competencesRetirees.length} retirée
+                          {dernierCV.ecart.competencesRetirees.length > 1 ? "s" : ""}.
+                          {dernierCV.ecart.nbReformulees > 0 &&
+                            ` ${dernierCV.ecart.nbReformulees} mission${
+                              dernierCV.ecart.nbReformulees > 1 ? "s" : ""
+                            } reformulée${
+                              dernierCV.ecart.nbReformulees > 1 ? "s" : ""
+                            } pour cette offre.`}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <p className="text-xs text-ardoise-400">
                     {dernierCV.modele.meta.nbEmprunts} emprunt
