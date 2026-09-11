@@ -5,6 +5,7 @@ import type { OffreExtraite } from "@/lib/extraction-offre";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { controler, type Verdict } from "@/lib/cv/controle";
+import { chargerCorpus, corpusEnTexte } from "@/lib/cv/corpus";
 import { ErreurCV } from "@/lib/cv/generer";
 import { extraireJson } from "@/lib/extraction-json";
 
@@ -16,41 +17,29 @@ import { extraireJson } from "@/lib/extraction-json";
  * sous les yeux de Taha. Rien n'entre dans un CV sans les deux.
  */
 
-const SYSTEME = `Tu es un rédacteur de CV spécialisé en contrôle de gestion et en comptabilité. Tu adaptes des missions déjà vécues au vocabulaire et au contexte d'une offre précise.
+const SYSTEME = `Tu es un rédacteur de CV spécialisé en contrôle de gestion et en comptabilité. Tu adaptes des missions déjà vécues au vocabulaire d'une offre précise.
 
-CE QUE TU PRODUIS
-Une phrase de professionnel du métier, pas une paraphrase molle. Concrètement :
-- un verbe d'action précis en tête, jamais "participé à" ni "contribué à" quand un verbe plus juste existe
-- le vocabulaire exact du secteur et de l'annonce : si l'offre dit "atterrissage", "OPEX", "réestimé", "clôture", emploie ces mots-là
-- le résultat ou l'objet avant la méthode : ce qui a été obtenu compte plus que l'outil employé
-- une syntaxe qui se lit d'une traite, sans enfilade de compléments
-- le registre de l'annonce : une PME industrielle et un bailleur social ne parlent pas pareil
+TA SEULE RAISON D'ÊTRE
+Faire apparaître dans une mission un terme que l'annonce emploie et que la mission ne dit pas encore. Une reformulation qui se contente de changer un adjectif, de déplacer une proposition ou de remplacer "chaque semaine" par "hebdomadaire" ne sert à rien : elle sera rejetée automatiquement. Si tu ne vois aucun terme de l'annonce à faire entrer, renvoie le texte d'origine inchangé.
 
-RÈGLE ABSOLUE
-Tu redis exactement la même chose. Tu n'ajoutes JAMAIS :
-- un chiffre, un pourcentage, un volume, une durée
-- un logiciel, un outil, un ERP, un sigle
-- une responsabilité, un périmètre, une taille d'équipe
-- une compétence ou une réalisation
+OÙ PRENDRE LA MATIÈRE
+Chaque expérience est accompagnée de son CORPUS : le détail de ce qui y a été fait, plus riche que ce que la mission dit. Tu peux employer un terme du corpus de CETTE expérience même s'il est absent de la mission. C'est le même travail dit plus précisément.
 
-qui ne soit déjà dans la mission d'origine. Tu ne retires aucun chiffre non plus. Une phrase plus flatteuse que la réalité est un mensonge sur un document signé : elle sera rejetée.
+Le corpus d'une expérience n'autorise rien dans la mission d'une autre. Ce qui a été fait chez un employeur ne se transporte pas chez un autre.
 
-Tu ne RETIRES rien non plus :
-- tous les sigles et noms propres de l'original doivent se retrouver dans ta phrase : KPI reste KPI, CODIR reste CODIR, ULIS reste ULIS. Ne les remplace jamais par un terme générique.
-- tu ne supprimes aucun élément d'une énumération : "par période, agence et catégorie" garde ses trois termes
-- tu ne supprimes aucun qualificatif de périmètre : "coûts de production" ne devient pas "coûts", "management opérationnel" ne devient pas "management"
-
-Tu ne NOMINALISES pas. Si l'original commence par un participe passé, ta phrase aussi : "Piloté" ne devient pas "Pilotage", "Optimisé" ne devient pas "Optimisation". Si l'original est déjà nominal, garde-le nominal.
-
-Ce que tu peux faire : choisir de meilleurs mots, réordonner, remplacer une tournure vague par la formulation métier consacrée à contenu strictement identique.
+CE QUE TU NE PEUX PAS FAIRE
+- ajouter un chiffre, un pourcentage, un volume, une durée absent de l'original
+- retirer un chiffre présent dans l'original
+- ajouter un outil, un logiciel, un ERP, un sigle qui ne soit ni dans l'original ni dans le corpus de cette expérience
+- effacer un sigle de l'original : KPI reste KPI, CODIR reste CODIR, ULIS reste ULIS
+- supprimer un élément d'énumération ou un qualificatif de périmètre
+- nominaliser : si l'original commence par un participe passé, ta phrase aussi
 
 FORME
 - français professionnel, une seule phrase par mission
 - longueur au plus égale à l'original, jamais plus de 20 % au-dessus
-- pas de première personne, pas de superlatif, ni "notamment", "activement", "rigoureux", "diverses"
-- conserve le temps grammatical de l'original
-
-Si une mission n'a rien à gagner, renvoie exactement le texte d'origine : il sera écarté.
+- pas de "notamment", "activement", "rigoureux", "diverses", pas de première personne
+- verbe d'action précis, vocabulaire du métier
 
 Tu réponds UNIQUEMENT par un tableau JSON, sans préambule ni balises de code :
 [{"id": "<identifiant fourni>", "texte": "<reformulation>"}]`;
@@ -154,11 +143,35 @@ export async function reformulerPourOffre(
     return { proposees: 0, rejetees: 0, ignorees, coutUsd: 0, details: [] };
   }
 
+  const corpusParExperience = await chargerCorpus();
+
+  // Les termes que l'annonce emploie : c'est ce que la reformulation doit
+  // faire entrer, et rien d'autre ne justifie de la payer.
+  const termesOffre = [
+    ...analyse.mots_cles_ats,
+    ...analyse.outils,
+    ...analyse.competences.map((c) => c.libelle),
+  ].filter((t) => t.trim().length >= 4);
+
+  const experiences = donnees.experiences.filter((e) =>
+    aTraiter.some((m) => m.experienceId === e.id)
+  );
+
   const message = [
     contexteOffre(analyse, offre.contenu_brut),
     "",
-    "MISSIONS À ADAPTER :",
-    ...aTraiter.map((m) => `[${m.id}] ${m.texte}`),
+    ...experiences.flatMap((e) => {
+      const corpus = corpusEnTexte(corpusParExperience.get(e.id));
+      const missions = aTraiter.filter((m) => m.experienceId === e.id);
+      return [
+        `=== ${e.entreprise} (${e.titre ?? ""}) ===`,
+        corpus ? `CORPUS DE CETTE EXPÉRIENCE :\n${corpus}` : "(aucun corpus)",
+        "",
+        "MISSIONS À ADAPTER :",
+        ...missions.map((m) => `[${m.id}] ${m.texte}`),
+        "",
+      ];
+    }),
   ].join("\n");
 
   const reponse = await appelIA({
@@ -197,7 +210,11 @@ export async function reformulerPourOffre(
     const proposee = propositions.find((p) => p.id === mission.id);
     if (!proposee) continue;
 
-    const verdict = controler(mission.texte, proposee.texte, outilsConnus);
+    const verdict = controler(mission.texte, proposee.texte, {
+      outilsConnus,
+      corpus: corpusEnTexte(corpusParExperience.get(mission.experienceId)),
+      termesOffre,
+    });
     details.push({
       missionId: mission.id,
       original: mission.texte,
@@ -205,8 +222,9 @@ export async function reformulerPourOffre(
       verdict,
     });
 
-    if (!verdict.accepte) continue;
-
+    // Les propositions écartées sont enregistrées elles aussi, avec leur
+    // motif : elles restent visibles et acceptables. Un rejet muet fait
+    // disparaître le travail payé sans laisser de trace.
     aInserer.push({
       mission_id: mission.id,
       volet: offre.volet,
@@ -214,6 +232,7 @@ export async function reformulerPourOffre(
       texte: proposee.texte.trim(),
       origine: "ia_reformulee",
       validee: false,
+      motif_rejet: verdict.accepte ? null : verdict.motifs.join(" "),
     });
   }
 
@@ -238,7 +257,7 @@ export async function reformulerPourOffre(
   }
 
   return {
-    proposees: aInserer.length,
+    proposees: details.filter((d) => d.verdict.accepte).length,
     rejetees: details.filter((d) => !d.verdict.accepte).length,
     ignorees,
     coutUsd: reponse.coutUsd,

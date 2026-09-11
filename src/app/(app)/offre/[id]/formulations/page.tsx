@@ -21,6 +21,7 @@ interface LigneFormulation {
   mission_id: string;
   texte: string;
   validee: boolean;
+  motif_rejet: string | null;
 }
 
 export default async function Formulations({
@@ -76,7 +77,7 @@ export default async function Formulations({
 
   const { data: adapteesBrutes } = await supabase
     .from("mission_formulations")
-    .select("id, mission_id, texte, validee")
+    .select("id, mission_id, texte, validee, motif_rejet")
     .eq("offre_id", params.id)
     .eq("volet", offre.volet);
 
@@ -116,7 +117,8 @@ export default async function Formulations({
     });
   }
 
-  const enAttente = adaptees.filter((a) => !a.validee);
+  const enAttente = adaptees.filter((a) => !a.validee && !a.motif_rejet);
+  const ecartees = adaptees.filter((a) => !a.validee && a.motif_rejet);
   const validees = adaptees.filter((a) => a.validee);
 
   return (
@@ -166,15 +168,22 @@ export default async function Formulations({
               {LIBELLES_POTENTIEL[potentiel.niveau]} — {potentiel.couverture} %
               du vocabulaire de l&apos;annonce est déjà présent
             </p>
-            {potentiel.manquants.length > 0 && (
-              <p className="mt-1 text-xs text-ardoise-600">
-                Absent du CV : {potentiel.manquants.join(" · ")}
+            {potentiel.recuperables.length > 0 && (
+              <p className="mt-1 text-xs text-ardoise-700">
+                Récupérable de ton parcours :{" "}
+                {potentiel.recuperables.join(" · ")}
+              </p>
+            )}
+            {potentiel.horsPortee.length > 0 && (
+              <p className="mt-1 text-xs text-ardoise-400">
+                Hors de portée, absent de tout ton parcours :{" "}
+                {potentiel.horsPortee.join(" · ")}
               </p>
             )}
             {potentiel.niveau === "faible" && (
               <p className="mt-1 text-xs text-ardoise-500">
-                Tu peux postuler tel quel : la reformulation ne gagnerait
-                presque rien.
+                Tu peux postuler tel quel : la reformulation n&apos;a rien à
+                aller chercher.
               </p>
             )}
           </div>
@@ -280,7 +289,12 @@ export default async function Formulations({
         </section>
       )}
 
-      {adaptees.length === 0 ? (
+      {adaptees.length === 0 && searchParams.etat === "ok" ? (
+        <EtatVide
+          titre="Aucune proposition n'apportait de terme nouveau"
+          description="Le modèle n'a trouvé aucun terme de l'annonce à faire entrer dans tes missions. Ton CV répond déjà, ou ce que l'annonce réclame n'est pas dans ton parcours."
+        />
+      ) : adaptees.length === 0 ? (
         <EtatVide
           titre="Aucune formulation adaptée"
           description="Lance la reformulation pour comparer, mission par mission, ce que dit ta base et ce que dirait l'annonce."
@@ -370,6 +384,83 @@ export default async function Formulations({
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {ecartees.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+                Écartées par le contrôle ({ecartees.length})
+              </h2>
+              <Carte>
+                <p className="mb-3 text-sm text-ardoise-600">
+                  Le contrôle les a rejetées avant de te les montrer. Tu peux
+                  les accepter malgré tout : tu es l&apos;auteur du document et
+                  tu sais ce qui est vrai. Lis le motif avant.
+                </p>
+                <div className="space-y-4">
+                  {ecartees.map((f) => {
+                    const invention = /absent de l'original|Chiffre/.test(
+                      f.motif_rejet ?? ""
+                    );
+                    return (
+                      <div
+                        key={f.id}
+                        className="border-t border-ardoise-100 pt-3"
+                      >
+                        <p className="text-xs text-ardoise-400">
+                          {originaux.get(f.mission_id)?.entreprise}
+                        </p>
+                        <p className="mt-1 text-sm text-ardoise-500 line-through decoration-ardoise-300">
+                          {originaux.get(f.mission_id)?.texte ?? "—"}
+                        </p>
+                        <p className="mt-1 text-sm text-ardoise-800">
+                          {f.texte}
+                        </p>
+                        <p
+                          className={`mt-2 rounded px-2 py-1 text-xs ${
+                            invention
+                              ? "bg-rose-100 text-rose-900"
+                              : "bg-ardoise-100 text-ardoise-600"
+                          }`}
+                        >
+                          {invention
+                            ? `Attention, le contrôle a repéré une invention : ${f.motif_rejet}`
+                            : f.motif_rejet}
+                        </p>
+
+                        <form
+                          action={deciderFormulation}
+                          className="mt-2 flex flex-wrap gap-2"
+                        >
+                          <input type="hidden" name="offreId" value={params.id} />
+                          <input type="hidden" name="id" value={f.id} />
+                          <button
+                            type="submit"
+                            name="action"
+                            value="accepter"
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                              invention
+                                ? "border-rose-300 text-rose-700"
+                                : "border-ardoise-300 text-ardoise-700"
+                            }`}
+                          >
+                            Accepter malgré tout
+                          </button>
+                          <button
+                            type="submit"
+                            name="action"
+                            value="refuser"
+                            className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-500"
+                          >
+                            Supprimer
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Carte>
             </section>
           )}
 

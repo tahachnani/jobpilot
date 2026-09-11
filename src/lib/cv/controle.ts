@@ -1,4 +1,5 @@
 import { normaliser } from "@/lib/texte";
+import { motsSignificatifs, termePresent } from "@/lib/termes";
 
 /**
  * Contrôle d'une reformulation, avant qu'elle ne soit montrée.
@@ -15,6 +16,25 @@ import { normaliser } from "@/lib/texte";
 export interface Verdict {
   accepte: boolean;
   motifs: string[];
+  /** Termes de l'annonce que la proposition fait apparaître. */
+  apports: string[];
+}
+
+export interface ContexteControle {
+  /** Libellés des compétences de catégorie outil. */
+  outilsConnus?: string[];
+  /**
+   * Corpus de la même expérience. Un terme qui y est ancré est autorisé même
+   * s'il est absent de la mission d'origine : c'est le même travail dit plus
+   * précisément. Cloisonné par expérience — rien ne migre d'un employeur à
+   * l'autre.
+   */
+  corpus?: string;
+  /**
+   * Vocabulaire de l'annonce. Une reformulation qui n'en fait apparaître aucun
+   * est un toilettage de style et sera rejetée.
+   */
+  termesOffre?: string[];
 }
 
 /** Rallongement maximal toléré, en proportion de l'original. */
@@ -87,13 +107,31 @@ function nominalise(original: string, proposition: string): boolean {
 export function controler(
   original: string,
   proposition: string,
-  outilsConnus: string[] = []
+  contexte: ContexteControle = {}
 ): Verdict {
+  const outilsConnus = contexte.outilsConnus ?? [];
+  const motsCorpus = motsSignificatifs(contexte.corpus ?? "");
   const motifs: string[] = [];
   const texte = proposition.trim();
 
   if (!texte) {
-    return { accepte: false, motifs: ["Proposition vide."] };
+    return { accepte: false, motifs: ["Proposition vide."], apports: [] };
+  }
+
+  // L'apport d'abord : une reformulation qui ne fait entrer aucun mot de
+  // l'annonce ne sert à rien. La première version autorisait « Suivi chaque
+  // semaine » devenu « Suivi hebdomadaire » — du style facturé au prix d'un
+  // appel.
+  const motsOriginal = motsSignificatifs(original);
+  const motsProposition = motsSignificatifs(texte);
+  const apports = (contexte.termesOffre ?? []).filter(
+    (t) => termePresent(t, motsProposition) && !termePresent(t, motsOriginal)
+  );
+
+  if ((contexte.termesOffre ?? []).length > 0 && apports.length === 0) {
+    motifs.push(
+      "N'introduit aucun terme de l'annonce : reformulation de pure forme."
+    );
   }
 
   if (normaliser(texte) === normaliser(original)) {
@@ -124,7 +162,7 @@ export function controler(
   const propresProposition = nomsPropres(texte);
 
   const propresAjoutes = [...propresProposition].filter(
-    (m) => !propresOriginal.has(m)
+    (m) => !propresOriginal.has(m) && !motsCorpus.has(m)
   );
   if (propresAjoutes.length > 0) {
     motifs.push(`Nom propre absent de l'original : ${propresAjoutes.join(", ")}.`);
@@ -144,12 +182,15 @@ export function controler(
   // Un outil peut se glisser sans majuscule ; on le cherche nommément.
   const normalisedOriginal = normaliser(original);
   const normalisedProposition = normaliser(texte);
+  const normalisedCorpus = normaliser(contexte.corpus ?? "");
   const outilsGlisses = outilsConnus
     .map(normaliser)
     .filter((o) => o.length >= 3)
     .filter(
       (o) =>
-        normalisedProposition.includes(o) && !normalisedOriginal.includes(o)
+        normalisedProposition.includes(o) &&
+        !normalisedOriginal.includes(o) &&
+        !normalisedCorpus.includes(o)
     );
   if (outilsGlisses.length > 0) {
     motifs.push(`Outil absent de l'original : ${outilsGlisses.join(", ")}.`);
@@ -173,5 +214,5 @@ export function controler(
     );
   }
 
-  return { accepte: motifs.length === 0, motifs };
+  return { accepte: motifs.length === 0, motifs, apports };
 }

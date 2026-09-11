@@ -1,6 +1,7 @@
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { normaliser } from "@/lib/texte";
+import { motsSignificatifs, termePresent } from "@/lib/termes";
 import type { DonneesCV } from "@/lib/cv/donnees";
 import { selectionner, type NiveauCompacite, type Selection } from "@/lib/cv/selection";
 
@@ -35,9 +36,17 @@ export interface Ecart {
 
 export interface Potentiel {
   niveau: "faible" | "moyen" | "fort";
-  /** Termes de l'annonce introuvables dans le CV composé. */
-  manquants: string[];
-  /** Part des termes de l'annonce déjà présents, en pourcentage. */
+  /**
+   * Absent du CV mais présent ailleurs dans le parcours — corpus, formations,
+   * compétences. Une reformulation peut le faire apparaître.
+   */
+  recuperables: string[];
+  /**
+   * Absent du parcours entier. Rien à en faire, et ce n'est pas un défaut :
+   * un CV n'a pas à couvrir toutes les annonces.
+   */
+  horsPortee: string[];
+  /** Part des termes de l'annonce déjà présents dans le CV, en pourcentage. */
   couverture: number;
 }
 
@@ -133,40 +142,20 @@ function digneDeCompte(terme: string): boolean {
  * répond déjà, et qu'une reformulation dépenserait un appel pour rien.
  */
 /**
- * Découpe un texte en mots significatifs, accents et ponctuation retirés.
- * Les mots-outils sont écartés : ils sont partout et ne prouvent rien.
- */
-const MOTS_OUTILS = new Set([
-  "de", "des", "du", "la", "le", "les", "et", "en", "au", "aux", "un", "une",
-  "sur", "pour", "par", "dans", "avec", "sans", "ou", "a", "l", "d",
-]);
-
-function motsSignificatifs(texte: string): Set<string> {
-  return new Set(
-    normaliser(texte)
-      .split(" ")
-      .filter((m) => m.length >= 3 && !MOTS_OUTILS.has(m))
-  );
-}
-
-/**
- * Un terme de l'annonce est considéré comme présent si tous ses mots
- * significatifs se retrouvent dans le CV.
+ * Mesure ce que l'annonce réclame et que le CV ne dit pas, en séparant ce qui
+ * est récupérable de ce qui ne l'est pas.
  *
- * La première version cherchait la chaîne exacte, et déclarait « analyse
- * écarts » absent d'un CV qui dit « analyse des écarts » : un article suffisait
- * à la tromper. Elle annonçait 7 % de couverture là où le CV répondait
- * largement, et poussait à payer une reformulation inutile.
+ * Le niveau affiché ne dépend que du récupérable : c'est le seul sur lequel
+ * une reformulation peut agir. Crier « fort » pour du hors-portée pousserait à
+ * payer un appel qui ne pouvait rien produire.
+ *
+ * @param parcours Corpus, formations et compétences — tout ce que Taha a fait
+ * ou appris, au-delà de ce que le CV a la place de dire.
  */
-function termePresent(terme: string, motsDuCv: Set<string>): boolean {
-  const mots = [...motsSignificatifs(terme)];
-  if (mots.length === 0) return true;
-  return mots.every((m) => motsDuCv.has(m));
-}
-
 export function potentielAdaptation(
   analyse: OffreExtraite,
-  selectionOffre: Selection
+  selectionOffre: Selection,
+  parcours = ""
 ): Potentiel {
   const attendus = [
     ...analyse.mots_cles_ats,
@@ -175,7 +164,7 @@ export function potentielAdaptation(
   ].filter(digneDeCompte);
 
   if (attendus.length === 0) {
-    return { niveau: "faible", manquants: [], couverture: 100 };
+    return { niveau: "faible", recuperables: [], horsPortee: [], couverture: 100 };
   }
 
   const motsDuCv = motsSignificatifs(
@@ -184,30 +173,39 @@ export function potentielAdaptation(
       ...selectionOffre.competences.map((c) => c.libelle),
     ].join(" ")
   );
+  const motsDuParcours = motsSignificatifs(parcours);
 
   const vus = new Set<string>();
-  const manquants = attendus.filter((terme) => {
+  const absents = attendus.filter((terme) => {
     const n = normaliser(terme);
     if (vus.has(n)) return false;
     vus.add(n);
     return !termePresent(terme, motsDuCv);
   });
 
+  const recuperables = absents.filter((t) => termePresent(t, motsDuParcours));
+  const horsPortee = absents.filter((t) => !termePresent(t, motsDuParcours));
+
   const total = vus.size;
-  const couverture = Math.round(((total - manquants.length) / total) * 100);
+  const couverture = Math.round(((total - absents.length) / total) * 100);
 
-  // Les seuils sont empiriques et se règlent ici. Un CV qui couvre plus des
-  // trois quarts du vocabulaire de l'annonce n'a pas grand-chose à gagner.
+  // Seuils empiriques, réglables ici. Comptés sur le récupérable seul.
+  const partRecuperable = recuperables.length / total;
   const niveau =
-    couverture >= 75 ? "faible" : couverture >= 50 ? "moyen" : "fort";
+    partRecuperable >= 0.25 ? "fort" : partRecuperable >= 0.1 ? "moyen" : "faible";
 
-  return { niveau, manquants: manquants.slice(0, 12), couverture };
+  return {
+    niveau,
+    recuperables: recuperables.slice(0, 12),
+    horsPortee: horsPortee.slice(0, 12),
+    couverture,
+  };
 }
 
 export const LIBELLES_POTENTIEL: Record<Potentiel["niveau"], string> = {
-  faible: "Ton CV répond déjà à l'essentiel de l'annonce",
-  moyen: "Une adaptation apporterait quelque chose",
-  fort: "L'annonce emploie un vocabulaire que ton CV ne reprend pas",
+  faible: "Rien de récupérable : ton CV dit déjà ce que ton parcours permet",
+  moyen: "Quelques termes de l'annonce sont récupérables de ton parcours",
+  fort: "Ton parcours couvre plusieurs termes que ton CV ne dit pas",
 };
 
 export type { CodeVolet };

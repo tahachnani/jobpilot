@@ -8,6 +8,7 @@ import { choisirNiveau } from "@/lib/cv/compacite";
 import { construireModele, modeleEnTexte, type ModeleCV } from "@/lib/cv/modele";
 import { estimerHauteur } from "@/lib/cv/encombrement";
 import { comparerAuReference, potentielAdaptation } from "@/lib/cv/ecart";
+import { chargerCorpus, corpusEnTexte } from "@/lib/cv/corpus";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 
 export class ErreurCV extends Error {}
@@ -63,6 +64,16 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
 
   // Les formulations validées pour cette offre priment sur les génériques.
   const donnees = await chargerDonneesCV(offre.volet, offreId);
+
+  // Le parcours au sens large : corpus, formations, compétences. C'est lui qui
+  // distingue un terme récupérable d'un terme hors de portée.
+  const corpusParExperience = await chargerCorpus();
+  const parcours = [
+    ...donnees.experiences.map((e) => corpusEnTexte(corpusParExperience.get(e.id))),
+    ...donnees.experiences.flatMap((e) => e.missions.map((m) => m.texte)),
+    ...donnees.competences.map((c) => `${c.libelle} ${c.precision ?? ""}`),
+    ...donnees.formations.map((f) => f.diplome),
+  ].join("\n");
   if (donnees.experiences.length === 0) {
     throw new ErreurCV(
       `Aucune expérience n'est visible dans le volet ${offre.volet}. ` +
@@ -131,7 +142,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
       // Calculés ici parce que la composition est gratuite et déterministe :
       // les écrans les relisent au lieu de recharger toute la base.
       ecart: comparerAuReference(donnees, analyse, selection.niveau, selection),
-      potentiel: potentielAdaptation(analyse, selection),
+      potentiel: potentielAdaptation(analyse, selection, parcours),
       hauteurEstimee: Math.round(estimerHauteur(modele)),
       pages,
       niveau: modele.meta.niveau,
