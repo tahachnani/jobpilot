@@ -6,6 +6,7 @@ import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { controler, type Verdict } from "@/lib/cv/controle";
 import { ErreurCV } from "@/lib/cv/generer";
+import { extraireJson } from "@/lib/extraction-json";
 
 /**
  * Reformulation des missions d'un CV pour une offre donnée.
@@ -81,7 +82,11 @@ function contexteOffre(offre: OffreExtraite, annonce: string | null): string {
   // L'annonce brute en plus de l'analyse : l'extraction normalise le
   // vocabulaire et perd les tournures exactes, précisément celles qu'il faut
   // reprendre. Le ton, le secteur et le registre ne sont nulle part ailleurs.
-  const brute = (annonce ?? "").trim().slice(0, 8000);
+  // 20 000 caractères et non 8 000 : la limite précédente était posée au jugé
+  // et coupait plus de la moitié des annonces longues. Les jetons d'entrée
+  // coûtent environ cinq fois moins que ceux de sortie — quelques centimes de
+  // plus par offre, contre la moitié du texte perdue.
+  const brute = (annonce ?? "").trim().slice(0, 20000);
 
   return [
     brute ? `ANNONCE INTÉGRALE :\n${brute}\n` : "",
@@ -160,19 +165,24 @@ export async function reformulerPourOffre(
     modele: MODELE_REDACTION,
     systeme: SYSTEME,
     message,
-    maxTokens: 4000,
+    // Quatorze missions rédigées par Sonnet dépassent 4000 jetons : sept
+    // appels sur huit ont été coupés au même endroit, chacun facturé pour
+    // rien. Même défaut que la lettre, corrigé là-bas et pas ici.
+    maxTokens: 8000,
     tache: "reformulation_missions",
     offreId,
   });
 
   let propositions: { id: string; texte: string }[];
   try {
-    const brut = reponse.texte.trim().replace(/^```(?:json)?|```$/g, "").trim();
-    propositions = JSON.parse(brut);
+    propositions = JSON.parse(extraireJson(reponse.texte));
     if (!Array.isArray(propositions)) throw new Error("format");
   } catch {
+    // Le début de la réponse brute est remonté : sans lui, il faut fouiller
+    // les journaux pour comprendre.
     throw new ErreurIA(
-      "La réponse du modèle n'était pas exploitable. Réessaie."
+      "La réponse du modèle n'était pas exploitable. Début reçu : " +
+        reponse.texte.trim().slice(0, 200)
     );
   }
 

@@ -5,6 +5,7 @@ import { VOLETS, type CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV } from "@/lib/cv/generer";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
+import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
 import {
   lettreEnTexte,
@@ -82,20 +83,6 @@ export interface ResultatLettre {
   email: { objet: string; corps: string };
   ancrage: Ancrage;
   coutUsd: number;
-}
-
-/**
- * Isole l'objet JSON d'une réponse.
- *
- * On prend de la première accolade à la dernière, au lieu de retirer des
- * balises de code : le modèle peut préfixer une phrase, changer de balisage,
- * ou n'en mettre aucun. Chercher les accolades survit à ces variations.
- */
-function extraireJson(texte: string): string {
-  const debut = texte.indexOf("{");
-  const fin = texte.lastIndexOf("}");
-  if (debut === -1 || fin <= debut) return texte.trim();
-  return texte.slice(debut, fin + 1);
 }
 
 function nettoyer(parties: (string | null | undefined)[], sep: string) {

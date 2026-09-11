@@ -132,6 +132,38 @@ function digneDeCompte(terme: string): boolean {
  * Sert à décider **avant de payer** : un potentiel faible signifie que le CV
  * répond déjà, et qu'une reformulation dépenserait un appel pour rien.
  */
+/**
+ * Découpe un texte en mots significatifs, accents et ponctuation retirés.
+ * Les mots-outils sont écartés : ils sont partout et ne prouvent rien.
+ */
+const MOTS_OUTILS = new Set([
+  "de", "des", "du", "la", "le", "les", "et", "en", "au", "aux", "un", "une",
+  "sur", "pour", "par", "dans", "avec", "sans", "ou", "a", "l", "d",
+]);
+
+function motsSignificatifs(texte: string): Set<string> {
+  return new Set(
+    normaliser(texte)
+      .split(" ")
+      .filter((m) => m.length >= 3 && !MOTS_OUTILS.has(m))
+  );
+}
+
+/**
+ * Un terme de l'annonce est considéré comme présent si tous ses mots
+ * significatifs se retrouvent dans le CV.
+ *
+ * La première version cherchait la chaîne exacte, et déclarait « analyse
+ * écarts » absent d'un CV qui dit « analyse des écarts » : un article suffisait
+ * à la tromper. Elle annonçait 7 % de couverture là où le CV répondait
+ * largement, et poussait à payer une reformulation inutile.
+ */
+function termePresent(terme: string, motsDuCv: Set<string>): boolean {
+  const mots = [...motsSignificatifs(terme)];
+  if (mots.length === 0) return true;
+  return mots.every((m) => motsDuCv.has(m));
+}
+
 export function potentielAdaptation(
   analyse: OffreExtraite,
   selectionOffre: Selection
@@ -146,7 +178,7 @@ export function potentielAdaptation(
     return { niveau: "faible", manquants: [], couverture: 100 };
   }
 
-  const corpus = normaliser(
+  const motsDuCv = motsSignificatifs(
     [
       ...textesMissions(selectionOffre),
       ...selectionOffre.competences.map((c) => c.libelle),
@@ -158,7 +190,7 @@ export function potentielAdaptation(
     const n = normaliser(terme);
     if (vus.has(n)) return false;
     vus.add(n);
-    return !corpus.includes(n);
+    return !termePresent(terme, motsDuCv);
   });
 
   const total = vus.size;
