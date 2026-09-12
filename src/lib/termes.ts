@@ -14,12 +14,29 @@ const MOTS_OUTILS = new Set([
   "son", "sa", "leur", "leurs", "ce", "ces", "cette",
 ]);
 
-/** Mots d'un texte, accents et ponctuation retirés, mots-outils écartés. */
+/**
+ * Racine approximative d'un mot : les six premiers caractères.
+ *
+ * Sans cela « régularisation » et « régularisées » sont deux mots étrangers
+ * l'un à l'autre, et une reformulation qui reprenait exactement le vocabulaire
+ * de l'annonce était rejetée pour n'avoir rien apporté. La troncature est
+ * grossière mais suffit : en français, les variantes d'un même terme métier
+ * partagent presque toujours leurs premières lettres.
+ *
+ * Elle produit quelques rapprochements indus — « comptable » et
+ * « comptabilisé » — sans conséquence ici : ce sont des termes du même champ.
+ */
+function racine(mot: string): string {
+  return mot.length > 6 ? mot.slice(0, 6) : mot;
+}
+
+/** Racines des mots d'un texte, mots-outils écartés. */
 export function motsSignificatifs(texte: string): Set<string> {
   return new Set(
     normaliser(texte)
       .split(" ")
       .filter((m) => m.length >= 3 && !MOTS_OUTILS.has(m))
+      .map(racine)
   );
 }
 

@@ -210,6 +210,15 @@ export async function reformulerPourOffre(
     const proposee = propositions.find((p) => p.id === mission.id);
     if (!proposee) continue;
 
+    // Le modèle renvoie l'original quand il n'a rien à apporter : c'est ce
+    // que l'instruction lui demande. L'afficher comme un rejet ferait passer
+    // une abstention correcte pour un échec.
+    if (
+      proposee.texte.trim().toLowerCase() === mission.texte.trim().toLowerCase()
+    ) {
+      continue;
+    }
+
     const verdict = controler(mission.texte, proposee.texte, {
       outilsConnus,
       corpus: corpusEnTexte(corpusParExperience.get(mission.experienceId)),
