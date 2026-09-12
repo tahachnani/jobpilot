@@ -72,8 +72,22 @@ export default async function Formulations({
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const potentiel = (cvBrut as { selection: { potentiel?: Potentiel } } | null)
+  const potentielBrut = (cvBrut as { selection: { potentiel?: Potentiel } } | null)
     ?.selection?.potentiel;
+
+  // Un potentiel stocké avant l'étape 4ter n'a ni `recuperables` ni
+  // `horsPortee` : il est figé au moment de la génération du CV. Lire ces
+  // champs sans précaution faisait planter la page entière.
+  const potentiel = potentielBrut
+    ? {
+        ...potentielBrut,
+        recuperables: potentielBrut.recuperables ?? [],
+        horsPortee: potentielBrut.horsPortee ?? [],
+      }
+    : undefined;
+
+  const potentielObsolete =
+    potentielBrut !== undefined && potentielBrut.recuperables === undefined;
 
   const { data: adapteesBrutes } = await supabase
     .from("mission_formulations")
@@ -168,6 +182,13 @@ export default async function Formulations({
               {LIBELLES_POTENTIEL[potentiel.niveau]} — {potentiel.couverture} %
               du vocabulaire de l&apos;annonce est déjà présent
             </p>
+            {potentielObsolete && (
+              <p className="mt-1 text-xs text-ardoise-500">
+                Cet indicateur a été calculé avant l&apos;arrivée du corpus.
+                Régénère le CV pour qu&apos;il distingue le récupérable du
+                hors-portée.
+              </p>
+            )}
             {potentiel.recuperables.length > 0 && (
               <p className="mt-1 text-xs text-ardoise-700">
                 Récupérable de ton parcours :{" "}
