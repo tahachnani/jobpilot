@@ -52,3 +52,44 @@ export function termesAbsents(termes: string[], texte: string): string[] {
   const mots = motsSignificatifs(texte);
   return termes.filter((t) => !termePresent(t, mots));
 }
+
+
+/**
+ * Marqueurs de qualité comportementale.
+ *
+ * Une annonce mêle des savoir-faire — régularisation des charges, clôtures,
+ * consolidation — et des qualités : rigueur, écoute active, force de
+ * proposition. Les secondes ne se font pas entrer dans une phrase de mission,
+ * et les compter dans le potentiel d'adaptation promettait une reformulation
+ * que rien ne pouvait produire.
+ */
+const MARQUEURS_COMPORTEMENT = [
+  "rigueur", "autonomie", "organisation", "communication", "pedagogie",
+  "ecoute", "proposition", "adaptation", "synthese", "esprit", "capacite",
+  "aisance", "motivation", "dynamisme", "curiosite", "relationnel",
+  "orientation terrain", "travail en equipe", "polyvalence", "reactivite",
+  "interet", "sens du", "sens de", "gout", "appetence", "implication",
+];
+
+/**
+ * Retire les tournures d'annonce : « maîtrise de », « connaissance des »,
+ * « capacité à ». Ce qui reste est le savoir-faire lui-même.
+ */
+export function noyauDuTerme(brut: string): string {
+  return brut
+    .trim()
+    .replace(
+      /^(tr[eè]s\s+bonne\s+|bonne\s+|solide\s+|excellentes?\s+|excellente\s+|forte\s+)?(ma[iî]trise|connaissances?|pratique|capacit[ée]s?)\s*(d'|de\s+la\s+|de\s+l'|des\s+|du\s+|de\s+|en\s+|[aà]\s+)?/i,
+      ""
+    )
+    .replace(/\s*\(.*?\)\s*$/, "")
+    .trim();
+}
+
+/** Le terme décrit-il un savoir-faire, et non une qualité ? */
+export function estSavoirFaire(terme: string): boolean {
+  // Trois caractères suffisent : SAP, ERP et TVA sont des savoir-faire.
+  const n = normaliser(noyauDuTerme(terme));
+  if (n.length < 3) return false;
+  return !MARQUEURS_COMPORTEMENT.some((m) => n.includes(normaliser(m)));
+}

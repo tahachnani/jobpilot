@@ -6,6 +6,7 @@ import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { controler, type Verdict } from "@/lib/cv/controle";
 import { chargerCorpus, corpusEnTexte } from "@/lib/cv/corpus";
+import { estSavoirFaire, noyauDuTerme } from "@/lib/termes";
 import { ErreurCV } from "@/lib/cv/generer";
 import { extraireJson } from "@/lib/extraction-json";
 
@@ -151,7 +152,10 @@ export async function reformulerPourOffre(
     ...analyse.mots_cles_ats,
     ...analyse.outils,
     ...analyse.competences.map((c) => c.libelle),
-  ].filter((t) => t.trim().length >= 4);
+  ]
+    .filter(estSavoirFaire)
+    .map(noyauDuTerme)
+    .filter((t) => t.length >= 4);
 
   const experiences = donnees.experiences.filter((e) =>
     aTraiter.some((m) => m.experienceId === e.id)

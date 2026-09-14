@@ -1,7 +1,12 @@
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { normaliser } from "@/lib/texte";
-import { motsSignificatifs, termePresent } from "@/lib/termes";
+import {
+  estSavoirFaire,
+  motsSignificatifs,
+  noyauDuTerme,
+  termePresent,
+} from "@/lib/termes";
 import type { DonneesCV } from "@/lib/cv/donnees";
 import { selectionner, type NiveauCompacite, type Selection } from "@/lib/cv/selection";
 
@@ -161,7 +166,13 @@ export function potentielAdaptation(
     ...analyse.mots_cles_ats,
     ...analyse.outils,
     ...analyse.competences.map((c) => c.libelle),
-  ].filter(digneDeCompte);
+  ]
+    // Seuls les savoir-faire comptent : une reformulation ne peut pas faire
+    // entrer « écoute active » dans une mission, et le promettre revient à
+    // pousser vers un appel qui ne produira rien.
+    .filter(digneDeCompte)
+    .filter(estSavoirFaire)
+    .map(noyauDuTerme);
 
   if (attendus.length === 0) {
     return { niveau: "faible", recuperables: [], horsPortee: [], couverture: 100 };
