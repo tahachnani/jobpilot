@@ -5,9 +5,13 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import {
   adopterCommeReference,
   deciderFormulation,
+  deciderMission,
   lancerReformulation,
+  proposerMissions,
   repondreCompetence,
 } from "./actions";
+import { chargerCorpus, type LigneCorpus } from "@/lib/cv/corpus";
+import { fondements } from "@/lib/cv/propositions";
 import { competencesManquantes } from "@/lib/cv/competences-manquantes";
 import { LIBELLES_POTENTIEL, type Potentiel } from "@/lib/cv/ecart";
 import type { OffreExtraite } from "@/lib/extraction-offre";
@@ -97,6 +101,41 @@ export default async function Formulations({
 
   const adaptees = (adapteesBrutes ?? []) as LigneFormulation[];
 
+  // Une mission proposée est une mission encore inactive : elle existe en base
+  // mais aucune sélection ne la voit tant qu'elle n'est pas acceptée.
+  const { data: proposeesBrutes } = await supabase
+    .from("mission_formulations")
+    .select(
+      "id, texte, mission_id, missions!inner ( id, actif, experience_id, experiences ( entreprise ) )"
+    )
+    .eq("offre_id", params.id)
+    .eq("validee", false)
+    .eq("missions.actif", false);
+
+  const corpusParExperience = await chargerCorpus();
+
+  const missionsProposees = ((proposeesBrutes ?? []) as unknown as {
+    id: string;
+    texte: string;
+    mission_id: string;
+    missions: {
+      experience_id: string;
+      experiences: { entreprise: string } | null;
+    } | null;
+  }[]).map((p) => ({
+    formulationId: p.id,
+    missionId: p.mission_id,
+    texte: p.texte,
+    entreprise: p.missions?.experiences?.entreprise ?? "",
+    fondements: fondements(
+      p.texte,
+      (corpusParExperience.get(p.missions?.experience_id ?? "") ??
+        []) as LigneCorpus[]
+    ),
+  }));
+
+  const idsProposees = new Set(missionsProposees.map((m) => m.formulationId));
+
   // L'original, c'est la formulation générique du volet : celle que le CV
   // emploierait sans adaptation.
   // Sans restriction de volet : une mission empruntée à l'autre volet n'a pas
@@ -131,7 +170,9 @@ export default async function Formulations({
     });
   }
 
-  const enAttente = adaptees.filter((a) => !a.validee && !a.motif_rejet);
+  const enAttente = adaptees.filter(
+    (a) => !a.validee && !a.motif_rejet && !idsProposees.has(a.id)
+  );
   const ecartees = adaptees.filter((a) => !a.validee && a.motif_rejet);
   const validees = adaptees.filter((a) => a.validee);
 
@@ -209,6 +250,20 @@ export default async function Formulations({
             )}
           </div>
         )}
+
+        <form action={proposerMissions} className="mt-4">
+          <input type="hidden" name="offreId" value={params.id} />
+          <BoutonSoumettre
+            libelle="Proposer des missions nouvelles"
+            libelleEnCours="Rédaction…"
+            className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+          />
+          <p className="mt-1 text-xs text-ardoise-400">
+            Le modèle puise dans le corpus de chaque expérience pour rédiger ce
+            que tes missions actuelles ne disent pas. Rien n&apos;entre dans ta
+            base sans ton accord.
+          </p>
+        </form>
 
         <form action={lancerReformulation} className="mt-4">
           <input type="hidden" name="offreId" value={params.id} />
@@ -310,6 +365,12 @@ export default async function Formulations({
         </section>
       )}
 
+      {searchParams.etat === "mission" && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">Décision enregistrée.</p>
+        </Carte>
+      )}
+
       {adaptees.length === 0 && searchParams.etat === "ok" ? (
         <EtatVide
           titre="Aucune proposition n'apportait de terme nouveau"
@@ -405,6 +466,75 @@ export default async function Formulations({
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {missionsProposees.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+                Missions nouvelles proposées ({missionsProposees.length})
+              </h2>
+              <div className="space-y-4">
+                {missionsProposees.map((m) => (
+                  <Carte key={m.formulationId} className="border-emerald-200">
+                    <p className="text-xs font-medium text-ardoise-400">
+                      {m.entreprise}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-ardoise-900">
+                      {m.texte}
+                    </p>
+
+                    {m.fondements.length > 0 && (
+                      <div className="mt-3 rounded-lg bg-ardoise-50 p-3">
+                        <p className="text-xs font-medium text-ardoise-600">
+                          Tiré de ton corpus
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {m.fondements.map((f, i) => (
+                            <li key={i} className="text-xs text-ardoise-500">
+                              • {f}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <form
+                      action={deciderMission}
+                      className="mt-3 flex flex-wrap gap-2"
+                    >
+                      <input type="hidden" name="offreId" value={params.id} />
+                      <input type="hidden" name="missionId" value={m.missionId} />
+                      <input
+                        type="hidden"
+                        name="formulationId"
+                        value={m.formulationId}
+                      />
+                      <button
+                        type="submit"
+                        name="action"
+                        value="accepter"
+                        className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${volet.classeAccent}`}
+                      >
+                        Ajouter à ma base
+                      </button>
+                      <button
+                        type="submit"
+                        name="action"
+                        value="refuser"
+                        className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700"
+                      >
+                        Refuser
+                      </button>
+                    </form>
+                  </Carte>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-ardoise-400">
+                Ajoutée, la mission devient générique : elle servira à toutes
+                les offres de ce volet, et la sélection décidera au cas par cas
+                si elle paraît sur le CV.
+              </p>
             </section>
           )}
 

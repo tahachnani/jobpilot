@@ -1,5 +1,6 @@
 "use server";
 
+import { proposerMissionsPourOffre } from "@/lib/cv/propositions";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { ErreurCV } from "@/lib/cv/generer";
 import { ErreurIA } from "@/lib/anthropic";
@@ -182,4 +183,66 @@ export async function repondreCompetence(formData: FormData) {
   revalidatePath(`/offre/${offreId}/formulations`);
   revalidatePath("/profil");
   redirect(`/offre/${offreId}/formulations?etat=competence`);
+}
+
+/** Demande au modèle des missions nouvelles tirées du corpus. */
+export async function proposerMissions(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  if (!offreId) return;
+
+  let resume = "";
+  try {
+    const r = await proposerMissionsPourOffre(offreId);
+    resume =
+      r.proposees === 0
+        ? `Aucune mission nouvelle à proposer : le corpus ne dit rien que tes missions actuelles ne disent déjà. ${r.rejetees} écartée${r.rejetees > 1 ? "s" : ""} par le contrôle. Coût : ${r.coutUsd.toFixed(4)} $.`
+        : `${r.proposees} mission${r.proposees > 1 ? "s" : ""} proposée${r.proposees > 1 ? "s" : ""}, ${r.rejetees} écartée${r.rejetees > 1 ? "s" : ""} par le contrôle. Coût : ${r.coutUsd.toFixed(4)} $.`;
+  } catch (e) {
+    const message =
+      e instanceof ErreurCV || e instanceof ErreurIA
+        ? e.message
+        : `La proposition a échoué : ${e instanceof Error ? e.message : String(e)}`;
+    redirect(
+      `/offre/${offreId}/formulations?etat=erreur&message=${encodeURIComponent(
+        message.slice(0, 300)
+      )}`
+    );
+  }
+
+  revalidatePath(`/offre/${offreId}/formulations`);
+  redirect(
+    `/offre/${offreId}/formulations?etat=ok&message=${encodeURIComponent(resume)}`
+  );
+}
+
+/**
+ * Accepte ou refuse une mission proposée.
+ *
+ * Acceptée, elle devient active et sa formulation devient générique : elle
+ * servira à toutes les offres du volet, pas seulement à celle-ci. Refusée,
+ * elle est supprimée — la formulation part avec elle par cascade.
+ */
+export async function deciderMission(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  const missionId = String(formData.get("missionId") ?? "");
+  const formulationId = String(formData.get("formulationId") ?? "");
+  const action = String(formData.get("action") ?? "");
+  if (!offreId || !missionId) return;
+
+  const supabase = creerClientServeur();
+
+  if (action === "accepter") {
+    await supabase.from("missions").update({ actif: true }).eq("id", missionId);
+    await supabase
+      .from("mission_formulations")
+      .update({ validee: true, offre_id: null })
+      .eq("id", formulationId);
+  } else {
+    await supabase.from("missions").delete().eq("id", missionId);
+  }
+
+  revalidatePath(`/offre/${offreId}/formulations`);
+  revalidatePath(`/offre/${offreId}`);
+  revalidatePath("/profil");
+  redirect(`/offre/${offreId}/formulations?etat=mission`);
 }
