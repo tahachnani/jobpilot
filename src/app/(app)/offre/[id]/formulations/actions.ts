@@ -232,10 +232,21 @@ export async function deciderMission(formData: FormData) {
   const supabase = creerClientServeur();
 
   if (action === "accepter") {
-    await supabase.from("missions").update({ actif: true }).eq("id", missionId);
+    // Le texte corrigé à la main fait foi : c'est Taha qui signe la ligne.
+    const texte = String(formData.get("texte") ?? "").trim();
+
+    await supabase
+      .from("missions")
+      .update({ actif: true, ...(texte ? { texte_source: texte } : {}) })
+      .eq("id", missionId);
+
     await supabase
       .from("mission_formulations")
-      .update({ validee: true, offre_id: null })
+      .update({
+        validee: true,
+        offre_id: null,
+        ...(texte ? { texte } : {}),
+      })
       .eq("id", formulationId);
   } else {
     await supabase.from("missions").delete().eq("id", missionId);

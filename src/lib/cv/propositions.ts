@@ -7,6 +7,7 @@ import { ErreurCV } from "@/lib/cv/generer";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { chargerCorpus, corpusEnTexte, type LigneCorpus } from "@/lib/cv/corpus";
 import { nombres, nomsPropres } from "@/lib/cv/controle";
+import { normaliser } from "@/lib/texte";
 import {
   estSavoirFaire,
   motsSignificatifs,
@@ -49,9 +50,36 @@ RÈGLES ABSOLUES
 - Tu ne redis pas une mission qui existe déjà. Les missions actuelles te sont données : si le corpus ne dit rien de plus qu'elles, ne propose rien.
 - Tu peux regrouper plusieurs entrées de corpus en une seule mission, à condition qu'elles relèvent du même travail.
 
+CE QU'EST UNE MISSION, ET CE QUI N'EN EST PAS UNE
+Une mission de CV dit SUR QUOI le travail portait et CE QU'IL A PRODUIT. La méthode, les outils et les interlocuteurs sont subordonnés à cela, jamais le sujet de la phrase.
+
+Ne sont PAS des missions, et ne doivent jamais être le cœur d'une proposition :
+- produire un document de méthode : "Formalisé un mode opératoire", "Rédigé une procédure", "Documenté un processus"
+- un échange : "Conduit des entretiens avec…", "Participé à des réunions", "Échangé avec le service…"
+- une étape d'un travail plus large : "Extrait les données", "Saisi les écritures", "Mis à jour un fichier"
+- une posture : "Sensibilisé à…", "Familiarisé avec…", "Impliqué dans…"
+
+Ces éléments peuvent figurer en complément de circonstance — "à partir d'extractions ULIS", "en lien avec les équipes comptables" — jamais comme verbe principal.
+
+Tu ne nommes JAMAIS un service, une direction, un projet ou une application internes à l'entreprise : "l'Unité Charges et Contrats" ne dit rien à un lecteur extérieur. Les progiciels du marché (SILOG, SAP, AS/400, ULIS Sopra) sont en revanche autorisés.
+
+STRUCTURE ATTENDUE
+[verbe au participe passé] + [objet et périmètre] + [résultat, finalité ou constat] (+ méthode ou outil, facultatif)
+
+MAUVAIS : "Formalisé un mode opératoire de rapprochement entre comptabilité générale et régularisation des charges par groupe immobilier."
+→ le sujet est le document, pas le travail.
+
+MAUVAIS : "Qualifié les écarts de charges non refacturées via entretiens avec l'Unité Charges et Contrats."
+→ le moyen devient le sujet, et le service interne ne parle à personne.
+
+BON : "Rapproché la comptabilité générale et les états de régularisation des charges sur l'ensemble du patrimoine, et identifié les charges non refacturées aux locataires ainsi que les régularisations excédentaires."
+→ objet, périmètre, résultat.
+
+BON : "Audité les stocks d'un site de production par inventaire physique et rapprochement avec l'ERP, et identifié les causes des écarts constatés."
+
 FORME
-- une seule phrase, commençant par un participe passé : "Audité", "Rapproché", "Analysé", "Construit"
-- 110 à 180 caractères, le format d'une ligne de CV
+- une seule phrase, commençant par un participe passé
+- 110 à 200 caractères
 - vocabulaire du métier et de l'annonce, verbe d'action précis
 - pas de "notamment", "activement", "divers", pas de première personne
 - les chiffres du corpus peuvent être repris, jamais inventés
@@ -85,6 +113,21 @@ function controlerProposition(
   missionsExistantes: string[]
 ): VerdictProposition {
   const motifs: string[] = [];
+
+  // Les verbes de modalité décrivent comment on a travaillé, pas ce qu'on a
+  // fait. Le modèle y revient spontanément ; on le lui interdit par le calcul.
+  const VERBES_DE_MODALITE = [
+    "formalise", "redige", "documente", "conduit des entretiens",
+    "participe a des reunions", "echange avec", "sensibilise", "familiarise",
+    "implique dans", "assiste a", "contribue a la redaction",
+  ];
+  const debut = normaliser(texte).slice(0, 40);
+  const modalite = VERBES_DE_MODALITE.find((v) => debut.startsWith(normaliser(v)));
+  if (modalite) {
+    motifs.push(
+      `Décrit une modalité de travail et non une mission : « ${modalite} ».`
+    );
+  }
 
   if (texte.length < 60) motifs.push("Trop courte pour une ligne de CV.");
   if (texte.length > 230) motifs.push("Trop longue pour une ligne de CV.");

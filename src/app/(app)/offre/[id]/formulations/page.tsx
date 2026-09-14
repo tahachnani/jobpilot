@@ -480,10 +480,6 @@ export default async function Formulations({
                     <p className="text-xs font-medium text-ardoise-400">
                       {m.entreprise}
                     </p>
-                    <p className="mt-1 text-sm font-medium text-ardoise-900">
-                      {m.texte}
-                    </p>
-
                     {m.fondements.length > 0 && (
                       <div className="mt-3 rounded-lg bg-ardoise-50 p-3">
                         <p className="text-xs font-medium text-ardoise-600">
@@ -499,10 +495,7 @@ export default async function Formulations({
                       </div>
                     )}
 
-                    <form
-                      action={deciderMission}
-                      className="mt-3 flex flex-wrap gap-2"
-                    >
+                    <form action={deciderMission} className="mt-3">
                       <input type="hidden" name="offreId" value={params.id} />
                       <input type="hidden" name="missionId" value={m.missionId} />
                       <input
@@ -510,22 +503,36 @@ export default async function Formulations({
                         name="formulationId"
                         value={m.formulationId}
                       />
-                      <button
-                        type="submit"
-                        name="action"
-                        value="accepter"
-                        className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${volet.classeAccent}`}
-                      >
-                        Ajouter à ma base
-                      </button>
-                      <button
-                        type="submit"
-                        name="action"
-                        value="refuser"
-                        className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700"
-                      >
-                        Refuser
-                      </button>
+
+                      <textarea
+                        name="texte"
+                        defaultValue={m.texte}
+                        rows={3}
+                        className="w-full rounded-lg border border-ardoise-300 p-2 text-sm"
+                      />
+                      <p className="mb-3 mt-1 text-xs text-ardoise-400">
+                        Retouche la phrase avant de l&apos;ajouter : c&apos;est
+                        toi qui signes la ligne.
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          name="action"
+                          value="accepter"
+                          className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${volet.classeAccent}`}
+                        >
+                          Ajouter à ma base
+                        </button>
+                        <button
+                          type="submit"
+                          name="action"
+                          value="refuser"
+                          className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700"
+                        >
+                          Refuser
+                        </button>
+                      </div>
                     </form>
                   </Carte>
                 ))}
