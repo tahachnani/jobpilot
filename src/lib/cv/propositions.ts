@@ -2,6 +2,7 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
 import { extraireJson } from "@/lib/extraction-json";
 import { VOLETS, type CodeVolet } from "@/config/volets";
+import { ACTIVITES } from "@/config/activites";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV } from "@/lib/cv/generer";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
@@ -85,6 +86,9 @@ FORME
 - les chiffres du corpus peuvent être repris, jamais inventés
 
 Propose au plus ${MAX_PROPOSITIONS} missions, les plus utiles à cette offre. Si le corpus n'apporte rien que les missions actuelles ne disent déjà, renvoie un tableau vide.
+
+LES CODES D'ACTIVITÉ
+Tu classes chaque mission dans la liste fermée fournie avec le message. Tu emploies les identifiants exacts — minuscules, sans accent, avec tirets bas — et rien d'autre. Un code inventé rend la mission invisible au moteur de sélection : elle n'atteindra jamais un CV.
 
 Tu réponds UNIQUEMENT par un tableau JSON, sans préambule ni balises de code :
 [{"experienceId": "<identifiant fourni>", "texte": "<mission>", "codes": ["code1", "code2"]}]`;
@@ -221,6 +225,8 @@ export async function proposerMissionsPourOffre(
   }
 
   const message = [
+    `CODES D'ACTIVITÉ AUTORISÉS : ${Object.keys(ACTIVITES).join(", ")}`,
+    "",
     `POSTE VISÉ : ${offre.intitule ?? ""} — volet ${VOLETS[offre.volet].nom}`,
     "",
     `SAVOIR-FAIRE RÉCLAMÉS PAR L'OFFRE : ${termesOffre.join(", ")}`,
@@ -281,6 +287,31 @@ export async function proposerMissionsPourOffre(
       continue;
     }
 
+    // Les codes doivent appartenir à la taxonomie fermée : c'est sur eux que
+    // le moteur de sélection compare une mission à une offre. Le modèle en a
+    // inventé — « analyse financière », « Orientation business » — et les
+    // missions acceptées n'atteignaient jamais un CV, faute de correspondance.
+    let codes = (p.codes ?? []).filter((c) => c in ACTIVITES);
+
+    // À défaut, on reprend ceux des entrées de corpus qui fondent la mission :
+    // elles décrivent le même travail.
+    if (codes.length === 0) {
+      const textesFondateurs = fondements(texte, lignes, 3);
+      codes = [
+        ...new Set(
+          lignes
+            .filter((l) => textesFondateurs.includes(l.texte))
+            .flatMap((l) => l.codes)
+            .filter((c) => c in ACTIVITES)
+        ),
+      ];
+    }
+
+    if (codes.length === 0) {
+      rejetees += 1;
+      continue;
+    }
+
     // La mission est créée inactive : elle existe, mais aucune sélection ne la
     // voit tant que Taha n'a pas dit oui.
     const { data: creee, error } = await supabase
@@ -288,7 +319,7 @@ export async function proposerMissionsPourOffre(
       .insert({
         experience_id: experience.id,
         texte_source: texte,
-        activites_codes: p.codes ?? [],
+        activites_codes: codes,
         contient_chiffre: /\d/.test(texte),
         pertinence_cdg: 3,
         pertinence_compta: 3,
