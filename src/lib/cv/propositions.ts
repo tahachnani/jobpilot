@@ -241,7 +241,10 @@ export async function proposerMissionsPourOffre(
     modele: MODELE_REDACTION,
     systeme: SYSTEME,
     message,
-    maxTokens: 4000,
+    // Le modèle produit un raisonnement invisible avant le JSON, qui compte
+    // dans les jetons de sortie : 4000 étaient atteints pile, réponse coupée.
+    // La limite est un plafond, pas un coût — seule la production est facturée.
+    maxTokens: 8000,
     tache: "propositions_missions",
     offreId,
   });

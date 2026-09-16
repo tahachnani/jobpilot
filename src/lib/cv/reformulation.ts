@@ -182,10 +182,10 @@ export async function reformulerPourOffre(
     modele: MODELE_REDACTION,
     systeme: SYSTEME,
     message,
-    // Quatorze missions rédigées par Sonnet dépassent 4000 jetons : sept
-    // appels sur huit ont été coupés au même endroit, chacun facturé pour
-    // rien. Même défaut que la lettre, corrigé là-bas et pas ici.
-    maxTokens: 8000,
+    // Quatorze missions rédigées par Sonnet, précédées d'un raisonnement
+    // invisible qui compte dans les jetons de sortie : 4000 puis 8000 ont été
+    // atteints pile. La limite est un plafond, pas un coût.
+    maxTokens: 12000,
     tache: "reformulation_missions",
     offreId,
   });
