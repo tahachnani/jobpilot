@@ -79,13 +79,45 @@ export async function appelIA(options: {
 
   const donnees = (await reponse.json()) as {
     content: { type: string; text?: string }[];
+    stop_reason?: string;
     usage: { input_tokens: number; output_tokens: number };
   };
 
-  const texte = donnees.content
+  let texte = donnees.content
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
     .join("\n");
+
+  // Repli : certains modèles renvoient le texte dans un bloc d'un autre type.
+  // Plutôt que de rendre une chaîne vide et un message d'erreur muet, on
+  // récupère tout ce qui porte du texte.
+  if (!texte.trim()) {
+    texte = donnees.content
+      .map((b) => b.text ?? "")
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  // Une réponse sans texte doit se diagnostiquer sur l'écran, pas dans les
+  // journaux : on dit ce qui est réellement revenu.
+  if (!texte.trim()) {
+    const types = donnees.content.map((b) => b.type).join(", ") || "aucun bloc";
+    const cause =
+      donnees.stop_reason === "max_tokens"
+        ? "réponse coupée par la limite de jetons"
+        : `arrêt : ${donnees.stop_reason ?? "inconnu"}`;
+    await journaliser(
+      options,
+      null,
+      false,
+      `réponse sans texte — blocs : ${types} — ${cause} — ` +
+        `${donnees.usage.output_tokens} jetons produits`
+    );
+    throw new ErreurIA(
+      `Le modèle n'a renvoyé aucun texte (blocs reçus : ${types} ; ${cause}). ` +
+        `${donnees.usage.output_tokens} jetons produits.`
+    );
+  }
 
   const tarif = TARIFS[options.modele] ?? { entree: 1, sortie: 5 };
   const coutUsd =
