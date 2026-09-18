@@ -173,14 +173,28 @@ export default async function Lettre({
             d&apos;appel reste « Madame, Monsieur ».
           </p>
         )}
-        <form action={genererLettre} className="mt-4">
-          <input type="hidden" name="offreId" value={params.id} />
-          <BoutonSoumettre
-            libelle={derniere ? "Rédiger une nouvelle version" : "Rédiger la lettre"}
-            libelleEnCours="Rédaction…"
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
-          />
-        </form>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <form action={genererLettre}>
+            <input type="hidden" name="offreId" value={params.id} />
+            <BoutonSoumettre
+              libelle={derniere ? "Rédiger une nouvelle version" : "Rédiger la lettre"}
+              libelleEnCours="Rédaction…"
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
+            />
+          </form>
+
+          {derniere && (
+            <form action={genererLettre}>
+              <input type="hidden" name="offreId" value={params.id} />
+              <input type="hidden" name="style" value="autre" />
+              <BoutonSoumettre
+                libelle="Réécrire dans un autre style"
+                libelleEnCours="Rédaction…"
+                className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+              />
+            </form>
+          )}
+        </div>
       </Carte>
 
       {!derniere || !modele ? (
@@ -248,6 +262,20 @@ export default async function Lettre({
                 >
                   Télécharger
                 </a>
+                <BoutonCopier
+                  texte={[
+                    modele.objet,
+                    "",
+                    modele.formuleAppel,
+                    "",
+                    ...modele.paragraphes,
+                    "",
+                    modele.formulePolitesse,
+                    "",
+                    modele.signature,
+                  ].join("\n")}
+                  className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700"
+                />
               </div>
             </form>
 

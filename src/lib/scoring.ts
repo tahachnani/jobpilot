@@ -98,6 +98,9 @@ function sousScoreMissions(
   for (const m of offre.missions) {
     let meilleure = 0;
     let couvertsMax: string[] = [];
+    // On garde aussi *quelle* mission couvre l'exigence. Afficher le seul nom
+    // du code — « Couvert par : Prévisionnel » — ne disait pas par quoi.
+    let missionCouvrante = "";
 
     if (m.codes.length === 0) {
       // Sans code, on ne peut rien mesurer : neutre, et on le dit.
@@ -112,6 +115,7 @@ function sousScoreMissions(
         if (note > meilleure) {
           meilleure = note;
           couvertsMax = communs;
+          missionCouvrante = p.texte;
         }
       }
     }
@@ -126,7 +130,11 @@ function sousScoreMissions(
         m.codes.length === 0
           ? "Aucun code d'activité identifié — non mesurable."
           : couvertsMax.length > 0
-            ? `Couvert par : ${couvertsMax.map(libelleActivite).join(", ")}.`
+            ? `Couvert par ta mission « ${
+                missionCouvrante.length > 90
+                  ? missionCouvrante.slice(0, 90) + "…"
+                  : missionCouvrante
+              } » — ${couvertsMax.map(libelleActivite).join(", ")}.`
             : `Non couvert. Attendu : ${m.codes.map(libelleActivite).join(", ")}.`,
     });
   }

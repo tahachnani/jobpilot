@@ -16,9 +16,11 @@ export async function genererLettre(formData: FormData) {
   const offreId = String(formData.get("offreId") ?? "");
   if (!offreId) return;
 
+  const autreStyle = String(formData.get("style") ?? "") === "autre";
+
   let resume = "";
   try {
-    const r = await genererLettrePourOffre(offreId);
+    const r = await genererLettrePourOffre(offreId, autreStyle);
     const orphelins =
       r.ancrage.nombresOrphelins.length + r.ancrage.nomsOrphelins.length;
     resume =

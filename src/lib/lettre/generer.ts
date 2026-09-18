@@ -181,8 +181,24 @@ async function contexteParcours(volet: CodeVolet): Promise<{
   };
 }
 
+/**
+ * Consignes de style, tirées au sort à chaque réécriture.
+ *
+ * Régénérer donnait presque la même lettre : mêmes phrases, mêmes tournures.
+ * Le modèle retombe naturellement sur sa formulation la plus probable ; pour
+ * qu'il change, il faut lui demander autre chose, pas la même chose une
+ * seconde fois.
+ */
+const STYLES = [
+  "Écris plus direct et plus court : phrases brèves, peu de subordonnées, aucun connecteur décoratif.",
+  "Écris de façon plus narrative : pars d'une situation concrète vécue et déroule, sans jamais inventer de fait.",
+  "Écris de façon plus analytique : pose le problème que le poste doit résoudre, puis montre en quoi le parcours y répond.",
+  "Écris plus sobre et factuel : aucune formule d'enthousiasme, le raisonnement seul, le ton d'une note interne.",
+];
+
 export async function genererLettrePourOffre(
-  offreId: string
+  offreId: string,
+  changerDeStyle = false
 ): Promise<ResultatLettre> {
   const supabase = creerClientServeur();
 
@@ -266,9 +282,14 @@ export async function genererLettrePourOffre(
     .filter(Boolean)
     .join("\n");
 
+  // Une consigne de style différente à chaque réécriture, choisie au hasard.
+  const style = changerDeStyle
+    ? STYLES[Math.floor(Math.random() * STYLES.length)]
+    : "";
+
   const reponse = await appelIA({
     modele: MODELE_REDACTION,
-    systeme: SYSTEME,
+    systeme: style ? `${SYSTEME}\n\nCONSIGNE DE STYLE POUR CETTE VERSION\n${style}\nNe reprends pas les tournures d'une version précédente.` : SYSTEME,
     message,
     // Une lettre de quatre paragraphes et un email, en JSON avec ses
     // échappements, dépassent largement 3000 jetons : la réponse était coupée
