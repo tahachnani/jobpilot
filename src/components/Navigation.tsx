@@ -1,6 +1,16 @@
 "use client";
 
 import Link from "next/link";
+
+/**
+ * Tous les liens portent `prefetch={false}`.
+ *
+ * Next.js précharge par défaut chaque lien visible. Comme toutes les pages de
+ * l'application sont en `force-dynamic` — elles lisent des données propres à
+ * l'utilisateur — chaque préchargement déclenchait un rendu serveur complet
+ * avec ses requêtes Supabase. Les journaux montraient huit pages rendues à
+ * chaque navigation, d'où la lenteur ressentie sur la barre latérale.
+ */
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { LISTE_VOLETS } from "@/config/volets";
@@ -43,7 +53,7 @@ export default function Navigation({ email }: { email: string }) {
       </div>
 
       {liensHaut.map((l) => (
-        <Link
+        <Link prefetch={false}
           key={l.href}
           href={l.href}
           onClick={() => setOuvert(false)}
@@ -59,7 +69,7 @@ export default function Navigation({ email }: { email: string }) {
           <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-ardoise-500">
             {v.emoji} {v.nom}
           </p>
-          <Link
+          <Link prefetch={false}
             href={`/${v.slug}/offres`}
             onClick={() => setOuvert(false)}
             className={classeLien(`/${v.slug}/offres`)}
@@ -67,7 +77,7 @@ export default function Navigation({ email }: { email: string }) {
             <span className="w-4" aria-hidden />
             Offres
           </Link>
-          <Link
+          <Link prefetch={false}
             href={`/${v.slug}/candidatures`}
             onClick={() => setOuvert(false)}
             className={classeLien(`/${v.slug}/candidatures`)}
@@ -80,7 +90,7 @@ export default function Navigation({ email }: { email: string }) {
 
       <div className="mt-5 border-t border-ardoise-800 pt-4">
         {liensBas.map((l) => (
-          <Link
+          <Link prefetch={false}
             key={l.href}
             href={l.href}
             onClick={() => setOuvert(false)}

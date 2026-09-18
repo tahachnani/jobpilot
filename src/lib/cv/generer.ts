@@ -8,7 +8,7 @@ import { choisirNiveau } from "@/lib/cv/compacite";
 import { construireModele, modeleEnTexte, type ModeleCV } from "@/lib/cv/modele";
 import { estimerHauteur } from "@/lib/cv/encombrement";
 import { comparerAuReference, potentielAdaptation } from "@/lib/cv/ecart";
-import { chargerCorpus, corpusEnTexte } from "@/lib/cv/corpus";
+import { chargerCorpus } from "@/lib/cv/corpus";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 
 export class ErreurCV extends Error {}
@@ -68,12 +68,17 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
   // Le parcours au sens large : corpus, formations, compétences. C'est lui qui
   // distingue un terme récupérable d'un terme hors de portée.
   const corpusParExperience = await chargerCorpus();
+  // Ligne à ligne, et non en un seul bloc : un terme n'est récupérable que si
+  // tous ses mots se trouvent dans la même ligne. Éparpillés sur deux entrées
+  // sans rapport, ils ne prouvent rien.
   const parcours = [
-    ...donnees.experiences.map((e) => corpusEnTexte(corpusParExperience.get(e.id))),
+    ...donnees.experiences.flatMap((e) =>
+      (corpusParExperience.get(e.id) ?? []).map((l) => l.texte)
+    ),
     ...donnees.experiences.flatMap((e) => e.missions.map((m) => m.texte)),
     ...donnees.competences.map((c) => `${c.libelle} ${c.precision ?? ""}`),
     ...donnees.formations.map((f) => f.diplome),
-  ].join("\n");
+  ];
   if (donnees.experiences.length === 0) {
     throw new ErreurCV(
       `Aucune expérience n'est visible dans le volet ${offre.volet}. ` +
@@ -83,7 +88,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
 
   let { selection, modele } = choisirNiveau(donnees, analyse, offre.volet);
   let pdf = await rendreModele(modele);
-  let pages = await compterPages(pdf);
+  let pages = compterPages(pdf);
 
   // L'estimation par comptage de caractères décide du premier essai ; la
   // composition réelle a le dernier mot. Tant qu'elle rend deux pages, on
@@ -95,7 +100,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     selection = selectionner(donnees, analyse, NIVEAUX[index]);
     modele = construireModele(donnees, selection, offre.volet);
     pdf = await rendreModele(modele);
-    pages = await compterPages(pdf);
+    pages = compterPages(pdf);
   }
 
   if (pages > 1) {

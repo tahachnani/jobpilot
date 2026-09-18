@@ -12,17 +12,24 @@ export async function rendreModele(modele: ModeleCV): Promise<Buffer> {
  * Nombre de pages réellement composées.
  *
  * L'estimation par comptage de caractères peut se tromper ; cette vérification
- * après coup transforme la contrainte « une seule page » en garantie. On
- * réutilise `unpdf`, déjà présent pour la lecture des offres en PDF. En cas
- * d'échec de lecture on renvoie 1 : mieux vaut livrer le CV estimé que de
- * bloquer la génération sur un outil de contrôle.
+ * après coup transforme la contrainte « une seule page » en garantie.
+ *
+ * Elle lisait le nombre de pages avec `unpdf`, qui charge tout un moteur de
+ * lecture PDF : un outil de contrôle plus lourd que ce qu'il contrôle, chargé
+ * à chaque génération. React-PDF écrit la structure du document en clair, le
+ * nombre de pages s'y lit directement.
+ *
+ * En cas d'échec on renvoie 1 : mieux vaut livrer le CV estimé que bloquer la
+ * génération sur une vérification.
  */
-export async function compterPages(pdf: Buffer): Promise<number> {
-  try {
-    const { getDocumentProxy } = await import("unpdf");
-    const doc = await getDocumentProxy(new Uint8Array(pdf));
-    return doc.numPages;
-  } catch {
-    return 1;
-  }
+export function compterPages(pdf: Buffer): number {
+  const texte = pdf.toString("latin1");
+
+  const catalogue = texte.match(/\/Type\s*\/Pages[\s\S]{0,400}?\/Count\s+(\d+)/);
+  if (catalogue) return Number(catalogue[1]);
+
+  // À défaut, on compte les objets page eux-mêmes — sans confondre /Page
+  // et /Pages, qui désigne le catalogue.
+  const pages = texte.match(/\/Type\s*\/Page(?![s])/g);
+  return pages ? pages.length : 1;
 }

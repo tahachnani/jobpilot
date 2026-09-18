@@ -1,3 +1,4 @@
+import { creerClientServeur } from "@/lib/supabase/server";
 import { Carte, TitrePage } from "@/components/ui";
 import { LISTE_VOLETS, VOLETS, type CodeVolet } from "@/config/volets";
 import {
@@ -8,6 +9,8 @@ import {
 import { chargerBasePro, dureeMois } from "@/lib/base-pro";
 import {
   basculerVisibilite,
+  modifierCompetence,
+  retablirCompetence,
   deplacer,
   modifierAccroche,
   modifierFormulation,
@@ -91,6 +94,24 @@ export default async function Profil({
 
   const annees = Math.floor(base.ancienneteMois / 12);
   const mois = Math.round(base.ancienneteMois % 12);
+
+  // Les compétences masquées ou écartées dans ce volet : elles n'apparaissent
+  // nulle part ailleurs, et un refus depuis une offre devenait irréversible.
+  const supabaseProfil = creerClientServeur();
+  const champVisible = volet === "cdg" ? "visible_cdg" : "visible_compta";
+  const { data: masqueesBrutes } = await supabaseProfil
+    .from("competences")
+    .select("id, libelle, categorie, niveau, origine, precision")
+    .eq(champVisible, false)
+    .order("libelle");
+  const masquees = (masqueesBrutes ?? []) as {
+    id: string;
+    libelle: string;
+    categorie: string;
+    niveau: number;
+    origine: string | null;
+    precision: string | null;
+  }[];
 
   const parCategorie = base.competences.reduce<
     Record<string, typeof base.competences>
@@ -283,8 +304,9 @@ export default async function Profil({
               {liste.map((c) => (
                 <li
                   key={c.id}
-                  className="flex flex-wrap items-center justify-between gap-2 border-b border-ardoise-50 pb-2 last:border-0"
+                  className="border-b border-ardoise-50 pb-2 last:border-0"
                 >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm text-ardoise-700">
                     {c.libelle}
                     {c.precision && (
@@ -307,12 +329,110 @@ export default async function Profil({
                     )}
                     <BoutonMasquer table="competences" id={c.id} volet={volet} />
                   </span>
+                  </div>
+
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-[11px] text-ardoise-400">
+                      Corriger
+                    </summary>
+                    <form action={modifierCompetence} className="mt-2 space-y-2">
+                      <input type="hidden" name="id" value={c.id} />
+                      <input type="hidden" name="volet" value={volet} />
+                      <input
+                        name="libelle"
+                        defaultValue={c.libelle}
+                        className="w-full rounded border border-ardoise-300 px-2 py-1 text-xs"
+                      />
+                      <input
+                        name="precision"
+                        defaultValue={c.precision ?? ""}
+                        placeholder="Précision (facultatif)"
+                        className="w-full rounded border border-ardoise-300 px-2 py-1 text-xs"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <select
+                          name="categorie"
+                          defaultValue={c.categorie}
+                          className="rounded border border-ardoise-300 px-2 py-1 text-xs"
+                        >
+                          <option value="cdg">Contrôle de gestion</option>
+                          <option value="compta">Comptabilité</option>
+                          <option value="outil">Outil / logiciel</option>
+                          <option value="transversale">Transversale</option>
+                        </select>
+                        <select
+                          name="niveau"
+                          defaultValue={String(c.niveau)}
+                          className="rounded border border-ardoise-300 px-2 py-1 text-xs"
+                        >
+                          <option value="1">Notions</option>
+                          <option value="2">Opérationnel</option>
+                          <option value="3">Maîtrisé</option>
+                        </select>
+                        <button
+                          type="submit"
+                          className="rounded border border-ardoise-300 px-2 py-1 text-xs font-medium text-ardoise-700"
+                        >
+                          Enregistrer
+                        </button>
+                      </div>
+                    </form>
+                  </details>
                 </li>
               ))}
             </ul>
           </Carte>
         ))}
       </div>
+
+      {masquees.length > 0 && (
+        <Carte className="mt-6">
+          <p className="text-sm font-medium text-ardoise-800">
+            Masquées ou écartées dans ce volet ({masquees.length})
+          </p>
+          <p className="mt-1 text-xs text-ardoise-500">
+            Celles que tu as masquées, et celles refusées depuis une offre —
+            enregistrées au niveau zéro pour ne plus être reproposées. Un refus
+            par erreur se répare ici.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {masquees.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-ardoise-50 pb-2 last:border-0"
+              >
+                <span className="text-sm text-ardoise-500">
+                  {c.libelle}
+                  {c.origine && (
+                    <span className="ml-2 text-[10px] text-ardoise-400">
+                      {c.origine}
+                    </span>
+                  )}
+                </span>
+                <form action={retablirCompetence} className="flex gap-2">
+                  <input type="hidden" name="id" value={c.id} />
+                  <input type="hidden" name="volet" value={volet} />
+                  <select
+                    name="niveau"
+                    defaultValue="2"
+                    className="rounded border border-ardoise-300 px-2 py-1 text-xs"
+                  >
+                    <option value="1">Notions</option>
+                    <option value="2">Opérationnel</option>
+                    <option value="3">Maîtrisé</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="rounded border border-ardoise-300 px-3 py-1 text-xs font-medium text-ardoise-700"
+                  >
+                    Rétablir
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Carte>
+      )}
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Carte>

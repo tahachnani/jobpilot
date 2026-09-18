@@ -36,7 +36,7 @@ export function nettoyerLibelle(brut: string): string {
   let t = brut.trim().replace(/\s+/g, " ");
 
   t = t.replace(
-    /^(bonne\s+|solide\s+|très\s+bonne\s+)?(maitrise|maîtrise|connaissance|connaissances|pratique|usage|utilisation)\s*(d'|de\s+la\s+|de\s+l'|des\s+|du\s+|de\s+|en\s+|sur\s+)?/i,
+    /^(bonne\s+|solide\s+|très\s+bonne\s+|forte\s+|réelle\s+)?(maitrise|maîtrise|connaissance|connaissances|pratique|usage|utilisation|interet|intérêt|appetence|appétence|gout|goût|sens|capacite|capacité|aisance)\s*(pour\s+les\s+|pour\s+la\s+|pour\s+le\s+|pour\s+l'|pour\s+|d'|de\s+la\s+|de\s+l'|des\s+|du\s+|de\s+|en\s+|sur\s+|à\s+|a\s+)?/i,
     ""
   );
   t = t.replace(/\s*\(.*?\)\s*$/, "");
@@ -50,6 +50,21 @@ export function nettoyerLibelle(brut: string): string {
   if (!estSigle) t = t.charAt(0).toUpperCase() + t.slice(1);
 
   return t;
+}
+
+/**
+ * Découpe un libellé qui en contient plusieurs.
+ *
+ * Les annonces écrivent « Élaboration et analyse des tableaux de bord /
+ * reporting » : trois compétences en une. Proposées telles quelles, elles
+ * entraient dans la base comme une ligne bâtarde qu'aucun CV ne pouvait
+ * reprendre.
+ */
+export function decouperLibelle(brut: string): string[] {
+  return brut
+    .split(/\s*\/\s*|\s*,\s*|\s+;\s*/)
+    .map((p) => nettoyerLibelle(p))
+    .filter((p) => p.length >= 3);
 }
 
 /** Trop court ou trop générique pour valoir une ligne de CV. */
@@ -83,13 +98,23 @@ export async function competencesManquantes(
 ): Promise<CompetenceManquante[]> {
   const supabase = creerClientServeur();
 
-  const { data } = await supabase
-    .from("competences")
-    .select("libelle, code_normalise");
+  const [{ data }, { data: langues }] = await Promise.all([
+    supabase.from("competences").select("libelle, code_normalise"),
+    supabase.from("langues").select("langue, niveau, certification"),
+  ]);
 
-  const connues = ((data ?? []) as { libelle: string; code_normalise: string }[])
-    .flatMap((c) => [c.libelle, c.code_normalise])
-    .filter(Boolean);
+  // Les langues vivent dans leur propre table : sans elles, « anglais
+  // opérationnel » était signalé absent d'un profil qui porte un TOEIC B2.
+  const connues = [
+    ...((data ?? []) as { libelle: string; code_normalise: string }[]).flatMap(
+      (c) => [c.libelle, c.code_normalise]
+    ),
+    ...((langues ?? []) as {
+      langue: string;
+      niveau: string | null;
+      certification: string | null;
+    }[]).flatMap((l) => [l.langue, l.niveau ?? "", l.certification ?? ""]),
+  ].filter(Boolean);
 
   const estConnue = (libelle: string) =>
     connues.some((c) => correspond(c, libelle));
@@ -98,11 +123,13 @@ export async function competencesManquantes(
   const candidates: CompetenceManquante[] = [];
 
   for (const c of offre.competences) {
-    candidates.push({
-      libelle: nettoyerLibelle(c.libelle),
-      origine: c.caractere === "indispensable" ? "indispensable" : "souhaitee",
-      categorieSuggeree: familleDuVolet,
-    });
+    for (const libelle of decouperLibelle(c.libelle)) {
+      candidates.push({
+        libelle,
+        origine: c.caractere === "indispensable" ? "indispensable" : "souhaitee",
+        categorieSuggeree: familleDuVolet,
+      });
+    }
   }
   for (const o of offre.outils) {
     candidates.push({

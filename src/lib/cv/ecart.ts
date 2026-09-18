@@ -150,6 +150,13 @@ function digneDeCompte(terme: string): boolean {
  * Mesure ce que l'annonce réclame et que le CV ne dit pas, en séparant ce qui
  * est récupérable de ce qui ne l'est pas.
  *
+ * Un terme est récupérable si tous ses mots se trouvent dans **une même ligne**
+ * du parcours — une mission, une entrée de corpus, une compétence. La première
+ * version les cherchait n'importe où dans le parcours entier : « finance »
+ * dans une ligne, « entreprise » dans une autre, et « Finance d'entreprise »
+ * était déclaré récupérable alors que rien ne le portait. D'où un potentiel
+ * fort suivi d'aucune proposition.
+ *
  * Le niveau affiché ne dépend que du récupérable : c'est le seul sur lequel
  * une reformulation peut agir. Crier « fort » pour du hors-portée pousserait à
  * payer un appel qui ne pouvait rien produire.
@@ -160,7 +167,7 @@ function digneDeCompte(terme: string): boolean {
 export function potentielAdaptation(
   analyse: OffreExtraite,
   selectionOffre: Selection,
-  parcours = ""
+  lignesParcours: string[] = []
 ): Potentiel {
   const attendus = [
     ...analyse.mots_cles_ats,
@@ -184,7 +191,7 @@ export function potentielAdaptation(
       ...selectionOffre.competences.map((c) => c.libelle),
     ].join(" ")
   );
-  const motsDuParcours = motsSignificatifs(parcours);
+  const motsParLigne = lignesParcours.map((l) => motsSignificatifs(l));
 
   const vus = new Set<string>();
   const absents = attendus.filter((terme) => {
@@ -194,8 +201,9 @@ export function potentielAdaptation(
     return !termePresent(terme, motsDuCv);
   });
 
-  const recuperables = absents.filter((t) => termePresent(t, motsDuParcours));
-  const horsPortee = absents.filter((t) => !termePresent(t, motsDuParcours));
+  const porte = (t: string) => motsParLigne.some((mots) => termePresent(t, mots));
+  const recuperables = absents.filter(porte);
+  const horsPortee = absents.filter((t) => !porte(t));
 
   const total = vus.size;
   const couverture = Math.round(((total - absents.length) / total) * 100);

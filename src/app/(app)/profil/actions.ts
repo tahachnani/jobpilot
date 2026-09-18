@@ -2,6 +2,7 @@
 
 import { creerClientServeur } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 const TABLES_VISIBILITE = ["experiences", "competences", "formations"] as const;
 const TABLES_ORDRE = [
@@ -131,4 +132,60 @@ export async function deplacer(formData: FormData) {
   await supabase.from(table).update({ ordre: c.ordre }).eq("id", voisin.id);
 
   rafraichir();
+}
+
+/**
+ * Corrige une compétence : libellé, catégorie, niveau, précision.
+ *
+ * L'application en ajoute désormais depuis les offres, avec des libellés
+ * repris d'annonces et une catégorie devinée. Sans moyen de les corriger, une
+ * erreur de saisie devenait définitive et remontait sur tous les CV.
+ */
+export async function modifierCompetence(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (!id) return;
+
+  const libelle = String(formData.get("libelle") ?? "").trim();
+  const precision = String(formData.get("precision") ?? "").trim();
+  const categorie = String(formData.get("categorie") ?? "").trim();
+  const niveau = Number(formData.get("niveau") ?? 0);
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("competences")
+    .update({
+      ...(libelle ? { libelle } : {}),
+      precision: precision || null,
+      ...(categorie ? { categorie } : {}),
+      niveau: Math.min(3, Math.max(0, niveau)),
+    })
+    .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/**
+ * Remet une compétence écartée dans le volet.
+ *
+ * Une compétence refusée depuis une offre était enregistrée au niveau zéro et
+ * invisible : elle n'apparaissait plus nulle part, et un refus par erreur ne
+ * pouvait plus être défait.
+ */
+export async function retablirCompetence(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  const niveau = Number(formData.get("niveau") ?? 2);
+  if (!id) return;
+
+  const champ = volet === "cdg" ? "visible_cdg" : "visible_compta";
+  const supabase = creerClientServeur();
+  await supabase
+    .from("competences")
+    .update({ [champ]: true, niveau: Math.min(3, Math.max(1, niveau)) })
+    .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
 }
