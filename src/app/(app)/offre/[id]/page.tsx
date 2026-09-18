@@ -14,6 +14,8 @@ import {
   type Potentiel,
 } from "@/lib/cv/ecart";
 import { supprimerOffre, recalculerScore, genererCV } from "./actions";
+import { repondreCompetence } from "./formulations/actions";
+import { competencesManquantes } from "@/lib/cv/competences-manquantes";
 
 export const dynamic = "force-dynamic";
 
@@ -148,12 +150,21 @@ export default async function DetailOffre({
 
   const dernierCV = cvs[0] ?? null;
 
+
   const lettres = tousDocuments.filter((d) => d.type === "lettre");
   const derniereLettre = lettres[0] ?? null;
 
   const score = (scoreBrut as { detail: Resultat } | null)?.detail ?? null;
   const analyse =
     (analyseBrute as { resultat: OffreExtraite } | null)?.resultat ?? null;
+
+  // Ce que l'offre réclame et que la base ne connaît pas : c'est une question
+  // de profil, pas d'adaptation de CV. Sa place est ici, sur la fiche d'offre,
+  // et non dans l'écran de reformulation où elle obligeait à entrer pour
+  // répondre à chaque fois.
+  const manquantes = analyse
+    ? await competencesManquantes(analyse, offre.volet as CodeVolet)
+    : [];
 
   const statut = STATUTS[offre.statut as string] ?? {
     libelle: String(offre.statut),
@@ -361,6 +372,83 @@ export default async function DetailOffre({
         rappelle pas l&apos;IA et ne coûte rien.
       </p>
 
+      {manquantes.length > 0 && (
+        <>
+          <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+            Réclamé par l&apos;offre, absent de ton profil ({manquantes.length})
+          </h2>
+          <Carte>
+            <p className="mb-4 text-sm text-ardoise-600">
+              Si tu les maîtrises, ajoute-les : elles serviront à toutes tes
+              offres. Sinon, écarte-les et elles ne reviendront plus — un refus
+              se répare depuis Mon profil.
+            </p>
+
+            <div className="space-y-4">
+              {manquantes.map((c) => (
+                <form
+                  key={c.libelle}
+                  action={repondreCompetence}
+                  className="border-t border-ardoise-100 pt-3"
+                >
+                  <input type="hidden" name="offreId" value={params.id} />
+                  <input type="hidden" name="libelle" value={c.libelle} />
+
+                  <p className="text-sm font-medium text-ardoise-800">
+                    {c.libelle}
+                    <span className="ml-2 text-xs font-normal text-ardoise-400">
+                      {c.origine === "indispensable"
+                        ? "exigée par l'offre"
+                        : c.origine === "outil"
+                        ? "outil cité"
+                        : "souhaitée"}
+                    </span>
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <select
+                      name="categorie"
+                      defaultValue={c.categorieSuggeree}
+                      className="rounded-lg border border-ardoise-300 px-2 py-1.5 text-xs"
+                    >
+                      <option value="cdg">Contrôle de gestion</option>
+                      <option value="compta">Comptabilité</option>
+                      <option value="outil">Outil / logiciel</option>
+                      <option value="transversale">Transversale</option>
+                    </select>
+                    <select
+                      name="niveau"
+                      defaultValue="2"
+                      className="rounded-lg border border-ardoise-300 px-2 py-1.5 text-xs"
+                    >
+                      <option value="1">Notions</option>
+                      <option value="2">Opérationnel</option>
+                      <option value="3">Maîtrisé</option>
+                    </select>
+                    <button
+                      type="submit"
+                      name="action"
+                      value="maitrisee"
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white ${volet.classeAccent}`}
+                    >
+                      Je la maîtrise
+                    </button>
+                    <button
+                      type="submit"
+                      name="action"
+                      value="ecartee"
+                      className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700"
+                    >
+                      Non, écarter
+                    </button>
+                  </div>
+                </form>
+              ))}
+            </div>
+          </Carte>
+        </>
+      )}
+
       <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
         CV personnalisé
       </h2>
@@ -469,6 +557,11 @@ export default async function DetailOffre({
                                 empruntée à l&apos;autre volet
                               </span>
                             )}
+                            {m.adaptee && (
+                              <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-900">
+                                reformulée pour cette offre
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -526,20 +619,59 @@ export default async function DetailOffre({
                         </div>
                       )}
 
-                      {(dernierCV.ecart.competencesAjoutees.length > 0 ||
-                        dernierCV.ecart.competencesRetirees.length > 0) && (
-                        <p className="mt-2 text-xs text-ardoise-600">
-                          Compétences : {dernierCV.ecart.competencesAjoutees.length}{" "}
-                          ajoutée
-                          {dernierCV.ecart.competencesAjoutees.length > 1 ? "s" : ""},{" "}
-                          {dernierCV.ecart.competencesRetirees.length} retirée
-                          {dernierCV.ecart.competencesRetirees.length > 1 ? "s" : ""}.
-                          {dernierCV.ecart.nbReformulees > 0 &&
-                            ` ${dernierCV.ecart.nbReformulees} mission${
-                              dernierCV.ecart.nbReformulees > 1 ? "s" : ""
-                            } reformulée${
-                              dernierCV.ecart.nbReformulees > 1 ? "s" : ""
-                            } pour cette offre.`}
+                      {dernierCV.ecart.competencesAjoutees.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-emerald-800">
+                            Compétences remontées par cette offre
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {dernierCV.ecart.competencesAjoutees.map((c, i) => (
+                              <li key={i} className="text-xs text-ardoise-600">
+                                • {c}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {dernierCV.ecart.competencesRetirees.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-ardoise-500">
+                            Compétences écartées au profit des précédentes
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {dernierCV.ecart.competencesRetirees.map((c, i) => (
+                              <li key={i} className="text-xs text-ardoise-400">
+                                • {c}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {dernierCV.modele && (
+                        <p className="mt-3 border-t border-ardoise-200 pt-2 text-xs text-ardoise-600">
+                          Total :{" "}
+                          {dernierCV.ecart.missionsMisesEnAvant.length +
+                            dernierCV.ecart.missionsEcartees.length +
+                            dernierCV.ecart.competencesAjoutees.length +
+                            dernierCV.ecart.competencesRetirees.length +
+                            dernierCV.ecart.nbReformulees}{" "}
+                          changement
+                          {dernierCV.ecart.missionsMisesEnAvant.length +
+                            dernierCV.ecart.missionsEcartees.length +
+                            dernierCV.ecart.competencesAjoutees.length +
+                            dernierCV.ecart.competencesRetirees.length +
+                            dernierCV.ecart.nbReformulees >
+                          1
+                            ? "s"
+                            : ""}{" "}
+                          par rapport au CV de référence, dont{" "}
+                          {dernierCV.ecart.nbReformulees} reformulation
+                          {dernierCV.ecart.nbReformulees > 1 ? "s" : ""} et{" "}
+                          {dernierCV.ecart.nbEmpruntees} emprunt
+                          {dernierCV.ecart.nbEmpruntees > 1 ? "s" : ""} à
+                          l&apos;autre volet.
                         </p>
                       )}
                     </div>

@@ -18,6 +18,8 @@ export interface MissionModele {
   texte: string;
   /** Traçabilité interne. Rien ne la distingue à l'écran ni sur le PDF. */
   empruntee: boolean;
+  /** Vraie si la formulation a été adaptée à cette offre. */
+  adaptee?: boolean;
   /** Note de sélection, conservée pour pouvoir expliquer le choix. */
   note: number;
 }
@@ -130,6 +132,7 @@ export function construireModele(
         missions: missions.map((m) => ({
           texte: m.texte,
           empruntee: m.empruntee,
+          adaptee: m.adaptee,
           note: m.note,
         })),
       })),
