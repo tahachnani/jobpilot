@@ -304,10 +304,25 @@ function sousScoreExperience(
   }
 
   const demande = offre.annees_experience;
+  const ecart = demande - annees;
+
+  /**
+   * Barème version 3 — D42.
+   *
+   * La courbe linéaire donnait 42 sur 100 à un profil auquel il manquait trois
+   * ans sur cinq, et le score global restait à 72 : une offre de profil
+   * confirmé passait pour une candidature solide. Au-delà d'un an d'écart,
+   * chaque année manquante retire un quart de la note, plancher à 10.
+   *
+   * L'écart d'ancienneté n'est pas proportionnel à la distance : passer de
+   * deux à trois ans manquants coûte plus qu'aller de zéro à un.
+   */
+  const lineaire = (annees / demande) * 100;
+  const penalite = ecart > 1 ? Math.max(0.3, 1 - 0.25 * (ecart - 1)) : 1;
   const note =
     annees >= demande * 0.8
       ? 100
-      : Math.round((annees / demande) * 100);
+      : Math.max(10, Math.round(lineaire * penalite));
 
   return {
     note,
