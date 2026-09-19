@@ -2,11 +2,13 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import { Carte, TitrePage } from "@/components/ui";
 import { LISTE_VOLETS, VOLETS, type CodeVolet } from "@/config/volets";
 import {
+  ACTIVITES,
   CATEGORIES_COMPETENCE,
   LIBELLES_CONTRAT,
   libelleActivite,
 } from "@/config/activites";
 import { chargerBasePro, dureeMois } from "@/lib/base-pro";
+import { chargerCorpus } from "@/lib/cv/corpus";
 import {
   basculerVisibilite,
   modifierCompetence,
@@ -14,6 +16,9 @@ import {
   deplacer,
   modifierAccroche,
   modifierFormulation,
+  ajouterEntreeCorpus,
+  modifierEntreeCorpus,
+  supprimerEntreeCorpus,
 } from "./actions";
 import Link from "next/link";
 
@@ -91,6 +96,11 @@ export default async function Profil({
   const volet: CodeVolet = searchParams.volet === "compta" ? "compta" : "cdg";
   const config = VOLETS[volet];
   const base = await chargerBasePro(volet);
+
+  // La matière première de la reformulation et des missions proposées. Elle
+  // n'apparaît sur aucun CV : sans écran de lecture, une phrase fausse y
+  // restait invisible tout en nourrissant le modèle.
+  const corpusParExperience = await chargerCorpus();
 
   const annees = Math.floor(base.ancienneteMois / 12);
   const mois = Math.round(base.ancienneteMois % 12);
@@ -202,6 +212,16 @@ export default async function Profil({
         </Carte>
       )}
 
+      {/* La taxonomie est fermée : un code hors liste est écarté à
+          l'enregistrement et l'entrée devient muette pour le moteur. */}
+      <datalist id="codes-activite">
+        {Object.entries(ACTIVITES).map(([code, a]) => (
+          <option key={code} value={code}>
+            {a.libelle}
+          </option>
+        ))}
+      </datalist>
+
       <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
         Expériences
       </h2>
@@ -287,6 +307,113 @@ export default async function Profil({
                 </div>
               ))}
             </div>
+
+            <details className="mt-4 border-t border-ardoise-100 pt-3">
+              <summary className="cursor-pointer text-xs font-medium text-ardoise-500">
+                Corpus — matière première ({
+                  (corpusParExperience.get(e.id) ?? []).length
+                }{" "}
+                {(corpusParExperience.get(e.id) ?? []).length > 1
+                  ? "entrées"
+                  : "entrée"}
+                )
+              </summary>
+
+              <p className="mt-2 text-xs leading-relaxed text-ardoise-400">
+                Ces lignes n&apos;apparaissent jamais sur un CV. Elles
+                autorisent un terme en reformulation et mesurent ce qui est
+                récupérable dans une offre — uniquement à l&apos;intérieur de
+                cette expérience.
+              </p>
+
+              <div className="mt-3 space-y-3">
+                {(corpusParExperience.get(e.id) ?? []).map((l) => (
+                  <div
+                    key={l.id}
+                    className="rounded-lg border border-ardoise-100 bg-ardoise-50/50 p-2.5"
+                  >
+                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                      {l.codes.map((c) => (
+                        <span
+                          key={c}
+                          className="rounded bg-ardoise-100 px-1.5 py-0.5 text-[10px] font-medium text-ardoise-600"
+                        >
+                          {libelleActivite(c)}
+                        </span>
+                      ))}
+                      {l.codes.length === 0 && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                          aucun code valide
+                        </span>
+                      )}
+                    </div>
+
+                    <form
+                      action={modifierEntreeCorpus}
+                      key={`corpus-${volet}-${l.id}`}
+                    >
+                      <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="volet" value={volet} />
+                      <textarea
+                        name="texte"
+                        defaultValue={l.texte}
+                        rows={3}
+                        className="w-full rounded-lg border border-ardoise-200 p-2 text-sm leading-relaxed outline-none focus:border-ardoise-500"
+                      />
+                      <input
+                        name="codes"
+                        defaultValue={l.codes.join(", ")}
+                        placeholder="codes d'activité, séparés par une virgule"
+                        list="codes-activite"
+                        className="mt-1.5 w-full rounded-lg border border-ardoise-200 p-2 text-xs outline-none focus:border-ardoise-500"
+                      />
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <button
+                          type="submit"
+                          className="rounded-lg border border-ardoise-300 px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                        >
+                          Enregistrer
+                        </button>
+                        <button
+                          type="submit"
+                          formAction={supprimerEntreeCorpus}
+                          className="rounded-lg border border-ardoise-200 px-3 py-1 text-xs text-ardoise-500 hover:bg-rose-50 hover:text-rose-700"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ))}
+
+                <form
+                  action={ajouterEntreeCorpus}
+                  key={`corpus-ajout-${volet}-${e.id}`}
+                  className="rounded-lg border border-dashed border-ardoise-200 p-2.5"
+                >
+                  <input type="hidden" name="experienceId" value={e.id} />
+                  <input type="hidden" name="volet" value={volet} />
+                  <textarea
+                    name="texte"
+                    rows={2}
+                    placeholder="Ajouter une ligne de corpus à cette expérience"
+                    className="w-full rounded-lg border border-ardoise-200 p-2 text-sm leading-relaxed outline-none focus:border-ardoise-500"
+                  />
+                  <input
+                    name="codes"
+                    placeholder="codes d'activité, séparés par une virgule"
+                    list="codes-activite"
+                    className="mt-1.5 w-full rounded-lg border border-ardoise-200 p-2 text-xs outline-none focus:border-ardoise-500"
+                  />
+                  <button
+                    type="submit"
+                    className="mt-1.5 rounded-lg border border-ardoise-300 px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                  >
+                    Ajouter
+                  </button>
+                </form>
+              </div>
+            </details>
           </Carte>
         ))}
       </div>

@@ -1,5 +1,6 @@
 "use server";
 
+import { ACTIVITES } from "@/config/activites";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -185,6 +186,93 @@ export async function retablirCompetence(formData: FormData) {
     .from("competences")
     .update({ [champ]: true, niveau: Math.min(3, Math.max(1, niveau)) })
     .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/**
+ * Les codes d'activité saisis à la main, filtrés sur la taxonomie fermée.
+ *
+ * Le scoring et la sélection comparent des codes, pas des libellés : un code
+ * hors liste rend l'entrée muette pour le moteur. Les missions proposées ont
+ * déjà payé cette leçon — trois d'entre elles portaient « analyse financière »
+ * au lieu de `analyse_financiere` et n'atteignaient aucun CV.
+ */
+function codesValides(brut: string): string[] {
+  return [
+    ...new Set(
+      brut
+        .split(/[,\s]+/)
+        .map((c) => c.trim().toLowerCase())
+        .filter((c) => c in ACTIVITES)
+    ),
+  ];
+}
+
+/** Corrige une entrée de corpus : son texte et ses codes d'activité. */
+export async function modifierEntreeCorpus(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  const texte = String(formData.get("texte") ?? "").trim();
+  if (!id || !texte) return;
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("corpus_experience")
+    .update({
+      texte,
+      activites_codes: codesValides(String(formData.get("codes") ?? "")),
+    })
+    .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/**
+ * Supprime une entrée de corpus.
+ *
+ * Sans conséquence sur les CV déjà générés : ils stockent leur propre modèle.
+ * Le corpus ne sert qu'à autoriser un terme en reformulation et à mesurer ce
+ * qui est récupérable.
+ */
+export async function supprimerEntreeCorpus(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+  await supabase.from("corpus_experience").delete().eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/** Ajoute une entrée de corpus à une expérience. */
+export async function ajouterEntreeCorpus(formData: FormData) {
+  const experienceId = String(formData.get("experienceId") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  const texte = String(formData.get("texte") ?? "").trim();
+  if (!experienceId || !texte) return;
+
+  const supabase = creerClientServeur();
+
+  const { data: derniere } = await supabase
+    .from("corpus_experience")
+    .select("ordre")
+    .eq("experience_id", experienceId)
+    .order("ordre", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase.from("corpus_experience").insert({
+    experience_id: experienceId,
+    texte,
+    activites_codes: codesValides(String(formData.get("codes") ?? "")),
+    source: "saisie_manuelle",
+    ordre: ((derniere as { ordre: number } | null)?.ordre ?? 0) + 1,
+  });
 
   revalidatePath("/profil");
   redirect(`/profil?volet=${volet}`);

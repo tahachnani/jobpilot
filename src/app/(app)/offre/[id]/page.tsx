@@ -1,5 +1,11 @@
 import { Carte, TitrePage } from "@/components/ui";
-import { STATUTS, VOLETS, type CodeVolet } from "@/config/volets";
+import {
+  STATUTS,
+  STATUTS_ENVOYES,
+  STATUTS_SUIVI,
+  VOLETS,
+  type CodeVolet,
+} from "@/config/volets";
 import { SECTEURS } from "@/config/secteurs";
 import { creerClientServeur } from "@/lib/supabase/server";
 import type { Resultat, SousScore } from "@/lib/scoring";
@@ -13,7 +19,16 @@ import {
   type Ecart,
   type Potentiel,
 } from "@/lib/cv/ecart";
-import { supprimerOffre, recalculerScore, genererCV } from "./actions";
+import {
+  supprimerOffre,
+  recalculerScore,
+  genererCV,
+  marquerEnvoyee,
+  changerStatut,
+  planifierRelance,
+  marquerRelancee,
+} from "./actions";
+import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { repondreCompetence } from "./formulations/actions";
 import { competencesManquantes } from "@/lib/cv/competences-manquantes";
 
@@ -81,7 +96,12 @@ export default async function DetailOffre({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { doublon?: string; cv?: string; message?: string };
+  searchParams: {
+    doublon?: string;
+    cv?: string;
+    message?: string;
+    suivi?: string;
+  };
 }) {
   const supabase = creerClientServeur();
 
@@ -172,6 +192,31 @@ export default async function DetailOffre({
   };
 
   const echec = offre.extraction_statut !== "complet";
+
+  // Le suivi de la candidature (étape 6). L'historique est écrit par le
+  // déclencheur `trg_journaliser_statut` depuis l'étape 1 : il n'y a qu'à le
+  // lire.
+  const { data: historiqueBrut } = await supabase
+    .from("statuts_historique")
+    .select("id, statut, date, commentaire")
+    .eq("offre_id", params.id)
+    .order("date", { ascending: false });
+  const historique = (historiqueBrut ?? []) as {
+    id: string;
+    statut: string;
+    date: string;
+    commentaire: string | null;
+  }[];
+
+  const statutCode = offre.statut as string;
+  // Le formulaire d'envoi disparaît dès que la candidature est partie, y
+  // compris si le statut a été posé à la main sans date.
+  const envoyee =
+    !!offre.date_candidature || STATUTS_ENVOYES.includes(statutCode);
+  const relancePrevue = (offre.relance_prevue_le as string | null) ?? null;
+  const aRelancer = relanceDue(statutCode, relancePrevue);
+  const joursEcoules = joursDepuis(offre.date_candidature as string | null);
+  const aujourdhui = new Date().toISOString().slice(0, 10);
 
   return (
     <>
@@ -773,12 +818,214 @@ export default async function DetailOffre({
         </div>
       </Carte>
 
-      <Carte className="mt-4 border-dashed">
-        <p className="text-sm text-ardoise-500">
-          Le changement de statut et le bouton « Marquer comme envoyée »
-          arrivent à l&apos;étape 6 : générer un document ne modifie pas le
-          statut de cette offre.
-        </p>
+      <Carte className="mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+            Suivi de la candidature
+          </p>
+          {aRelancer && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+              À relancer
+            </span>
+          )}
+        </div>
+
+        {searchParams.suivi && (
+          <p className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
+            {searchParams.suivi === "envoyee"
+              ? "Candidature marquée comme envoyée."
+              : searchParams.suivi === "relancee"
+                ? "Relance enregistrée, la suivante est repoussée."
+                : searchParams.suivi === "relance"
+                  ? "Date de relance mise à jour."
+                  : "Statut mis à jour."}
+          </p>
+        )}
+
+        {!envoyee ? (
+          <form action={marquerEnvoyee} className="mt-4">
+            <input type="hidden" name="id" value={params.id} />
+            <p className="text-sm text-ardoise-600">
+              Rien ne bascule ici tout seul : l&apos;application n&apos;envoie
+              aucun email et ne peut pas savoir qu&apos;une candidature est
+              partie.
+            </p>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-xs text-ardoise-500">
+                Date d&apos;envoi
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={aujourdhui}
+                  className="mt-1 block rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                />
+              </label>
+              <label className="flex-1 text-xs text-ardoise-500">
+                Commentaire (facultatif)
+                <input
+                  name="commentaire"
+                  placeholder="Candidature déposée sur le site, référence…"
+                  className="mt-1 block w-full rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                />
+              </label>
+              <BoutonSoumettre
+                libelle="Marquer comme envoyée"
+                libelleEnCours="Enregistrement…"
+                className="rounded-lg bg-ardoise-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-ardoise-800"
+              />
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-ardoise-600">
+              <span>
+                Envoyée le{" "}
+                <strong className="text-ardoise-900">
+                  {jour(offre.date_candidature as string)}
+                </strong>
+                {joursEcoules !== null && (
+                  <span className="text-ardoise-400">
+                    {" "}
+                    · il y a {joursEcoules} jour{joursEcoules > 1 ? "s" : ""}
+                  </span>
+                )}
+              </span>
+              <span>
+                Relances{" "}
+                <strong className="text-ardoise-900">
+                  {(offre.relances as number) ?? 0}
+                </strong>
+                {!!offre.derniere_relance_le && (
+                  <span className="text-ardoise-400">
+                    {" "}
+                    · dernière le {jour(offre.derniere_relance_le as string)}
+                  </span>
+                )}
+              </span>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-ardoise-100 pt-4">
+              <form action={planifierRelance} className="flex items-end gap-2">
+                <input type="hidden" name="id" value={params.id} />
+                <label className="text-xs text-ardoise-500">
+                  Prochaine relance
+                  <input
+                    type="date"
+                    name="date"
+                    defaultValue={relancePrevue ?? ""}
+                    className="mt-1 block rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                >
+                  Enregistrer
+                </button>
+              </form>
+
+              {statutCode === "envoyee" && (
+                <form action={marquerRelancee}>
+                  <input type="hidden" name="id" value={params.id} />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    Relancé aujourd&apos;hui
+                  </button>
+                </form>
+              )}
+            </div>
+
+            <form
+              action={changerStatut}
+              className="mt-4 border-t border-ardoise-100 pt-4"
+            >
+              <input type="hidden" name="id" value={params.id} />
+              <p className="text-xs text-ardoise-500">Déclarer une issue</p>
+              <div className="mt-2 flex flex-wrap items-end gap-3">
+                <select
+                  name="statut"
+                  defaultValue={
+                    STATUTS_SUIVI.includes(
+                      statutCode as (typeof STATUTS_SUIVI)[number]
+                    )
+                      ? statutCode
+                      : "entretien"
+                  }
+                  className="rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                >
+                  {STATUTS_SUIVI.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUTS[s].libelle}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="commentaire"
+                  placeholder="Commentaire (facultatif)"
+                  className="flex-1 rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                />
+                <BoutonSoumettre
+                  libelle="Enregistrer"
+                  libelleEnCours="Enregistrement…"
+                  className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+                />
+              </div>
+            </form>
+          </>
+        )}
+
+        {historique.length > 0 && (
+          <details className="mt-4 border-t border-ardoise-100 pt-3">
+            <summary className="cursor-pointer text-xs font-medium text-ardoise-500">
+              Historique ({historique.length})
+            </summary>
+            <ul className="mt-2 space-y-1.5">
+              {historique.map((h) => (
+                <li key={h.id} className="flex flex-wrap gap-2 text-xs">
+                  <span className="text-ardoise-400">{jour(h.date)}</span>
+                  <span className="font-medium text-ardoise-700">
+                    {STATUTS[h.statut]?.libelle ?? h.statut}
+                  </span>
+                  {h.commentaire && (
+                    <span className="text-ardoise-500">— {h.commentaire}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-ardoise-400">
+            Corriger le statut
+          </summary>
+          <form action={changerStatut} className="mt-2 flex flex-wrap gap-2">
+            <input type="hidden" name="id" value={params.id} />
+            <select
+              name="statut"
+              defaultValue={statutCode}
+              className="rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+            >
+              {Object.entries(STATUTS).map(([code, s]) => (
+                <option key={code} value={code}>
+                  {s.libelle}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-lg border border-ardoise-200 px-3 py-1.5 text-xs text-ardoise-600 hover:bg-ardoise-50"
+            >
+              Poser ce statut
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-ardoise-400">
+            Sans garde-fou, y compris en arrière : une erreur de clic ne doit
+            pas être définitive.
+          </p>
+        </details>
       </Carte>
     </>
   );

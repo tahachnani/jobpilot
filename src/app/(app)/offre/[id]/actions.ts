@@ -5,6 +5,13 @@ import { VOLETS, type CodeVolet } from "@/config/volets";
 import { enregistrerScore } from "@/lib/analyse";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV, genererCVPourOffre } from "@/lib/cv/generer";
+import {
+  avancerPreparation,
+  commenterDernierStatut,
+  dateDeRelanceParDefaut,
+  dateDansNJours,
+} from "@/lib/suivi";
+import { STATUTS } from "@/config/volets";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -75,9 +82,8 @@ export async function recalculerScore(formData: FormData) {
  * Génère le CV de l'offre et l'enregistre comme nouvelle version.
  *
  * Aucun appel IA, donc aucun coût : régénérer autant de fois qu'on veut est
- * sans conséquence. Le statut de l'offre n'est pas touché — le passage à
- * « CV généré » relève de l'étape 6, au même titre que « Marquer comme
- * envoyée ».
+ * sans conséquence. L'offre avance à « CV généré » si elle était en deçà
+ * (D43) ; une offre déjà envoyée ou classée ne bouge pas.
  */
 export async function genererCV(formData: FormData) {
   const id = String(formData.get("id") ?? "");
@@ -98,7 +104,119 @@ export async function genererCV(formData: FormData) {
     redirect(`/offre/${id}?cv=erreur&message=${encodeURIComponent(message)}`);
   }
 
+  await avancerPreparation(id, "cv_genere");
+
   revalidatePath(`/offre/${id}`);
   revalidatePath("/mes-cv");
   redirect(`/offre/${id}?cv=ok`);
+}
+
+/**
+ * Déclare la candidature envoyée (D44).
+ *
+ * C'est le seul chemin vers `envoyee` : l'application n'envoie rien et ne
+ * peut pas le deviner. La date est modifiable, parce qu'une candidature
+ * partie hier et saisie aujourd'hui fausserait le délai de relance.
+ */
+export async function marquerEnvoyee(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const saisie = String(formData.get("date") ?? "").trim();
+  const dateEnvoi = saisie ? new Date(saisie) : new Date();
+  if (Number.isNaN(dateEnvoi.getTime())) return;
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({
+      statut: "envoyee",
+      date_candidature: dateEnvoi.toISOString(),
+      relance_prevue_le: dateDeRelanceParDefaut(dateEnvoi),
+    })
+    .eq("id", id);
+
+  await commenterDernierStatut(id, String(formData.get("commentaire") ?? ""));
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=envoyee`);
+}
+
+/**
+ * Déclare une issue après l'envoi (D45), ou corrige un statut (D49).
+ *
+ * Aucun garde-fou volontairement : l'application a un seul utilisateur, et une
+ * erreur de clic ne doit pas devenir définitive.
+ */
+export async function changerStatut(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const statut = String(formData.get("statut") ?? "");
+  if (!id || !(statut in STATUTS)) return;
+
+  const supabase = creerClientServeur();
+
+  // Une offre qui sort de l'attente n'a plus de relance à prévoir.
+  const enAttente = statut === "envoyee";
+  await supabase
+    .from("offres")
+    .update({
+      statut,
+      ...(enAttente ? {} : { relance_prevue_le: null }),
+    })
+    .eq("id", id);
+
+  await commenterDernierStatut(id, String(formData.get("commentaire") ?? ""));
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=statut`);
+}
+
+/** Change ou efface la date de relance prévue (D46). */
+export async function planifierRelance(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const saisie = String(formData.get("date") ?? "").trim();
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({ relance_prevue_le: saisie || null })
+    .eq("id", id);
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=relance`);
+}
+
+/**
+ * Enregistre une relance effectuée (D47).
+ *
+ * Le statut ne change pas : relancer n'est pas obtenir une réponse. La
+ * prochaine relance est repoussée du même délai.
+ */
+export async function marquerRelancee(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+  const { data } = await supabase
+    .from("offres")
+    .select("relances")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return;
+
+  const aujourdhui = dateDansNJours(0);
+  await supabase
+    .from("offres")
+    .update({
+      relances: ((data as { relances: number | null }).relances ?? 0) + 1,
+      derniere_relance_le: aujourdhui,
+      relance_prevue_le: dateDeRelanceParDefaut(),
+    })
+    .eq("id", id);
+
+  revalidatePath(`/offre/${id}`);
+  revalidatePath("/");
+  redirect(`/offre/${id}?suivi=relancee`);
 }

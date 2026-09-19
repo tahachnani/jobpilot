@@ -8,6 +8,7 @@ import {
   regenererEmailPourOffre,
 } from "@/lib/lettre/generer";
 import { creerClientServeur } from "@/lib/supabase/server";
+import { avancerPreparation } from "@/lib/suivi";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -40,6 +41,10 @@ export async function genererLettre(formData: FormData) {
       )}`
     );
   }
+
+  // La lettre est produite : l'offre avance, sauf si elle est déjà plus loin
+  // ou déjà envoyée (D43).
+  await avancerPreparation(offreId, "lettre_generee");
 
   revalidatePath(`/offre/${offreId}/lettre`);
   redirect(
@@ -103,6 +108,8 @@ export async function regenererEmail(formData: FormData) {
       )}`
     );
   }
+
+  await avancerPreparation(offreId, "email_genere");
 
   revalidatePath(`/offre/${offreId}/lettre`);
   redirect(`/offre/${offreId}/lettre?etat=email`);

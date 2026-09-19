@@ -85,3 +85,33 @@ export const STATUTS_ENVOYES = [
   "refusee",
   "sans_reponse",
 ];
+
+/**
+ * La chaîne de préparation, dans l'ordre (D43).
+ *
+ * Générer un document fait avancer l'offre le long de cette chaîne, et
+ * seulement vers l'avant : régénérer un CV après avoir écrit la lettre ne doit
+ * pas faire reculer l'offre. Tout ce qui vient après `email_genere` — l'envoi
+ * et ses suites — se déclare à la main et n'est jamais atteint par un
+ * traitement automatique.
+ */
+export const CHAINE_PREPARATION = [
+  "enregistree",
+  "analysee",
+  "cv_genere",
+  "lettre_generee",
+  "email_genere",
+] as const;
+
+export type StatutPreparation = (typeof CHAINE_PREPARATION)[number];
+
+/** Les issues déclarables après l'envoi (D45). */
+export const STATUTS_SUIVI = [
+  "entretien",
+  "refusee",
+  "sans_reponse",
+  "cloturee",
+] as const;
+
+/** Délai proposé par défaut avant une relance, en jours (D46, D47). */
+export const DELAI_RELANCE_JOURS = 10;
