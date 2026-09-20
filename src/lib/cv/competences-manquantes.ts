@@ -153,7 +153,9 @@ export async function detailCouverture(
 
   const vues = new Set<string>();
   const manquantes: CompetenceManquante[] = [];
-  const connues: string[] = [];
+  // Nom distinct de `connues` plus haut, qui porte le vocabulaire de la base :
+  // ici on collecte les libellés de l'annonce qui s'y rattachent.
+  const reconnues: string[] = [];
   const ignorees: string[] = [];
 
   for (const c of candidates) {
@@ -162,11 +164,11 @@ export async function detailCouverture(
     vues.add(cle);
 
     if (!digneDInteret(c.libelle)) ignorees.push(c.libelle);
-    else if (estConnue(c.libelle)) connues.push(c.libelle);
+    else if (estConnue(c.libelle)) reconnues.push(c.libelle);
     else manquantes.push(c);
   }
 
-  return { manquantes, connues, ignorees };
+  return { manquantes, connues: reconnues, ignorees };
 }
 
 /**
