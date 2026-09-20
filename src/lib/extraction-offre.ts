@@ -2,7 +2,7 @@ import { ACTIVITES } from "@/config/activites";
 import { SECTEURS } from "@/config/secteurs";
 import {
   appelIA,
-  extraireJson,
+  analyserJson,
   MODELE_EXTRACTION,
   ErreurIA,
 } from "@/lib/anthropic";
@@ -141,12 +141,14 @@ export async function extraireOffre(
     modele: MODELE_EXTRACTION,
     systeme: SYSTEME,
     message: `Voici l'offre d'emploi à extraire :\n\n${contenu.slice(0, 40000)}`,
-    maxTokens: 4000,
+    // 4000 a été la limite exacte de trois troncatures ailleurs dans l'app :
+    // une offre longue avec beaucoup de missions y arrive aussi.
+    maxTokens: 8000,
     tache: "extraction_offre",
     offreId,
   });
 
-  const brut = extraireJson<Partial<OffreExtraite>>(r.texte);
+  const brut = analyserJson<Partial<OffreExtraite>>(r.texte);
 
   // Nettoyage : on écarte tout code hors taxonomie plutôt que de le stocker.
   const missions: MissionOffre[] = (brut.missions ?? [])

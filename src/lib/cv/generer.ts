@@ -10,6 +10,7 @@ import { estimerHauteur } from "@/lib/cv/encombrement";
 import { comparerAuReference, potentielAdaptation } from "@/lib/cv/ecart";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
+import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
 
 export class ErreurCV extends Error {}
 
@@ -143,6 +144,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     storage_path: stocke ? chemin : null,
     contenu_texte: modeleEnTexte(modele),
     selection: {
+      schema: SCHEMA_SELECTION,
       modele,
       // Calculés ici parce que la composition est gratuite et déterministe :
       // les écrans les relisent au lieu de recharger toute la base.
@@ -161,6 +163,10 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
       `Le CV a été composé mais n'a pas pu être enregistré : ${erreurInsertion.message}`
     );
   }
+
+  // Les versions au-delà des trois dernières partent, PDF compris : sans
+  // cela, un CV retravaillé dix fois laisse dix fichiers dans le bucket.
+  await purgerAnciennesVersions(offreId, "cv");
 
   return { documentId, version, modele, pages, stocke };
 }

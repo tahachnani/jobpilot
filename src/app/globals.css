@@ -9,3 +9,24 @@
 body {
   @apply bg-ardoise-50 text-ardoise-900 antialiased;
 }
+
+/*
+ * Sur iOS, un champ dont le texte fait moins de 16 px déclenche un zoom
+ * automatique à la mise au point, et la page reste zoomée ensuite. L'essentiel
+ * de la saisie de cette application se fait depuis une tablette : les champs
+ * repassent donc à 16 px sur petit écran, l'apparence des écrans larges étant
+ * inchangée.
+ */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Cibles tactiles : un bouton de 20 px de haut se rate une fois sur deux. */
+  button,
+  [type="submit"] {
+    min-height: 36px;
+  }
+}

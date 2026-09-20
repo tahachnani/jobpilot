@@ -1,4 +1,4 @@
-import { Carte, TitrePage } from "@/components/ui";
+import { AlerteBudget, Carte, TitrePage } from "@/components/ui";
 import {
   STATUTS,
   STATUTS_ENVOYES,
@@ -13,6 +13,7 @@ import type { OffreExtraite } from "@/lib/extraction-offre";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import BoutonSoumettre from "@/components/BoutonSoumettre";
+import BoutonCopier from "@/components/BoutonCopier";
 import type { ModeleCV } from "@/lib/cv/modele";
 import {
   LIBELLES_POTENTIEL,
@@ -27,8 +28,10 @@ import {
   changerStatut,
   planifierRelance,
   marquerRelancee,
+  genererRelance,
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
+import { budgetDuMois, montant } from "@/lib/couts";
 import { repondreCompetence } from "./formulations/actions";
 import { competencesManquantes } from "@/lib/cv/competences-manquantes";
 
@@ -218,6 +221,23 @@ export default async function DetailOffre({
   const joursEcoules = joursDepuis(offre.date_candidature as string | null);
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
+  // Les boutons de cette page dépensent : l'alerte a sa place ici.
+  const budget = await budgetDuMois();
+
+  const { data: relanceBrute } = await supabase
+    .from("documents")
+    .select("contenu_texte, selection, version, created_at")
+    .eq("offre_id", params.id)
+    .eq("type", "relance")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const relanceRedigee = relanceBrute as {
+    contenu_texte: string | null;
+    selection: { relance?: { objet: string; corps: string }; rang?: number } | null;
+    version: number;
+  } | null;
+
   return (
     <>
       <Link
@@ -226,6 +246,13 @@ export default async function DetailOffre({
       >
         ← Retour aux offres {volet.nom}
       </Link>
+
+      <AlerteBudget
+        depense={montant(budget.depense)}
+        plafond={montant(budget.plafond)}
+        depasse={budget.depasse}
+        proche={budget.proche}
+      />
 
       {searchParams.doublon && (
         <Carte className="mb-4 border-amber-200 bg-amber-50">
@@ -830,9 +857,15 @@ export default async function DetailOffre({
           )}
         </div>
 
-        {searchParams.suivi && (
+        {searchParams.suivi === "erreur" ? (
+          <p className="mt-3 rounded-lg bg-rose-50 p-2.5 text-sm text-rose-900">
+            {searchParams.message ?? "La dernière action a échoué."}
+          </p>
+        ) : searchParams.suivi ? (
           <p className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
-            {searchParams.suivi === "envoyee"
+            {searchParams.suivi === "relance-redigee"
+              ? "Relance rédigée, à relire ci-dessous avant envoi."
+              : searchParams.suivi === "envoyee"
               ? "Candidature marquée comme envoyée."
               : searchParams.suivi === "relancee"
                 ? "Relance enregistrée, la suivante est repoussée."
@@ -840,7 +873,7 @@ export default async function DetailOffre({
                   ? "Date de relance mise à jour."
                   : "Statut mis à jour."}
           </p>
-        )}
+        ) : null}
 
         {!envoyee ? (
           <form action={marquerEnvoyee} className="mt-4">
@@ -935,7 +968,48 @@ export default async function DetailOffre({
                   </button>
                 </form>
               )}
+
+              {statutCode === "envoyee" && (
+                <form action={genererRelance}>
+                  <input type="hidden" name="id" value={params.id} />
+                  <BoutonSoumettre
+                    libelle={
+                      relanceRedigee ? "Réécrire la relance" : "Rédiger la relance"
+                    }
+                    libelleEnCours="Rédaction…"
+                    className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                  />
+                </form>
+              )}
             </div>
+
+            {relanceRedigee?.selection?.relance && (
+              <div className="mt-4 rounded-lg border border-ardoise-200 bg-ardoise-50/60 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-ardoise-600">
+                    Relance rédigée
+                    {relanceRedigee.selection.rang
+                      ? ` — ${relanceRedigee.selection.rang}ᵉ`
+                      : ""}{" "}
+                    · version {relanceRedigee.version}
+                  </p>
+                  <BoutonCopier
+                    texte={`${relanceRedigee.selection.relance.objet}\n\n${relanceRedigee.selection.relance.corps}`}
+                    className="rounded-lg border border-ardoise-300 bg-white px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                  />
+                </div>
+                <p className="mt-2 text-sm font-medium text-ardoise-900">
+                  {relanceRedigee.selection.relance.objet}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ardoise-700">
+                  {relanceRedigee.selection.relance.corps}
+                </p>
+                <p className="mt-2 text-xs text-ardoise-400">
+                  Rien n'est envoyé d'ici : copie le message, puis clique
+                  « Relancé aujourd&apos;hui » une fois parti.
+                </p>
+              </div>
+            )}
 
             <form
               action={changerStatut}

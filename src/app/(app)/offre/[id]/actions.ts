@@ -5,6 +5,8 @@ import { VOLETS, type CodeVolet } from "@/config/volets";
 import { enregistrerScore } from "@/lib/analyse";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV, genererCVPourOffre } from "@/lib/cv/generer";
+import { ErreurIA } from "@/lib/anthropic";
+import { genererRelancePourOffre } from "@/lib/relance/generer";
 import {
   avancerPreparation,
   commenterDernierStatut,
@@ -219,4 +221,35 @@ export async function marquerRelancee(formData: FormData) {
   revalidatePath(`/offre/${id}`);
   revalidatePath("/");
   redirect(`/offre/${id}?suivi=relancee`);
+}
+
+/**
+ * Rédige l'email de relance de cette candidature.
+ *
+ * Le seul bouton de cet écran qui dépense. Il ne change ni le statut ni la
+ * date de relance : écrire le message et déclarer qu'on a relancé sont deux
+ * gestes distincts, et on peut vouloir relire avant d'envoyer.
+ */
+export async function genererRelance(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  try {
+    await genererRelancePourOffre(id);
+  } catch (e) {
+    const message =
+      e instanceof ErreurCV || e instanceof ErreurIA
+        ? e.message
+        : `La rédaction de la relance a échoué : ${
+            e instanceof Error ? e.message : String(e)
+          }`;
+    redirect(
+      `/offre/${id}?suivi=erreur&message=${encodeURIComponent(
+        message.slice(0, 300)
+      )}`
+    );
+  }
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=relance-redigee`);
 }

@@ -1,13 +1,15 @@
-import { TitrePage, Carte, Indicateur } from "@/components/ui";
+import { TitrePage, Carte, Indicateur, AlerteBudget } from "@/components/ui";
 import { LISTE_VOLETS, STATUTS_ENVOYES, VOLETS } from "@/config/volets";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
+import { budgetDuMois, montant } from "@/lib/couts";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function TableauDeBord() {
   const supabase = creerClientServeur();
+  const budget = await budgetDuMois();
 
   const { data: offres } = await supabase
     .from("offres")
@@ -49,6 +51,13 @@ export default async function TableauDeBord() {
       <TitrePage
         titre="🏠 Tableau de bord"
         sousTitre="Vue d'ensemble de la recherche"
+      />
+
+      <AlerteBudget
+        depense={montant(budget.depense)}
+        plafond={montant(budget.plafond)}
+        depasse={budget.depasse}
+        proche={budget.proche}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -115,8 +124,10 @@ export default async function TableauDeBord() {
         />
         <Indicateur
           libelle="Coût IA du mois"
-          valeur="0,00 $"
-          precision="plafond 10 $"
+          valeur={montant(budget.depense)}
+          precision={`plafond ${montant(budget.plafond)} · ${budget.appels} appel${
+            budget.appels > 1 ? "s" : ""
+          }`}
         />
       </div>
 

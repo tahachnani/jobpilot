@@ -56,7 +56,7 @@ function BoutonOrdre({
       <button
         type="submit"
         aria-label={sens === "haut" ? "Monter" : "Descendre"}
-        className="rounded border border-ardoise-200 px-2 py-0.5 text-xs text-ardoise-500 hover:bg-ardoise-50"
+        className="rounded border border-ardoise-200 px-2.5 py-1 text-xs text-ardoise-500 hover:bg-ardoise-50"
       >
         {sens === "haut" ? "↑" : "↓"}
       </button>
@@ -80,7 +80,7 @@ function BoutonMasquer({
       <input type="hidden" name="volet" value={volet} />
       <button
         type="submit"
-        className="rounded border border-ardoise-200 px-2 py-0.5 text-xs text-ardoise-500 hover:bg-rose-50 hover:text-rose-700"
+        className="rounded border border-ardoise-200 px-2.5 py-1 text-xs text-ardoise-500 hover:bg-rose-50 hover:text-rose-700"
       >
         Masquer
       </button>
@@ -251,7 +251,11 @@ export default async function Profil({
               </div>
             </div>
 
-            <div className="mt-4 space-y-4 border-t border-ardoise-100 pt-4">
+            <details className="mt-4 border-t border-ardoise-100 pt-4">
+              <summary className="cursor-pointer text-xs font-medium text-ardoise-500">
+                Missions ({e.missions.length}) — formulations modifiables
+              </summary>
+              <div className="mt-3 space-y-4">
               {e.missions.map((m) => (
                 <div key={m.id}>
                   <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
@@ -306,7 +310,8 @@ export default async function Profil({
                   </form>
                 </div>
               ))}
-            </div>
+              </div>
+            </details>
 
             <details className="mt-4 border-t border-ardoise-100 pt-3">
               <summary className="cursor-pointer text-xs font-medium text-ardoise-500">

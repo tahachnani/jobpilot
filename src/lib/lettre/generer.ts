@@ -7,6 +7,7 @@ import { ErreurCV } from "@/lib/cv/generer";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
+import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
 import {
   lettreEnTexte,
   rendreLettre,
@@ -401,7 +402,7 @@ export async function genererLettrePourOffre(
       version,
       storage_path: erreurStockage ? null : chemin,
       contenu_texte: lettreEnTexte(modele),
-      selection: { modele, ancrage },
+      selection: { schema: SCHEMA_SELECTION, modele, ancrage },
       cout_usd: reponse.coutUsd,
     },
     {
@@ -421,6 +422,9 @@ export async function genererLettrePourOffre(
       `La lettre a été rédigée mais n'a pas pu être enregistrée : ${error.message}`
     );
   }
+
+  await purgerAnciennesVersions(offreId, "lettre");
+  await purgerAnciennesVersions(offreId, "email");
 
   return {
     documentLettreId,
@@ -559,4 +563,6 @@ export async function regenererEmailPourOffre(offreId: string): Promise<void> {
     selection: { email },
     cout_usd: reponse.coutUsd,
   });
+
+  await purgerAnciennesVersions(offreId, "email");
 }

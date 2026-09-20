@@ -1,14 +1,14 @@
 # JobPilot — reprise de projet
 
-État du projet au 19 septembre 2026, étape 6 comprise.
+État du projet au 20 septembre 2026, étape 6 et passe d'amélioration comprises.
 À joindre au premier message d'une nouvelle conversation.
 
 ---
 
 ## Où en est le projet
 
-**Les six étapes sont écrites. L'étape 6 attend sa migration et son
-déploiement.**
+**Les six étapes sont écrites, plus une passe de dix améliorations
+(`docs/AMELIORATIONS_10.md`, D53 à D62).**
 
 | Étape | Contenu | État |
 |---|---|---|
@@ -19,7 +19,8 @@ déploiement.**
 | 4bis | Reformulation des missions par offre | en ligne |
 | 4ter | Corpus d'expérience, missions proposées | en ligne |
 | 5 | Lettre de motivation et email | en ligne |
-| 6 | Statuts, envois, relances, suivi | à déployer |
+| 6 | Statuts, envois, relances, suivi | en ligne |
+| — | Dix améliorations (D53–D62) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -100,14 +101,16 @@ copiable et réécrivable seul.
 - 33 entrées de corpus : 16 LMMH, 10 TECHNICAPS, 7 TRIUMPH.
 - Barème passé en **version 3** : cdg 30/25/35/10, compta 30/30/30/10.
 
-## La migration qui reste à appliquer
+## Les migrations qui restent à appliquer
 
-`0006_suivi_candidature.sql` — colonnes `relance_prevue_le`,
-`derniere_relance_le` et `relances` sur `offres`, plus un index partiel sur les
-relances dues. C'est la seule migration de l'étape 6 : l'énumération
-`statut_offre`, la table `statuts_historique` et son déclencheur existent
-depuis l'étape 1. Tant qu'elle n'est pas passée, les écrans de suivi lisent des
-colonnes absentes et échouent.
+- `0006_suivi_candidature.sql` — `relance_prevue_le`, `derniere_relance_le` et
+  `relances` sur `offres`, plus un index partiel. Sans elle, les écrans de
+  suivi lisent des colonnes absentes et échouent.
+- `0007_relance_et_index.sql` — ajoute `relance` à `type_document`. **À lancer
+  seule** : `add value` n'accepte pas d'être dans une transaction.
+- `0005_corpus_experience.sql` — reconstituée après coup : elle avait été
+  appliquée à la main à l'étape 4ter sans être versionnée. Sans effet sur la
+  base existante, indispensable pour repartir d'un projet Supabase neuf.
 
 ---
 
@@ -149,6 +152,16 @@ fichier manquant produisait une erreur de compilation qui semblait venir d'un
 tout autre endroit. Livrer peu d'archives, groupées, et vérifier que chaque
 fichier annoncé est bien sur le disque.
 
+**Une migration appliquée à la main finit par manquer.** La 0005 n'avait
+jamais été versionnée : le dépôt sautait de 0004 à 0006, et une base
+reconstruite depuis les migrations n'aurait eu ni corpus ni `motif_rejet`.
+Toute modification de schéma passe par un fichier, même appliquée d'abord dans
+l'éditeur.
+
+**Une redirection Next passe par une exception.** Un `redirect()` placé dans un
+`try` est attrapé par le `catch` et transformé en message d'erreur. Il reste
+donc toujours hors du bloc surveillé.
+
 **L'estimateur du CV est calibré sur du réel.** `largeurCaractere = 0.452`,
 mesuré sur un CV composé. La valeur théorique de 0,505 faisait retirer des
 missions pour rien. Tous les réglages sont groupés dans
@@ -168,10 +181,25 @@ Il n'y a plus d'étape prévue. Ce qui reste en suspens, par ordre de gêne :
 
 ---
 
+## Les tests
+
+`npm test`, ou automatiquement avant `npm run build`. Quarante cas sur le
+contrôle de reformulation, le barème, l'ordre des compétences, l'estimateur de
+page, la comparaison de termes et le suivi. Ils **bloquent en local et jamais
+sur Vercel** : le lanceur se retire quand il détecte la construction en ligne.
+Aucune dépendance — Node exécute le TypeScript directement depuis la 22.6, et
+les chemins `@/…` passent par `scripts/alias-hooks.mjs`.
+
+Un test qui échoue dit l'une de deux choses : une régression, ou une règle qui
+a changé exprès. Dans le second cas, c'est le test qu'on met à jour — jamais en
+le supprimant sans le remplacer.
+
+---
+
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D52 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D62 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

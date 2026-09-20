@@ -1,4 +1,5 @@
 import { creerClientServeur } from "@/lib/supabase/server";
+import { extraireJson } from "@/lib/extraction-json";
 
 /** Tarifs officiels, en dollars par million de tokens. */
 const TARIFS: Record<string, { entree: number; sortie: number }> = {
@@ -159,20 +160,23 @@ async function journaliser(
   }
 }
 
-/** Extrait le premier objet JSON d'une réponse, même entourée de texte. */
-export function extraireJson<T>(texte: string): T {
-  const nettoye = texte
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-  const debut = nettoye.indexOf("{");
-  const fin = nettoye.lastIndexOf("}");
-  if (debut === -1 || fin === -1) {
-    throw new ErreurIA("La réponse de l'IA n'était pas au format attendu.");
-  }
+/**
+ * Analyse la réponse JSON d'un modèle.
+ *
+ * L'isolement du JSON est délégué à `extraction-json`, qui gère aussi les
+ * tableaux et se repère sur les délimiteurs plutôt que sur les balises de
+ * code. Deux versions ont coexisté un temps, et c'était la plus fragile qui
+ * servait à l'extraction d'offre — la porte d'entrée de tout le reste.
+ */
+export function analyserJson<T>(texte: string): T {
+  const isole = extraireJson(texte);
   try {
-    return JSON.parse(nettoye.slice(debut, fin + 1)) as T;
+    return JSON.parse(isole) as T;
   } catch {
-    throw new ErreurIA("La réponse de l'IA n'était pas un JSON valide.");
+    throw new ErreurIA(
+      `La réponse de l'IA n'était pas un JSON valide. Début reçu : ${texte
+        .trim()
+        .slice(0, 200)}`
+    );
   }
 }

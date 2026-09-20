@@ -83,3 +83,40 @@ export function EtatVide({
     </Carte>
   );
 }
+
+/**
+ * Bandeau d'alerte de budget IA.
+ *
+ * Il avertit sans jamais empêcher : le plafond est une limite que tu t'es
+ * fixée, pas une règle de l'application. Rien ne s'affiche tant que la
+ * dépense reste loin du plafond.
+ */
+export function AlerteBudget({
+  depense,
+  plafond,
+  depasse,
+  proche,
+}: {
+  depense: string;
+  plafond: string;
+  depasse: boolean;
+  proche: boolean;
+}) {
+  if (!depasse && !proche) return null;
+
+  return (
+    <Carte
+      className={`mb-4 ${
+        depasse ? "border-rose-200 bg-rose-50" : "border-amber-200 bg-amber-50"
+      }`}
+    >
+      <p
+        className={`text-sm ${depasse ? "text-rose-900" : "text-amber-900"}`}
+      >
+        {depasse
+          ? `Plafond mensuel dépassé : ${depense} dépensés sur ${plafond}. Rien n'est bloqué — les générations continuent de coûter.`
+          : `Budget IA du mois : ${depense} sur ${plafond}.`}
+      </p>
+    </Carte>
+  );
+}
