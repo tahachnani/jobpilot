@@ -33,7 +33,7 @@ import {
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { budgetDuMois, montant } from "@/lib/couts";
 import { repondreCompetence } from "./formulations/actions";
-import { competencesManquantes } from "@/lib/cv/competences-manquantes";
+import { detailCouverture } from "@/lib/cv/competences-manquantes";
 
 export const dynamic = "force-dynamic";
 
@@ -185,9 +185,10 @@ export default async function DetailOffre({
   // de profil, pas d'adaptation de CV. Sa place est ici, sur la fiche d'offre,
   // et non dans l'écran de reformulation où elle obligeait à entrer pour
   // répondre à chaque fois.
-  const manquantes = analyse
-    ? await competencesManquantes(analyse, offre.volet as CodeVolet)
-    : [];
+  const couverture = analyse
+    ? await detailCouverture(analyse, offre.volet as CodeVolet)
+    : { manquantes: [], connues: [], ignorees: [] };
+  const manquantes = couverture.manquantes;
 
   const statut = STATUTS[offre.statut as string] ?? {
     libelle: String(offre.statut),
@@ -451,15 +452,36 @@ export default async function DetailOffre({
           </h2>
           <Carte className="border-dashed">
             <p className="text-sm text-ardoise-600">
-              Rien à signaler : les{" "}
-              {analyse.competences.length + analyse.outils.length} compétences
-              et outils cités par cette annonce sont déjà dans ta base.
+              Rien à ajouter : {couverture.connues.length} libellé
+              {couverture.connues.length > 1 ? "s" : ""} cité
+              {couverture.connues.length > 1 ? "s" : ""} par l&apos;annonce
+              {couverture.connues.length > 1 ? " sont" : " est"} déjà dans ta
+              base.
             </p>
-            <p className="mt-2 text-xs text-ardoise-400">
-              Un bloc vide ne veut pas dire que l&apos;écran est cassé. Si tu
-              attendais quelque chose ici, c&apos;est que le libellé existe déjà
-              sous une autre forme — vérifie-le dans Mon profil.
-            </p>
+
+            {couverture.ignorees.length > 0 && (
+              <>
+                <p className="mt-3 text-sm text-ardoise-600">
+                  {couverture.ignorees.length} autre
+                  {couverture.ignorees.length > 1 ? "s" : ""} ne{" "}
+                  {couverture.ignorees.length > 1 ? "sont" : "est"} pas
+                  proposé{couverture.ignorees.length > 1 ? "s" : ""} à
+                  l&apos;ajout, jugé
+                  {couverture.ignorees.length > 1 ? "s" : ""} trop générique
+                  {couverture.ignorees.length > 1 ? "s" : ""} pour valoir une
+                  ligne de CV :
+                </p>
+                <p className="mt-1 text-xs text-ardoise-500">
+                  {couverture.ignorees.join(" · ")}
+                </p>
+                <p className="mt-2 text-xs text-ardoise-400">
+                  Attention : le score, lui, les compte. Si l&apos;une
+                  d&apos;elles apparaît à 0 dans le détail des compétences,
+                  c&apos;est qu&apos;elle te coûte des points sans que
+                  l&apos;application te propose de l&apos;ajouter.
+                </p>
+              </>
+            )}
           </Carte>
         </>
       )}

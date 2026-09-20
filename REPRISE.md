@@ -99,7 +99,8 @@ copiable et réécrivable seul.
 - Compétence « Logiciels comptables » renommée et ramenée au niveau 1, AS/400
   ajoutée.
 - 33 entrées de corpus : 16 LMMH, 10 TECHNICAPS, 7 TRIUMPH.
-- Barème passé en **version 3** : cdg 30/25/35/10, compta 30/30/30/10.
+- Barème passé en **version 4** : mêmes poids (cdg 30/25/35/10, compta
+  30/30/30/10), mais une qualité comportementale compte pour moitié (D63).
 
 ## Les migrations qui restent à appliquer
 
@@ -162,6 +163,14 @@ l'éditeur.
 `try` est attrapé par le `catch` et transformé en message d'erreur. Il reste
 donc toujours hors du bloc surveillé.
 
+**Le répertoire de travail n'est pas le dépôt.** Après une réinitialisation du
+conteneur, ma copie a été reconstruite en réappliquant les archives dans
+l'ordre — et `src/lib/termes.ts` y est resté à une version antérieure, sans
+`estSavoirFaire` ni `noyauDuTerme`, alors que trois fichiers les importent.
+Aucun dégât : ce fichier n'a jamais été livré, et la comparaison complète des
+deux arbres n'a montré que lui. Mais avant toute passe qui touche à plusieurs
+fichiers, la copie de travail se resynchronise sur un zip du dépôt.
+
 **L'estimateur du CV est calibré sur du réel.** `largeurCaractere = 0.452`,
 mesuré sur un CV composé. La valeur théorique de 0,505 faisait retirer des
 missions pour rien. Tous les réglages sont groupés dans
@@ -199,7 +208,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D62 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D63 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

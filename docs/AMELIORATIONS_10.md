@@ -96,8 +96,30 @@ une tablette.
 
 ---
 
+## D63 — Une qualité comportementale compte pour moitié
+
+Ajoutée après coup, sur constat d'usage : une offre affichait « Polyvalence —
+absente de ta base » à 0, alors que l'application **refuse** de proposer ce
+libellé à l'ajout, le jugeant trop générique pour valoir une ligne de CV. Deux
+modules, deux définitions de ce qui compte comme compétence : le score
+facturait ce que le profil n'avait aucun moyen d'acquérir.
+
+Les deux s'appuient désormais sur la même fonction, `estSavoirFaire`. Une
+qualité comportementale pèse la moitié d'un savoir-faire de même caractère, et
+son absence ne plafonne plus le score global. Réduit plutôt qu'annulé : un
+recruteur qui met la polyvalence en tête de son annonce dit quelque chose du
+poste — cela doit peser, sans jamais faire basculer un score.
+
+Le barème passe en **version 4**. Toutes les offres sont à renoter depuis
+l'écran Paramètres après déploiement : 23 des 25 scores existants dataient
+encore de la version 2 et n'étaient donc comparables ni entre eux, ni aux
+nouveaux.
+
+---
+
 ## Ce que cette passe ne fait pas
 
-Aucun changement de la logique de scoring, de la sélection des missions, du
-contrôle de reformulation ni de la composition du CV. Les tests figent ces
-comportements tels qu'ils sont aujourd'hui.
+Aucun changement de la sélection des missions, du contrôle de reformulation ni
+de la composition du CV. Le scoring ne change que sur le point D63, validé
+explicitement. Les tests figent ces comportements tels qu'ils sont
+aujourd'hui.

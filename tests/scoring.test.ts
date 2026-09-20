@@ -27,6 +27,12 @@ const BAREME: Bareme = {
   },
 };
 
+function offreCompetences(
+  competences: OffreExtraite["competences"]
+): OffreExtraite {
+  return { ...offre(null), competences };
+}
+
 function offre(anneesExperience: number | null): OffreExtraite {
   return {
     intitule: "Contrôleur de gestion",
@@ -106,4 +112,63 @@ test("les poids du barème sont ceux passés, pas des valeurs codées en dur", (
   const r = calculerScore(offre(3), profil(24), "cdg", BAREME);
   assert.equal(r.experience.poids, 35);
   assert.equal(r.missions.poids, 30);
+});
+
+/**
+ * D63 — une qualité comportementale pèse moitié moins qu'un savoir-faire.
+ *
+ * L'application refuse de proposer « polyvalence » à l'ajout ; le scoring ne
+ * doit donc pas la facturer au même prix qu'une compétence métier qu'on peut
+ * réellement acquérir et déclarer.
+ */
+const noteCompetences = (competences: OffreExtraite["competences"]) =>
+  calculerScore(offreCompetences(competences), profil(24), "cdg", BAREME)
+    .competences.note;
+
+test("une qualité absente coûte moins qu'un savoir-faire absent", () => {
+  const qualite = noteCompetences([
+    { libelle: "Excel", caractere: "indispensable" },
+    { libelle: "Polyvalence", caractere: "indispensable" },
+  ]);
+  const savoirFaire = noteCompetences([
+    { libelle: "Excel", caractere: "indispensable" },
+    { libelle: "Consolidation", caractere: "indispensable" },
+  ]);
+  assert.ok(
+    qualite > savoirFaire,
+    `qualité ${qualite} devrait coûter moins que savoir-faire ${savoirFaire}`
+  );
+});
+
+test("une qualité absente ne plafonne jamais le score global", () => {
+  const r = calculerScore(
+    offreCompetences([
+      { libelle: "Excel", caractere: "indispensable" },
+      { libelle: "Rigueur", caractere: "indispensable" },
+    ]),
+    profil(24),
+    "cdg",
+    BAREME
+  );
+  assert.equal(r.plafonne, false);
+});
+
+test("le détail signale qu'une qualité ne compte que pour moitié", () => {
+  const r = calculerScore(
+    offreCompetences([{ libelle: "Polyvalence", caractere: "souhaitee" }]),
+    profil(24),
+    "cdg",
+    BAREME
+  );
+  assert.ok(r.competences.lignes.some((l) => l.explication.includes("moitié")));
+});
+
+test("un savoir-faire garde son plein poids", () => {
+  const r = calculerScore(
+    offreCompetences([{ libelle: "Consolidation", caractere: "indispensable" }]),
+    profil(24),
+    "cdg",
+    BAREME
+  );
+  assert.ok(!r.competences.lignes[0].explication.includes("moitié"));
 });

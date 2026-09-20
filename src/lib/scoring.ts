@@ -3,6 +3,7 @@ import { noteSecteur } from "@/config/secteurs";
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { dureeMois } from "@/lib/base-pro";
+import { estSavoirFaire } from "@/lib/termes";
 
 /**
  * Scoring 100 % déterministe (spécification §8).
@@ -226,7 +227,22 @@ function sousScoreCompetences(
   };
 
   for (const c of offre.competences) {
-    const poids = c.caractere === "indispensable" ? 3 : 1;
+    /**
+     * Une qualité comportementale compte moitié moins qu'un savoir-faire de
+     * même caractère (D63).
+     *
+     * L'application refuse déjà de proposer « polyvalence » ou « rigueur » à
+     * l'ajout : trop génériques pour valoir une ligne de CV. Le scoring, lui,
+     * les notait à plein — une annonce pouvait donc coûter des points sur une
+     * compétence que rien ne permettait d'acquérir. Les deux modules
+     * s'appuient désormais sur la même définition, `estSavoirFaire`.
+     *
+     * Réduit plutôt qu'annulé : un recruteur qui écrit « polyvalence » en tête
+     * de son annonce dit quelque chose du poste. Cela doit peser, sans jamais
+     * faire basculer un score.
+     */
+    const comportementale = !estSavoirFaire(c.libelle);
+    const poids = (c.caractere === "indispensable" ? 3 : 1) / (comportementale ? 2 : 1);
     total += poids;
 
     const codeDemontre = activiteDepuisLibelle(c.libelle);
@@ -264,11 +280,19 @@ function sousScoreCompetences(
     // Le plafond ne se déclenche plus que sur une absence totale : avoir des
     // notions sur une exigence, c'est être en dessous du niveau attendu, pas
     // hors-jeu.
-    if (c.caractere === "indispensable" && note === 0) {
+    // Une qualité absente ne plafonne pas le score global : on ne bloque pas
+    // une candidature parce qu'une annonce réclame de la polyvalence.
+    if (c.caractere === "indispensable" && note === 0 && !comportementale) {
       manquantesIndispensables.push(c.libelle);
     }
 
-    lignes.push({ libelle: c.libelle, note, explication });
+    lignes.push({
+      libelle: c.libelle,
+      note,
+      explication: comportementale
+        ? `${explication} Qualité comportementale : compte pour moitié.`
+        : explication,
+    });
   }
 
   const note = Math.round((obtenu / total) * 100);

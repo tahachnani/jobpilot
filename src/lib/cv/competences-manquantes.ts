@@ -88,14 +88,26 @@ function digneDInteret(libelle: string): boolean {
 }
 
 /**
- * Compare ce que l'offre réclame à tout ce que la base contient — y compris
- * les compétences invisibles. Une compétence déjà écartée une fois n'est pas
- * reproposée à chaque offre.
+ * Le détail de la couverture, pour pouvoir l'afficher sans mentir.
+ *
+ * Un écran qui annonçait « tout est déjà dans ta base » alors que le détail du
+ * score affichait « Polyvalence — absente de ta base » se contredisait
+ * lui-même. Les deux disaient vrai : la compétence est bien absente, mais elle
+ * est écartée ici comme trop générique pour valoir une ligne de CV. Les trois
+ * listes sont donc distinguées.
  */
-export async function competencesManquantes(
+export interface Couverture {
+  manquantes: CompetenceManquante[];
+  /** Déjà dans la base, sous ce libellé ou un autre. */
+  connues: string[];
+  /** Écartées comme trop courtes, trop longues ou purement comportementales. */
+  ignorees: string[];
+}
+
+export async function detailCouverture(
   offre: OffreExtraite,
   volet: string
-): Promise<CompetenceManquante[]> {
+): Promise<Couverture> {
   const supabase = creerClientServeur();
 
   const [{ data }, { data: langues }] = await Promise.all([
@@ -140,13 +152,33 @@ export async function competencesManquantes(
   }
 
   const vues = new Set<string>();
-  return candidates
-    .filter((c) => digneDInteret(c.libelle))
-    .filter((c) => !estConnue(c.libelle))
-    .filter((c) => {
-      const cle = c.libelle.toLowerCase().trim();
-      if (vues.has(cle)) return false;
-      vues.add(cle);
-      return true;
-    });
+  const manquantes: CompetenceManquante[] = [];
+  const connues: string[] = [];
+  const ignorees: string[] = [];
+
+  for (const c of candidates) {
+    const cle = c.libelle.toLowerCase().trim();
+    if (vues.has(cle)) continue;
+    vues.add(cle);
+
+    if (!digneDInteret(c.libelle)) ignorees.push(c.libelle);
+    else if (estConnue(c.libelle)) connues.push(c.libelle);
+    else manquantes.push(c);
+  }
+
+  return { manquantes, connues, ignorees };
+}
+
+/**
+ * Ce que l'offre réclame et que la base ne connaît pas.
+ *
+ * Façade conservée telle quelle : elle ne rend que les manquantes, comme
+ * avant, et reste le point d'entrée des écrans qui n'ont besoin que de
+ * celles-là.
+ */
+export async function competencesManquantes(
+  offre: OffreExtraite,
+  volet: string
+): Promise<CompetenceManquante[]> {
+  return (await detailCouverture(offre, volet)).manquantes;
 }
