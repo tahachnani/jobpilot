@@ -25,6 +25,7 @@ create table if not exists public.corpus_experience (
   experience_id   uuid not null references public.experiences(id) on delete cascade,
   texte           text not null,
   activites_codes text[] not null default '{}',
+  volets          text[],
   source          text,
   ordre           int not null default 0,
   created_at      timestamptz not null default now(),

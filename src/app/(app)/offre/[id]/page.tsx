@@ -444,6 +444,26 @@ export default async function DetailOffre({
         rappelle pas l&apos;IA et ne coûte rien.
       </p>
 
+      {analyse && manquantes.length === 0 && (
+        <>
+          <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+            Réclamé par l&apos;offre, absent de ton profil
+          </h2>
+          <Carte className="border-dashed">
+            <p className="text-sm text-ardoise-600">
+              Rien à signaler : les{" "}
+              {analyse.competences.length + analyse.outils.length} compétences
+              et outils cités par cette annonce sont déjà dans ta base.
+            </p>
+            <p className="mt-2 text-xs text-ardoise-400">
+              Un bloc vide ne veut pas dire que l&apos;écran est cassé. Si tu
+              attendais quelque chose ici, c&apos;est que le libellé existe déjà
+              sous une autre forme — vérifie-le dans Mon profil.
+            </p>
+          </Carte>
+        </>
+      )}
+
       {manquantes.length > 0 && (
         <>
           <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">

@@ -133,7 +133,16 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     .from("documents")
     .upload(chemin, pdf, { contentType: "application/pdf", upsert: true });
 
+  // Un échec d'envoi dans le bucket était jusqu'ici avalé en silence : le CV
+  // se recomposait à la demande, donc rien ne se voyait — et 54 CV sur 54 se
+  // sont retrouvés sans fichier, faute d'une règle d'écriture sur le bucket.
+  // Le PDF n'est pas perdu pour autant, mais l'anomalie doit être visible.
   const stocke = !erreurStockage;
+  if (erreurStockage) {
+    console.error(
+      `[cv] envoi du PDF refusé par le stockage (${chemin}) : ${erreurStockage.message}`
+    );
+  }
 
   const { error: erreurInsertion } = await supabase.from("documents").insert({
     id: documentId,
