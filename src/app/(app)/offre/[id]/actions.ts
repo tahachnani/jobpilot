@@ -7,6 +7,7 @@ import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV, genererCVPourOffre } from "@/lib/cv/generer";
 import { ErreurIA } from "@/lib/anthropic";
 import { genererRelancePourOffre } from "@/lib/relance/generer";
+import { genererPreparationPourOffre } from "@/lib/entretien/generer";
 import {
   avancerPreparation,
   commenterDernierStatut,
@@ -321,4 +322,34 @@ export async function revenirEnArriere(formData: FormData) {
   revalidatePath(`/offre/${id}`);
   revalidatePath("/");
   redirect(`/offre/${id}?suivi=retour`);
+}
+
+/**
+ * Prépare l'entretien de cette offre (D70).
+ *
+ * Disponible dès qu'un CV existe, mise en avant au statut « Entretien ». Elle
+ * ne change aucun statut : préparer n'est pas passer l'entretien.
+ */
+export async function genererPreparation(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  try {
+    await genererPreparationPourOffre(id);
+  } catch (e) {
+    const message =
+      e instanceof ErreurCV || e instanceof ErreurIA
+        ? e.message
+        : `La préparation a échoué : ${
+            e instanceof Error ? e.message : String(e)
+          }`;
+    redirect(
+      `/offre/${id}?suivi=erreur&message=${encodeURIComponent(
+        message.slice(0, 300)
+      )}`
+    );
+  }
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=preparation`);
 }

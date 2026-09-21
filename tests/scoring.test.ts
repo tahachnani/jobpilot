@@ -97,9 +97,25 @@ test("la note ne descend jamais sous 10", () => {
   assert.ok(note(15, 6) >= 10);
 });
 
-test("une offre qui ne précise pas d'expérience ne pénalise pas", () => {
-  const n = note(null, 24);
-  assert.ok(n >= 70, `note neutre attendue, obtenue ${n}`);
+test("une offre muette sur l'expérience écarte le critère au lieu de le noter", () => {
+  const r = calculerScore(offre(null), profil(24), "cdg", BAREME);
+  assert.equal(r.experience.mesurable, false);
+  assert.equal(r.experience.poids, 0);
+  assert.ok(r.criteresEcartes >= 1);
+});
+
+test("un critère écarté ne tire pas le score vers le bas", () => {
+  // La note du critère écarté vaut 0 : si elle entrait dans le calcul, le
+  // score global s'effondrerait. C'est tout l'objet de la redistribution.
+  const r = calculerScore(offre(null), profil(24), "cdg", BAREME);
+  assert.ok(r.global > 40, `score effondré : ${r.global}`);
+});
+
+test("les poids affichés totalisent cent sur les critères mesurés", () => {
+  const r = calculerScore(offre(3), profil(24), "cdg", BAREME);
+  const somme =
+    r.missions.poids + r.competences.poids + r.experience.poids + r.secteur.poids;
+  assert.ok(Math.abs(somme - 100) <= 2, `somme des poids : ${somme}`);
 });
 
 test("le score global reste dans les bornes et porte la version du barème", () => {
@@ -108,10 +124,12 @@ test("le score global reste dans les bornes et porte la version du barème", () 
   assert.equal(r.versionBareme, "3");
 });
 
-test("les poids du barème sont ceux passés, pas des valeurs codées en dur", () => {
+test("les poids gardent les proportions du barème entre critères mesurés", () => {
   const r = calculerScore(offre(3), profil(24), "cdg", BAREME);
-  assert.equal(r.experience.poids, 35);
-  assert.equal(r.missions.poids, 30);
+  // 35 contre 30 au barème : l'expérience reste au-dessus des missions, même
+  // après redistribution de la part du secteur, ici non mesurable.
+  assert.ok(r.experience.poids > r.missions.poids);
+  assert.ok(r.missions.poids > r.competences.poids);
 });
 
 /**
@@ -171,4 +189,116 @@ test("un savoir-faire garde son plein poids", () => {
     BAREME
   );
   assert.ok(!r.competences.lignes[0].explication.includes("moitié"));
+});
+
+/**
+ * D64 — le niveau du poste supplée l'absence de durée chiffrée.
+ */
+test("un intitulé de responsable rend l'expérience mesurable sans durée écrite", () => {
+  const o = { ...offre(null), intitule: "Responsable du contrôle de gestion" };
+  const r = calculerScore(o, profil(24), "cdg", BAREME);
+  assert.equal(r.experience.mesurable, true);
+  assert.ok(
+    r.experience.note < 60,
+    `deux ans face à un poste de responsable : note attendue basse, obtenue ${r.experience.note}`
+  );
+});
+
+test("un poste junior ne manque jamais d'expérience", () => {
+  const o = { ...offre(null), intitule: "Contrôleur de gestion junior" };
+  const r = calculerScore(o, profil(24), "cdg", BAREME);
+  assert.equal(r.experience.note, 100);
+});
+
+test("un encadrement annoncé l'emporte sur un intitulé neutre", () => {
+  const o = { ...offre(null), intitule: "Contrôleur de gestion", encadrement: 4 };
+  const r = calculerScore(o, profil(24), "cdg", BAREME);
+  assert.equal(r.experience.mesurable, true);
+  assert.ok(r.experience.note < 60);
+});
+
+/**
+ * D65 — le vocabulaire départage deux missions au même code.
+ */
+test("une mission dite avec les mêmes mots note plus haut qu'un simple code commun", () => {
+  const exigence = {
+    texte: "Élaboration du budget annuel et suivi des écarts mensuels",
+    codes: ["budget"],
+    importance: 3,
+  };
+
+  const proche = calculerScore(
+    { ...offre(3), missions: [exigence] },
+    {
+      ...profil(24),
+      missions: [
+        {
+          codes: ["budget"],
+          pertinence: 3,
+          texte: "Élaboration du budget annuel et suivi mensuel des écarts",
+        },
+      ],
+    },
+    "cdg",
+    BAREME
+  ).missions.note;
+
+  const lointain = calculerScore(
+    { ...offre(3), missions: [exigence] },
+    {
+      ...profil(24),
+      missions: [
+        { codes: ["budget"], pertinence: 3, texte: "Saisie des pièces fournisseurs" },
+      ],
+    },
+    "cdg",
+    BAREME
+  ).missions.note;
+
+  assert.ok(
+    proche > lointain,
+    `vocabulaire proche ${proche} devrait dépasser vocabulaire lointain ${lointain}`
+  );
+  assert.ok(lointain >= 50, "un code commun reste une couverture réelle");
+});
+
+/**
+ * D66 — une ligne non classée sort du calcul.
+ */
+test("une mission sans code d'activité ne compte ni en bien ni en mal", () => {
+  const avec = calculerScore(
+    {
+      ...offre(3),
+      missions: [
+        { texte: "Reporting mensuel", codes: ["reporting"], importance: 3 },
+        { texte: "Participer à la vie du service", codes: [], importance: 1 },
+      ],
+    },
+    profil(24),
+    "cdg",
+    BAREME
+  ).missions.note;
+
+  const sans = calculerScore(
+    {
+      ...offre(3),
+      missions: [{ texte: "Reporting mensuel", codes: ["reporting"], importance: 3 }],
+    },
+    profil(24),
+    "cdg",
+    BAREME
+  ).missions.note;
+
+  assert.equal(avec, sans);
+});
+
+test("une offre sans aucune compétence citée écarte le critère", () => {
+  const r = calculerScore(
+    { ...offre(3), competences: [] },
+    profil(24),
+    "cdg",
+    BAREME
+  );
+  assert.equal(r.competences.mesurable, false);
+  assert.equal(r.competences.poids, 0);
 });

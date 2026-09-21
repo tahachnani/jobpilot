@@ -3,7 +3,12 @@ import { noteSecteur } from "@/config/secteurs";
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { dureeMois } from "@/lib/base-pro";
-import { estSavoirFaire } from "@/lib/termes";
+import { estSavoirFaire, motsSignificatifs } from "@/lib/termes";
+import {
+  ANNEES_IMPLICITES,
+  LIBELLES_SENIORITE,
+  niveauDuPoste,
+} from "@/lib/seniorite";
 
 /**
  * Scoring 100 % déterministe (spécification §8).
@@ -24,12 +29,30 @@ export interface SousScore {
   poids: number;
   lignes: DetailLigne[];
   resume: string;
+  /**
+   * Faux quand l'annonce ne donne pas de quoi mesurer ce critère (D66).
+   *
+   * Un critère non mesurable sort du calcul : son poids est redistribué sur
+   * les autres. Auparavant il recevait une note neutre — 70 pour des missions
+   * sans code, 75 pour une expérience non chiffrée — et ces valeurs hautes
+   * remontaient mécaniquement tous les scores. Sur cinq offres notées, quatre
+   * n'annonçaient aucune durée d'expérience : trente-cinq pour cent du score
+   * était une constante à 75.
+   */
+  mesurable: boolean;
 }
 
 export interface Resultat {
   global: number;
   plafonne: boolean;
   raisonPlafond: string | null;
+  /**
+   * Combien des quatre critères l'annonce n'a pas permis de mesurer (D66).
+   *
+   * Un score calculé sur deux critères vaut moins qu'un score calculé sur
+   * quatre : l'écran le dit au lieu de laisser croire à la même solidité.
+   */
+  criteresEcartes: number;
   missions: SousScore;
   competences: SousScore;
   experience: SousScore;
@@ -85,10 +108,12 @@ function sousScoreMissions(
 ): SousScore {
   if (offre.missions.length === 0) {
     return {
-      note: 70,
+      note: 0,
       poids: 0,
+      mesurable: false,
       lignes: [],
-      resume: "Aucune mission identifiable dans l'offre — valeur neutre.",
+      resume:
+        "Aucune mission identifiable dans l'offre : critère écarté du calcul.",
     };
   }
 
@@ -96,28 +121,62 @@ function sousScoreMissions(
   let totalPondere = 0;
   let totalPoids = 0;
 
+  let ecartees = 0;
+
   for (const m of offre.missions) {
+    // Une mission que l'IA n'a pas su classer ne prouve rien, ni pour ni
+    // contre : elle sort du calcul au lieu de valoir 70 (D66).
+    if (m.codes.length === 0) {
+      ecartees += 1;
+      lignes.push({
+        libelle: m.texte.length > 110 ? m.texte.slice(0, 110) + "…" : m.texte,
+        note: 0,
+        explication:
+          "Aucun code d'activité identifié : ligne écartée du calcul, elle ne compte ni en bien ni en mal.",
+      });
+      continue;
+    }
+
     let meilleure = 0;
     let couvertsMax: string[] = [];
     // On garde aussi *quelle* mission couvre l'exigence. Afficher le seul nom
     // du code — « Couvert par : Prévisionnel » — ne disait pas par quoi.
     let missionCouvrante = "";
+    let vocabulaireRetenu = 0;
 
-    if (m.codes.length === 0) {
-      // Sans code, on ne peut rien mesurer : neutre, et on le dit.
-      meilleure = 70;
-    } else {
-      for (const p of profil.missions) {
-        const communs = m.codes.filter((c) => p.codes.includes(c));
-        const taux = (communs.length / m.codes.length) * 100;
-        // Une mission du profil très pertinente pour le volet compte plus.
-        const bonus = p.pertinence >= 3 ? 1 : p.pertinence >= 2 ? 0.95 : 0.85;
-        const note = Math.round(taux * bonus);
-        if (note > meilleure) {
-          meilleure = note;
-          couvertsMax = communs;
-          missionCouvrante = p.texte;
-        }
+    const motsExiges = motsSignificatifs(m.texte);
+
+    for (const p of profil.missions) {
+      const communs = m.codes.filter((c) => p.codes.includes(c));
+      if (communs.length === 0) continue;
+
+      const taux = (communs.length / m.codes.length) * 100;
+      // Une mission du profil très pertinente pour le volet compte plus.
+      const bonus = p.pertinence >= 3 ? 1 : p.pertinence >= 2 ? 0.95 : 0.85;
+
+      /**
+       * Le vocabulaire départage ce que le code ne distingue pas (D65).
+       *
+       * La plupart des missions d'annonce ne portent qu'un seul code : le taux
+       * de recouvrement ne valait donc que 0 ou 100, et un profil dont les
+       * missions couvrent toute la taxonomie « couvrait » 90 % des offres du
+       * métier. On mesure en plus la part des mots significatifs de l'exigence
+       * qui se retrouvent dans la mission du parcours.
+       *
+       * Le facteur ne descend pas sous 0,6 : partager un code d'activité reste
+       * une couverture réelle, même dit avec d'autres mots.
+       */
+      const motsTenus = motsSignificatifs(p.texte);
+      const partagés = [...motsExiges].filter((mot) => motsTenus.has(mot)).length;
+      const vocabulaire = motsExiges.size === 0 ? 1 : partagés / motsExiges.size;
+      const facteur = 0.6 + 0.4 * vocabulaire;
+
+      const note = Math.round(taux * bonus * facteur);
+      if (note > meilleure) {
+        meilleure = note;
+        couvertsMax = communs;
+        missionCouvrante = p.texte;
+        vocabulaireRetenu = vocabulaire;
       }
     }
 
@@ -128,28 +187,47 @@ function sousScoreMissions(
       libelle: m.texte.length > 110 ? m.texte.slice(0, 110) + "…" : m.texte,
       note: meilleure,
       explication:
-        m.codes.length === 0
-          ? "Aucun code d'activité identifié — non mesurable."
-          : couvertsMax.length > 0
-            ? `Couvert par ta mission « ${
-                missionCouvrante.length > 90
-                  ? missionCouvrante.slice(0, 90) + "…"
-                  : missionCouvrante
-              } » — ${couvertsMax.map(libelleActivite).join(", ")}.`
-            : `Non couvert. Attendu : ${m.codes.map(libelleActivite).join(", ")}.`,
+        couvertsMax.length > 0
+          ? `Couvert par ta mission « ${
+              missionCouvrante.length > 90
+                ? missionCouvrante.slice(0, 90) + "…"
+                : missionCouvrante
+            } » — ${couvertsMax.map(libelleActivite).join(", ")}. Vocabulaire commun : ${Math.round(
+              vocabulaireRetenu * 100
+            )} %.`
+          : `Non couvert. Attendu : ${m.codes.map(libelleActivite).join(", ")}.`,
     });
+  }
+
+  if (totalPoids === 0) {
+    return {
+      note: 0,
+      poids: 0,
+      mesurable: false,
+      lignes,
+      resume:
+        "Aucune mission de l'offre n'a pu être rattachée à la taxonomie : critère écarté du calcul.",
+    };
   }
 
   const note = Math.round(totalPondere / totalPoids);
   const couvertes = lignes.filter((l) => l.note >= 50).length;
+  const mesurees = offre.missions.length - ecartees;
 
   return {
     note,
     poids: 0,
+    mesurable: true,
     lignes,
-    resume: `${couvertes} mission${couvertes > 1 ? "s" : ""} sur ${
-      offre.missions.length
-    } couverte${couvertes > 1 ? "s" : ""} par ton profil.`,
+    resume:
+      `${couvertes} mission${couvertes > 1 ? "s" : ""} sur ${mesurees} couverte${
+        couvertes > 1 ? "s" : ""
+      } par ton profil, codes et vocabulaire confondus` +
+      (ecartees > 0
+        ? `. ${ecartees} ligne${ecartees > 1 ? "s" : ""} non classée${
+            ecartees > 1 ? "s" : ""
+          }, écartée${ecartees > 1 ? "s" : ""} du calcul.`
+        : "."),
   };
 }
 
@@ -180,10 +258,12 @@ function sousScoreCompetences(
   if (offre.competences.length === 0) {
     return {
       sous: {
-        note: 70,
+        note: 0,
         poids: 0,
+        mesurable: false,
         lignes: [],
-        resume: "Aucune compétence explicite dans l'offre — valeur neutre.",
+        resume:
+          "Aucune compétence explicite dans l'offre : critère écarté du calcul.",
       },
       manquantesIndispensables: [],
     };
@@ -302,6 +382,7 @@ function sousScoreCompetences(
     sous: {
       note,
       poids: 0,
+      mesurable: true,
       lignes: lignes.sort((a, b) => a.note - b.note),
       resume: `${acquises} compétence${acquises > 1 ? "s" : ""} sur ${
         offre.competences.length
@@ -326,16 +407,55 @@ function sousScoreExperience(
     annees >= 2 ? "s" : ""
   } et ${Math.round(mois % 12)} mois.`;
 
-  if (offre.annees_experience === null || offre.annees_experience === 0) {
+  /**
+   * L'exigence en années, lue ou déduite du niveau du poste (D64, D66).
+   *
+   * Quand l'annonce ne chiffre rien, on regarde ce qu'elle dit du niveau —
+   * explicitement, par son intitulé, ou par l'encadrement annoncé. Faute de
+   * quoi le critère sort du calcul plutôt que de recevoir une note neutre à
+   * 75, qui figeait trente-cinq pour cent du score.
+   */
+  const chiffree = offre.annees_experience !== null && offre.annees_experience > 0;
+  const niveau = niveauDuPoste(offre);
+
+  if (!chiffree && niveau.niveau === null) {
     return {
-      note: 75,
+      note: 0,
       poids: 0,
-      lignes: [{ libelle: "Exigence non précisée", note: 75, explication: detail }],
-      resume: "L'offre ne précise aucune exigence — valeur neutre, non mesurée.",
+      mesurable: false,
+      lignes: [
+        {
+          libelle: "Exigence non précisée",
+          note: 0,
+          explication: `${detail} ${niveau.explication}`,
+        },
+      ],
+      resume:
+        "L'offre ne dit rien de l'expérience attendue : critère écarté du calcul, le score se fait sur les autres.",
     };
   }
 
-  const demande = offre.annees_experience;
+  const demande = chiffree
+    ? (offre.annees_experience as number)
+    : ANNEES_IMPLICITES[niveau.niveau!];
+
+  // Un poste ouvert aux débutants ne peut pas manquer d'expérience.
+  if (demande === 0) {
+    return {
+      note: 100,
+      poids: 0,
+      mesurable: true,
+      lignes: [
+        {
+          libelle: LIBELLES_SENIORITE.junior,
+          note: 100,
+          explication: `${detail} ${niveau.explication}`,
+        },
+      ],
+      resume: "Poste ouvert aux profils débutants : ton ancienneté suffit.",
+    };
+  }
+
   const ecart = demande - annees;
 
   /**
@@ -359,11 +479,18 @@ function sousScoreExperience(
   return {
     note,
     poids: 0,
+    mesurable: true,
     lignes: [
       {
-        libelle: `${demande} an${demande > 1 ? "s" : ""} demandé${demande > 1 ? "s" : ""}`,
+        libelle: chiffree
+          ? `${demande} an${demande > 1 ? "s" : ""} demandé${demande > 1 ? "s" : ""}`
+          : `${demande} an${demande > 1 ? "s" : ""} attendus au niveau ${
+              LIBELLES_SENIORITE[niveau.niveau!]
+            }`,
         note,
-        explication: detail,
+        explication: chiffree
+          ? detail
+          : `${detail} ${niveau.explication} L'annonce ne chiffre aucune durée : l'exigence est déduite du niveau du poste.`,
       },
     ],
     resume:
@@ -396,23 +523,49 @@ export function calculerScore(
   const secteur: SousScore = {
     note: s.note,
     poids: 0,
+    // Le secteur est toujours mesurable : une offre sans secteur identifié est
+    // notée sur la proximité nulle, ce qui est une information, pas un trou.
+    mesurable: offre.secteur_code !== null,
     lignes: [{ libelle: "Secteur", note: s.note, explication: s.explication }],
     resume: s.explication,
   };
 
   const p = bareme.poids;
-  missions.poids = p.missions;
-  competences.poids = p.competences;
-  experience.poids = p.experience;
-  secteur.poids = p.secteur;
 
-  let global = Math.round(
-    (missions.note * p.missions +
-      competences.note * p.competences +
-      experience.note * p.experience +
-      secteur.note * p.secteur) /
-      (p.missions + p.competences + p.experience + p.secteur)
-  );
+  /**
+   * Les poids sont redistribués sur les seuls critères mesurables (D66).
+   *
+   * Un critère que l'annonce ne permet pas d'évaluer ne reçoit plus de note
+   * neutre : il sort du calcul, et sa part va aux autres. Le score répond
+   * alors à « sur ce que l'offre dit, où j'en suis », au lieu de mélanger des
+   * mesures et des valeurs de remplissage.
+   */
+  const parts: { sous: SousScore; poids: number }[] = [
+    { sous: missions, poids: p.missions },
+    { sous: competences, poids: p.competences },
+    { sous: experience, poids: p.experience },
+    { sous: secteur, poids: p.secteur },
+  ];
+
+  const mesurables = parts.filter((x) => x.sous.mesurable);
+  const totalPoids = mesurables.reduce((t, x) => t + x.poids, 0);
+
+  for (const x of parts) {
+    // Le poids affiché est le poids réel dans ce score, pas celui du barème :
+    // sinon l'écran annoncerait 35 % pour un critère qui n'a rien pesé.
+    x.sous.poids = x.sous.mesurable
+      ? Math.round((x.poids / totalPoids) * 100)
+      : 0;
+  }
+
+  let global =
+    totalPoids === 0
+      ? 0
+      : Math.round(
+          mesurables.reduce((t, x) => t + x.sous.note * x.poids, 0) / totalPoids
+        );
+
+  const ecartes = parts.filter((x) => !x.sous.mesurable).length;
 
   let plafonne = false;
   let raisonPlafond: string | null = null;
@@ -435,6 +588,7 @@ export function calculerScore(
     global,
     plafonne,
     raisonPlafond,
+    criteresEcartes: ecartes,
     missions,
     competences,
     experience,

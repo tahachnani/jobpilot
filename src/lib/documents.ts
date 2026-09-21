@@ -37,7 +37,7 @@ export function schemaDe(selection: unknown): number {
 
 export async function purgerAnciennesVersions(
   offreId: string,
-  type: "cv" | "lettre" | "email" | "relance"
+  type: "cv" | "lettre" | "email" | "relance" | "preparation"
 ): Promise<number> {
   const supabase = creerClientServeur();
 

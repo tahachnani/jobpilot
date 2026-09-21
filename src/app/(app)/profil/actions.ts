@@ -277,3 +277,47 @@ export async function ajouterEntreeCorpus(formData: FormData) {
   revalidatePath("/profil");
   redirect(`/profil?volet=${volet}`);
 }
+
+/**
+ * Supprime définitivement des compétences, par lot.
+ *
+ * Constat du 21 septembre : 93 des 146 lignes venaient d'annonces, acceptées
+ * au niveau 2 par défaut, dont trente-neuf purement comportementales et une
+ * dizaine de doublons — ERP, ERP Sage, Progiciels de gestion, Outils
+ * informatiques, Pack Office. Le sous-score compétences se nourrissait de
+ * lignes jamais revendiquées, et plus aucune offre ne signalait de manque.
+ *
+ * La suppression est irréversible, mais sans conséquence sur les CV déjà
+ * générés : ils portent leur propre modèle figé.
+ */
+export async function supprimerCompetences(formData: FormData) {
+  const ids = formData
+    .getAll("competence")
+    .map((v) => String(v))
+    .filter(Boolean);
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (ids.length === 0) redirect(`/profil?volet=${volet}&menage=aucune`);
+
+  const supabase = creerClientServeur();
+  await supabase.from("competences").delete().in("id", ids);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}&menage=${ids.length}`);
+}
+
+/** Change le niveau d'une compétence sans passer par le formulaire complet. */
+export async function reniveler(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  const niveau = Number(formData.get("niveau") ?? 1);
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("competences")
+    .update({ niveau: Math.min(3, Math.max(0, niveau)) })
+    .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}&menage=niveau`);
+}

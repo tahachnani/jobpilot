@@ -30,11 +30,13 @@ import {
   marquerRelancee,
   genererRelance,
   revenirEnArriere,
+  genererPreparation,
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { budgetDuMois, montant } from "@/lib/couts";
 import { repondreCompetence } from "./formulations/actions";
 import { detailCouverture } from "@/lib/cv/competences-manquantes";
+import { preparationEnTexte, type Preparation } from "@/lib/entretien/generer";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +233,18 @@ export default async function DetailOffre({
 
   // Les boutons de cette page dépensent : l'alerte a sa place ici.
   const budget = await budgetDuMois();
+
+  const { data: preparationBrute } = await supabase
+    .from("documents")
+    .select("selection, version")
+    .eq("offre_id", params.id)
+    .eq("type", "preparation")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const preparation =
+    (preparationBrute as { selection: { preparation?: Preparation } | null } | null)
+      ?.selection?.preparation ?? null;
 
   const { data: relanceBrute } = await supabase
     .from("documents")
@@ -549,7 +563,7 @@ export default async function DetailOffre({
                     </select>
                     <select
                       name="niveau"
-                      defaultValue="2"
+                      defaultValue="1"
                       className="rounded-lg border border-ardoise-300 px-2 py-1.5 text-xs"
                     >
                       <option value="1">Notions</option>
@@ -922,7 +936,9 @@ export default async function DetailOffre({
           </p>
         ) : searchParams.suivi ? (
           <p className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
-            {searchParams.suivi === "retour"
+            {searchParams.suivi === "preparation"
+              ? "Fiche de préparation prête, en bas de page."
+              : searchParams.suivi === "retour"
               ? "Étape annulée : le statut précédent est rétabli."
               : searchParams.suivi === "sans-retour"
                 ? "Aucune étape antérieure à rétablir."
@@ -1146,6 +1162,120 @@ export default async function DetailOffre({
             </ul>
           </details>
         )}
+
+        <div className="mt-4 border-t border-ardoise-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-ardoise-800">
+                Préparation d&apos;entretien
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-ardoise-500">
+                Construite sur l&apos;annonce, le CV exactement tel qu&apos;il
+                est parti, et les écarts que l&apos;application a mesurés — donc
+                sur ce que le recruteur va chercher.
+              </p>
+            </div>
+            {dernierCV && (
+              <form action={genererPreparation}>
+                <input type="hidden" name="id" value={params.id} />
+                <BoutonSoumettre
+                  libelle={preparation ? "Refaire la fiche" : "Préparer l'entretien"}
+                  libelleEnCours="Préparation…"
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    statutCode === "entretien"
+                      ? "bg-ardoise-900 text-white hover:bg-ardoise-800"
+                      : "border border-ardoise-300 text-ardoise-700 hover:bg-ardoise-50"
+                  }`}
+                />
+              </form>
+            )}
+          </div>
+
+          {!dernierCV && (
+            <p className="mt-2 text-xs text-ardoise-400">
+              Génère d&apos;abord le CV : la préparation s&apos;appuie sur celui
+              qui est parti, pas sur ton profil en général.
+            </p>
+          )}
+
+          {preparation && (
+            <div className="mt-4 rounded-lg border border-ardoise-200 bg-ardoise-50/60 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="text-sm font-medium text-ardoise-900">
+                  {preparation.attendu || "Fiche de préparation"}
+                </p>
+                <BoutonCopier
+                  texte={preparationEnTexte(preparation)}
+                  className="shrink-0 rounded-lg border border-ardoise-300 bg-white px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                />
+              </div>
+
+              {preparation.questions.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ardoise-500">
+                    Questions probables
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {preparation.questions.map((q, i) => (
+                      <li key={i} className="border-b border-ardoise-100 pb-2 last:border-0">
+                        <p className="text-sm text-ardoise-800">{q.question}</p>
+                        {q.appui && (
+                          <p className="mt-0.5 text-xs text-ardoise-500">
+                            S&apos;appuyer sur : {q.appui}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {preparation.fragilites.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ardoise-500">
+                    Ce qui va être cherché
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {preparation.fragilites.map((f, i) => (
+                      <li key={i}>
+                        <p className="text-sm text-ardoise-800">{f.point}</p>
+                        {f.posture && (
+                          <p className="mt-0.5 text-xs text-ardoise-500">{f.posture}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {preparation.aRetenir.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ardoise-500">
+                    À avoir en tête
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ardoise-700">
+                    {preparation.aRetenir.map((x, i) => (
+                      <li key={i}>{x}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {preparation.aPoser.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ardoise-500">
+                    À poser au recruteur
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ardoise-700">
+                    {preparation.aPoser.map((x, i) => (
+                      <li key={i}>{x}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <details className="mt-3">
           <summary className="cursor-pointer text-xs text-ardoise-400">

@@ -29,7 +29,7 @@ export default function Navigation({ email }: { email: string }) {
   const liensHaut: Lien[] = [{ href: "/", libelle: "Tableau de bord", emoji: "🏠" }];
 
   const liensBas: Lien[] = [
-    { href: "/marche-cache", libelle: "Marché caché", emoji: "🕵️", bientot: true },
+    { href: "/marche-cache", libelle: "Marché caché", emoji: "🕵️" },
     { href: "/mes-cv", libelle: "Mes CV", emoji: "📄" },
     { href: "/profil", libelle: "Mon profil", emoji: "👤" },
     { href: "/parametres", libelle: "Paramètres", emoji: "⚙️" },

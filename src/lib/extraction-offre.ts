@@ -34,6 +34,15 @@ export interface OffreExtraite {
   competences: CompetenceOffre[];
   outils: string[];
   annees_experience: number | null;
+  /**
+   * Le niveau d'exigence du poste (D64). Null quand l'annonce n'en dit rien :
+   * il est alors déduit ailleurs, et la déduction est affichée comme telle.
+   */
+  seniorite: "junior" | "confirme" | "senior" | "responsable" | null;
+  /** Nombre de personnes encadrées, si l'annonce le chiffre. */
+  encadrement: number | null;
+  /** Ce que l'annonce dit du périmètre : entités, sites, budget piloté. */
+  perimetre: string | null;
   formation: string | null;
   langues: string[];
   mots_cles_ats: string[];
@@ -73,6 +82,13 @@ function dateValide(v: unknown): string | null {
   return Number.isNaN(new Date(s).getTime()) ? null : s;
 }
 
+const SENIORITES = ["junior", "confirme", "senior", "responsable"];
+
+function senioriteValide(v: unknown): OffreExtraite["seniorite"] {
+  const s = String(v ?? "").toLowerCase().trim();
+  return (SENIORITES.includes(s) ? s : null) as OffreExtraite["seniorite"];
+}
+
 function nombreValide(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : null;
@@ -110,6 +126,9 @@ FORMAT DE RÉPONSE :
   "competences": [{"libelle": string, "caractere": "indispensable"|"souhaitee"}],
   "outils": [string],
   "annees_experience": number|null,
+  "seniorite": "junior"|"confirme"|"senior"|"responsable"|null,
+  "encadrement": number|null,
+  "perimetre": string|null,
   "formation": string|null,
   "langues": [string],
   "mots_cles_ats": [string]
@@ -119,6 +138,9 @@ PRÉCISIONS :
 - importance 3 = mission centrale du poste, 2 = importante, 1 = accessoire.
 - caractere "indispensable" seulement si l'offre l'exige explicitement (requis, impératif, indispensable, maîtrise exigée).
 - annees_experience : le nombre minimal demandé. Si l'offre dit "débutant accepté" ou ne précise rien, mets null.
+- seniorite : le niveau d'exigence du poste. "junior" si débutant accepté ou première expérience, "confirme" si autonomie attendue sur le métier, "senior" si expertise ou référent, "responsable" si le poste encadre ou pilote une équipe. Mets null si l'annonce ne permet pas de trancher — ne devine pas à partir du seul intitulé.
+- encadrement : le nombre de personnes encadrées, uniquement s'il est écrit. Sinon null.
+- perimetre : une phrase courte reprenant ce que l'annonce dit de l'étendue du poste — nombre d'entités, de sites, de filiales, montant du budget ou du chiffre d'affaires suivi. Uniquement ce qui est écrit, jamais une estimation. Sinon null.
 - Une mission peut porter plusieurs codes. Si aucun code ne correspond, mets un tableau vide.`;
 
 /** Réponse trop courte ou sans mission : extraction jugée insuffisante. */
@@ -188,6 +210,12 @@ export async function extraireOffre(
     outils: brut.outils ?? [],
     annees_experience:
       typeof brut.annees_experience === "number" ? brut.annees_experience : null,
+    seniorite: senioriteValide(brut.seniorite),
+    encadrement: nombreValide(brut.encadrement),
+    perimetre:
+      typeof brut.perimetre === "string" && brut.perimetre.trim().length > 2
+        ? brut.perimetre.trim().slice(0, 300)
+        : null,
     formation: brut.formation ?? null,
     langues: brut.langues ?? [],
     mots_cles_ats: brut.mots_cles_ats ?? [],

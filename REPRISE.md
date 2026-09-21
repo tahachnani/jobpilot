@@ -1,6 +1,6 @@
 # JobPilot — reprise de projet
 
-État du projet au 20 septembre 2026, étape 6 et passe d'amélioration comprises.
+État du projet au 21 septembre 2026, étape 6 et deux passes d'amélioration comprises.
 À joindre au premier message d'une nouvelle conversation.
 
 ---
@@ -20,7 +20,8 @@
 | 4ter | Corpus d'expérience, missions proposées | en ligne |
 | 5 | Lettre de motivation et email | en ligne |
 | 6 | Statuts, envois, relances, suivi | en ligne |
-| — | Dix améliorations (D53–D62) | à déployer |
+| — | Dix améliorations (D53–D62) | en ligne |
+| — | Score, marché caché, entretien (D64–D70) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -63,6 +64,21 @@ adaptations. Le potentiel distingue ce qui est **récupérable** — un terme de
 l'offre dont tous les mots figurent dans une même ligne du parcours — de ce qui
 est **hors de portée**.
 
+**Le score** ne mesure plus le seul thème de l'offre. Un critère que
+l'annonce ne permet pas d'évaluer **sort du calcul** et son poids passe aux
+autres, au lieu de recevoir une note neutre — trois planchers à 70 et 75
+remontaient mécaniquement tous les scores, et l'un d'eux figeait 35 % du total.
+Le niveau du poste, lu ou déduit de l'intitulé et de l'encadrement, sert
+d'exigence quand aucune durée n'est chiffrée. Et le vocabulaire départage deux
+missions qui partagent un code : la note n'est plus binaire. `docs/AMELIORATIONS_SCORE.md`.
+
+**Le marché caché** tient la liste des entreprises visées sans annonce
+publiée, avec l'état de la démarche. Rien n'y est collecté automatiquement.
+
+**La préparation d'entretien** part de l'annonce, du CV réellement envoyé et
+des écarts mesurés. Elle ne rédige aucune réponse : elle pose les questions et
+nomme ce sur quoi s'appuyer.
+
 **Le suivi** (étape 6) sépare deux régimes qui ne se mélangent jamais. La
 préparation avance toute seule et seulement vers l'avant : générer un CV pose
 `cv_genere`, écrire la lettre pose `lettre_generee`, régénérer l'email pose
@@ -99,8 +115,9 @@ copiable et réécrivable seul.
 - Compétence « Logiciels comptables » renommée et ramenée au niveau 1, AS/400
   ajoutée.
 - 33 entrées de corpus : 16 LMMH, 10 TECHNICAPS, 7 TRIUMPH.
-- Barème passé en **version 4** : mêmes poids (cdg 30/25/35/10, compta
-  30/30/30/10), mais une qualité comportementale compte pour moitié (D63).
+- Barème passé en **version 5** : mêmes poids nominaux (cdg 30/25/35/10,
+  compta 30/30/30/10), mais redistribués sur les seuls critères mesurables
+  (D66) ; une qualité comportementale compte pour moitié (D63).
 
 ## Les migrations qui restent à appliquer
 
@@ -109,6 +126,10 @@ copiable et réécrivable seul.
   suivi lisent des colonnes absentes et échouent.
 - `0007_relance_et_index.sql` — ajoute `relance` à `type_document`. **À lancer
   seule** : `add value` n'accepte pas d'être dans une transaction.
+- `0009_entreprises_cibles.sql` — table du marché caché, avec son énumération,
+  sa règle RLS et son déclencheur d'horodatage.
+- `0010_type_preparation.sql` — ajoute `preparation` à `type_document`. **À
+  lancer seule**, même raison que la 0007.
 - `0005_corpus_experience.sql` — reconstituée après coup : elle avait été
   appliquée à la main à l'étape 4ter sans être versionnée. Sans effet sur la
   base existante, indispensable pour repartir d'un projet Supabase neuf.
@@ -163,6 +184,17 @@ l'éditeur.
 `try` est attrapé par le `catch` et transformé en message d'erreur. Il reste
 donc toujours hors du bloc surveillé.
 
+**Une valeur neutre haute est un mensonge qui s'ignore.** Trois planchers —
+70, 70, 75 — avaient été posés pour ne pas pénaliser une offre muette. Ils ont
+fini par rendre tous les scores identiques, et le critère le plus lourd était
+le plus souvent constant. Ce qu'on ne peut pas mesurer se retire du calcul ; on
+ne lui invente pas une note.
+
+**Une vérification qui ne filtre que les erreurs de syntaxe ne vérifie rien.**
+Une redéclaration de variable est une erreur TS2451, pas TS1xxx : elle passait
+dans le bruit de mon contrôle hors ligne et a cassé un déploiement. Le filtre
+ne retire plus que les erreurs imputables à l'absence de `node_modules`.
+
 **Le répertoire de travail n'est pas le dépôt.** Après une réinitialisation du
 conteneur, ma copie a été reconstruite en réappliquant les archives dans
 l'ordre — et `src/lib/termes.ts` y est resté à une version antérieure, sans
@@ -208,7 +240,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D63 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D70 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

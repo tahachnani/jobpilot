@@ -145,7 +145,10 @@ export async function repondreCompetence(formData: FormData) {
   const libelle = String(formData.get("libelle") ?? "").trim();
   const action = String(formData.get("action") ?? "");
   const categorie = String(formData.get("categorie") ?? "transversale");
-  const niveau = Number(formData.get("niveau") ?? 2);
+  // Niveau 1 par défaut (D67) : une compétence lue dans une annonce entre
+  // comme des notions, à toi de la monter si tu la tiens vraiment. À 2 par
+  // défaut, le profil se notait lui-même au fil des offres analysées.
+  const niveau = Number(formData.get("niveau") ?? 1);
   if (!offreId || !libelle) return;
 
   const supabase = creerClientServeur();

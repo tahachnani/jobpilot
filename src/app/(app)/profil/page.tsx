@@ -19,7 +19,10 @@ import {
   ajouterEntreeCorpus,
   modifierEntreeCorpus,
   supprimerEntreeCorpus,
+  supprimerCompetences,
 } from "./actions";
+import { estSavoirFaire } from "@/lib/termes";
+import { normaliser } from "@/lib/texte";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +94,7 @@ function BoutonMasquer({
 export default async function Profil({
   searchParams,
 }: {
-  searchParams: { volet?: string };
+  searchParams: { volet?: string; menage?: string };
 }) {
   const volet: CodeVolet = searchParams.volet === "compta" ? "compta" : "cdg";
   const config = VOLETS[volet];
@@ -122,6 +125,40 @@ export default async function Profil({
     origine: string | null;
     precision: string | null;
   }[];
+
+  /**
+   * Le ménage des compétences (D67).
+   *
+   * On travaille sur la table entière, visibles et masquées confondues : une
+   * ligne écartée dans un volet continue de compter dans le score, et les
+   * doublons se cachent souvent d'un volet à l'autre.
+   */
+  const { data: toutesBrutes } = await supabaseProfil
+    .from("competences")
+    .select("id, libelle, categorie, niveau, origine")
+    .order("libelle");
+  const toutes = (toutesBrutes ?? []) as {
+    id: string;
+    libelle: string;
+    categorie: string;
+    niveau: number;
+    origine: string | null;
+  }[];
+
+  const venuesDOffres = toutes.filter((c) => c.origine === "offre");
+  const comportementales = venuesDOffres.filter((c) => !estSavoirFaire(c.libelle));
+
+  // Deux libellés dont les trois premiers mots normalisés coïncident sont
+  // presque toujours la même chose dite deux fois.
+  const cle = (libelle: string) =>
+    normaliser(libelle).split(" ").filter((m) => m.length > 2).slice(0, 3).join(" ");
+  const parCle = new Map<string, typeof toutes>();
+  for (const c of toutes) {
+    const k = cle(c.libelle);
+    if (!k) continue;
+    parCle.set(k, [...(parCle.get(k) ?? []), c]);
+  }
+  const doublons = [...parCle.values()].filter((g) => g.length > 1);
 
   const parCategorie = base.competences.reduce<
     Record<string, typeof base.competences>
@@ -426,6 +463,151 @@ export default async function Profil({
       <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
         Compétences
       </h2>
+
+      {searchParams.menage && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">
+            {searchParams.menage === "aucune"
+              ? "Aucune ligne cochée : rien n'a été supprimé."
+              : searchParams.menage === "niveau"
+                ? "Niveau mis à jour."
+                : `${searchParams.menage} compétence${
+                    Number(searchParams.menage) > 1 ? "s" : ""
+                  } supprimée${
+                    Number(searchParams.menage) > 1 ? "s" : ""
+                  }. Recalcule les scores depuis Paramètres pour en voir l'effet.`}
+          </p>
+        </Carte>
+      )}
+
+      {venuesDOffres.length > 0 && (
+        <Carte className="mb-4 border-amber-200 bg-amber-50/40">
+          <p className="text-sm font-medium text-ardoise-800">
+            Ménage — {venuesDOffres.length} compétence
+            {venuesDOffres.length > 1 ? "s" : ""} venue
+            {venuesDOffres.length > 1 ? "s" : ""} d&apos;annonces
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ardoise-600">
+            Chaque compétence acceptée depuis une offre entre dans le calcul du
+            sous-score compétences. Accumulées, elles font monter tous les
+            scores et finissent par masquer ce qui te manque vraiment : plus
+            aucune offre ne signale de manque. Coche ce que tu ne revendiquerais
+            pas en entretien.
+          </p>
+
+          <form action={supprimerCompetences} className="mt-4">
+            <input type="hidden" name="volet" value={volet} />
+
+            {comportementales.length > 0 && (
+              <details open className="mb-3">
+                <summary className="cursor-pointer text-xs font-medium text-ardoise-600">
+                  Qualités plutôt que savoir-faire ({comportementales.length})
+                </summary>
+                <p className="mt-1 text-xs text-ardoise-400">
+                  Elles ne tiennent pas une ligne de CV et comptent déjà pour
+                  moitié dans le score.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {comportementales.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        name="competence"
+                        value={c.id}
+                        id={`m-${c.id}`}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      <label htmlFor={`m-${c.id}`} className="text-ardoise-700">
+                        {c.libelle}
+                        <span className="ml-1 text-ardoise-400">
+                          — {NIVEAUX[c.niveau]?.libelle ?? "non noté"}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {doublons.length > 0 && (
+              <details className="mb-3">
+                <summary className="cursor-pointer text-xs font-medium text-ardoise-600">
+                  Doublons probables ({doublons.length} groupe
+                  {doublons.length > 1 ? "s" : ""})
+                </summary>
+                <p className="mt-1 text-xs text-ardoise-400">
+                  Libellés très proches : garde le plus précis, coche les
+                  autres.
+                </p>
+                <div className="mt-2 space-y-3">
+                  {doublons.map((groupe) => (
+                    <ul
+                      key={groupe[0].id}
+                      className="space-y-1 border-l-2 border-amber-200 pl-3"
+                    >
+                      {groupe.map((c) => (
+                        <li key={c.id} className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            name="competence"
+                            value={c.id}
+                            id={`d-${c.id}`}
+                            className="h-4 w-4 shrink-0"
+                          />
+                          <label htmlFor={`d-${c.id}`} className="text-ardoise-700">
+                            {c.libelle}
+                            <span className="ml-1 text-ardoise-400">
+                              — {NIVEAUX[c.niveau]?.libelle ?? "non noté"}
+                              {c.origine ? ` · ${c.origine}` : ""}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            <details className="mb-3">
+              <summary className="cursor-pointer text-xs font-medium text-ardoise-600">
+                Toutes celles venues d&apos;annonces ({venuesDOffres.length})
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {venuesDOffres.map((c) => (
+                  <li key={c.id} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      name="competence"
+                      value={c.id}
+                      id={`o-${c.id}`}
+                      className="h-4 w-4 shrink-0"
+                    />
+                    <label htmlFor={`o-${c.id}`} className="text-ardoise-700">
+                      {c.libelle}
+                      <span className="ml-1 text-ardoise-400">
+                        — {CATEGORIES_COMPETENCE[c.categorie] ?? c.categorie} ·{" "}
+                        {NIVEAUX[c.niveau]?.libelle ?? "non noté"}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </details>
+
+            <button
+              type="submit"
+              className="rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+            >
+              Supprimer les lignes cochées
+            </button>
+            <p className="mt-2 text-xs text-ardoise-400">
+              Définitif, mais sans effet sur les CV déjà générés : ils portent
+              leur propre modèle figé.
+            </p>
+          </form>
+        </Carte>
+      )}
       <div className="space-y-4">
         {Object.entries(parCategorie).map(([cat, liste]) => (
           <Carte key={cat}>
