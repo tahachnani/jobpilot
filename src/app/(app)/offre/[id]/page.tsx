@@ -29,6 +29,7 @@ import {
   planifierRelance,
   marquerRelancee,
   genererRelance,
+  revenirEnArriere,
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { budgetDuMois, montant } from "@/lib/couts";
@@ -104,6 +105,7 @@ export default async function DetailOffre({
     cv?: string;
     message?: string;
     suivi?: string;
+    competence?: string;
   };
 }) {
   const supabase = creerClientServeur();
@@ -222,6 +224,11 @@ export default async function DetailOffre({
   const joursEcoules = joursDepuis(offre.date_candidature as string | null);
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
+  // Le statut d'avant, pour nommer le bouton de retour : « Revenir à
+  // Candidature envoyée » se comprend sans explication, « Annuler » non.
+  const statutPrecedent = historique.find((h) => h.statut !== statutCode)
+    ?.statut;
+
   // Les boutons de cette page dépensent : l'alerte a sa place ici.
   const budget = await budgetDuMois();
 
@@ -254,6 +261,15 @@ export default async function DetailOffre({
         depasse={budget.depasse}
         proche={budget.proche}
       />
+
+      {searchParams.competence && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">
+            Compétence enregistrée. Le score se met à jour au prochain recalcul,
+            depuis le bouton « Recalculer le score » ci-dessous.
+          </p>
+        </Carte>
+      )}
 
       {searchParams.doublon && (
         <Carte className="mb-4 border-amber-200 bg-amber-50">
@@ -507,6 +523,7 @@ export default async function DetailOffre({
                 >
                   <input type="hidden" name="offreId" value={params.id} />
                   <input type="hidden" name="libelle" value={c.libelle} />
+                  <input type="hidden" name="retour" value="offre" />
 
                   <p className="text-sm font-medium text-ardoise-800">
                     {c.libelle}
@@ -905,7 +922,11 @@ export default async function DetailOffre({
           </p>
         ) : searchParams.suivi ? (
           <p className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-sm text-emerald-900">
-            {searchParams.suivi === "relance-redigee"
+            {searchParams.suivi === "retour"
+              ? "Étape annulée : le statut précédent est rétabli."
+              : searchParams.suivi === "sans-retour"
+                ? "Aucune étape antérieure à rétablir."
+                : searchParams.suivi === "relance-redigee"
               ? "Relance rédigée, à relire ci-dessous avant envoi."
               : searchParams.suivi === "envoyee"
               ? "Candidature marquée comme envoyée."
@@ -916,6 +937,19 @@ export default async function DetailOffre({
                   : "Statut mis à jour."}
           </p>
         ) : null}
+
+        {statutPrecedent && (
+          <form action={revenirEnArriere} className="mt-3">
+            <input type="hidden" name="id" value={params.id} />
+            <BoutonSoumettre
+              libelle={`← Revenir à « ${
+                STATUTS[statutPrecedent]?.libelle ?? statutPrecedent
+              } »`}
+              libelleEnCours="Retour…"
+              className="rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+            />
+          </form>
+        )}
 
         {!envoyee ? (
           <form action={marquerEnvoyee} className="mt-4">
@@ -1071,7 +1105,7 @@ export default async function DetailOffre({
                   }
                   className="rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
                 >
-                  {STATUTS_SUIVI.map((s) => (
+                  {["envoyee", ...STATUTS_SUIVI].map((s) => (
                     <option key={s} value={s}>
                       {STATUTS[s].libelle}
                     </option>

@@ -181,8 +181,18 @@ export async function repondreCompetence(formData: FormData) {
   });
 
   revalidatePath(`/offre/${offreId}/formulations`);
+  revalidatePath(`/offre/${offreId}`);
   revalidatePath("/profil");
-  redirect(`/offre/${offreId}/formulations?etat=competence`);
+
+  // On revient là où le clic a eu lieu. Ce bloc vit sur deux écrans depuis
+  // qu'il a quitté la page de reformulation : répondre depuis la fiche d'offre
+  // et se retrouver ailleurs donne l'impression d'avoir déclenché autre chose.
+  const retour = String(formData.get("retour") ?? "");
+  redirect(
+    retour === "offre"
+      ? `/offre/${offreId}?competence=ok`
+      : `/offre/${offreId}/formulations?etat=competence`
+  );
 }
 
 /** Demande au modèle des missions nouvelles tirées du corpus. */

@@ -253,3 +253,72 @@ export async function genererRelance(formData: FormData) {
   revalidatePath(`/offre/${id}`);
   redirect(`/offre/${id}?suivi=relance-redigee`);
 }
+
+/**
+ * Défait la dernière étape du suivi.
+ *
+ * Le sélecteur d'issue ne va que vers l'avant, et « Corriger le statut »
+ * vivait replié en bas de page : poser « Entretien » par erreur donnait
+ * l'impression d'un aller sans retour. Ce bouton relit l'historique — écrit
+ * par le déclencheur depuis l'étape 1 — et repose le statut précédent.
+ *
+ * Le retour est lui-même journalisé : l'historique garde la trace de l'aller
+ * comme du retour, plutôt que de faire semblant que rien n'a eu lieu.
+ */
+export async function revenirEnArriere(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+
+  const { data: offre } = await supabase
+    .from("offres")
+    .select("statut, date_candidature")
+    .eq("id", id)
+    .maybeSingle();
+  if (!offre) return;
+
+  const courant = (offre as { statut: string }).statut;
+
+  const { data: lignes } = await supabase
+    .from("statuts_historique")
+    .select("statut, date")
+    .eq("offre_id", id)
+    .order("date", { ascending: false })
+    .limit(20);
+
+  // Le premier statut de l'historique qui diffère du statut courant : les
+  // répétitions d'un même statut ne comptent pas pour un retour.
+  const precedent = ((lignes ?? []) as { statut: string }[]).find(
+    (l) => l.statut !== courant
+  )?.statut;
+
+  if (!precedent || !(precedent in STATUTS)) {
+    redirect(`/offre/${id}?suivi=sans-retour`);
+  }
+
+  const dateEnvoi = (offre as { date_candidature: string | null })
+    .date_candidature;
+
+  await supabase
+    .from("offres")
+    .update({
+      statut: precedent,
+      // Revenir à l'attente redonne une relance à prévoir : sans cela, l'offre
+      // sort définitivement de la liste des relances dues.
+      ...(precedent === "envoyee"
+        ? {
+            relance_prevue_le: dateDeRelanceParDefaut(
+              dateEnvoi ? new Date(dateEnvoi) : undefined
+            ),
+          }
+        : {}),
+    })
+    .eq("id", id);
+
+  await commenterDernierStatut(id, "Retour en arrière depuis l'écran de suivi.");
+
+  revalidatePath(`/offre/${id}`);
+  revalidatePath("/");
+  redirect(`/offre/${id}?suivi=retour`);
+}
