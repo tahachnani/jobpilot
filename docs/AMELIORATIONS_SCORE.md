@@ -134,6 +134,62 @@ et ne change aucun statut : préparer n'est pas passer l'entretien.
 
 ---
 
+## D71 — La virgule n'est pas un séparateur de compétences
+
+Constat du 22 septembre, sur une offre réelle. L'extraction avait produit deux
+libellés parfaitement corrects :
+
+- « Expérience en environnement industriel, R&D ou grand groupe »
+- « Dispositifs de financement de l'innovation (CIR, subventions, brevets) »
+
+L'écran les proposait à l'ajout en **quatre lignes** : « R&D ou grand groupe »,
+« Dispositifs de financement de l'innovation (CIR », « Subventions »,
+« Brevets) » — parenthèses cassées comprises. C'était `decouperLibelle` qui
+coupait sur toutes les virgules, y compris à l'intérieur des parenthèses.
+
+Le découpage ne se fait plus que sur le **slash** et le **point-virgule**, et
+jamais sur un libellé qui contient une parenthèse : dans une annonce, la
+virgule énumère aussi souvent des exemples que des compétences distinctes, et
+rien ne permet de trancher. Le prix est assumé — « Reporting, budget,
+forecast » restera d'un bloc — et vaut mieux qu'un profil rempli de moitiés de
+phrases.
+
+Deux règles s'ajoutent au prompt d'extraction pour tarir la source : un type
+d'entreprise ou un contexte de travail n'est pas une compétence, et une
+parenthèse d'exemples reste attachée à son libellé.
+
+Sept tests figent ces cas, tirés d'offres réelles.
+
+---
+
+## D72 — Un libellé d'annonce n'est pas un libellé de CV
+
+D71 avait réparé le découpage ; restait le fond. Une annonce écrit « Appétence
+pour les systèmes d'information », « Expérience en environnement industriel »,
+« Capacité à respecter les délais ». Repris tels quels, ces libellés entraient
+dans la base et pouvaient finir sur un CV. Deux cas, deux traitements.
+
+**Ce qui n'est pas une compétence est écarté de l'ajout.** Une exigence de
+contexte — secteur, type d'entreprise, diplôme, première expérience — est
+désormais détectée et affichée dans un bloc à part, « Exigences de contexte »,
+en lecture seule. Elle dit quelque chose du poste, mais elle ne se revendique
+pas comme un savoir-faire : une expérience sectorielle se lit dans les
+employeurs du CV, pas dans une ligne de compétence — et le sous-score
+« secteur » la mesure déjà.
+
+**Ce qui est une compétence se reformule avant d'entrer.** Le libellé proposé
+n'est plus un texte figé mais un **champ modifiable**, pré-rempli du libellé
+nettoyé. Deux valeurs circulent donc : celui de l'annonce, qui sert à ne pas
+reproposer la même ligne, et celui que tu as corrigé, qui entre en base. Le
+nettoyage automatique retire aussi les tournures d'expérience :
+« Expérience significative en contrôle de gestion » devient « Contrôle de
+gestion ».
+
+Dix tests couvrent ces cas, dont la liste des contextes tirée d'annonces
+réelles.
+
+---
+
 ## Migrations
 
 - `0009_entreprises_cibles.sql` — table `entreprises_cibles`, énumération

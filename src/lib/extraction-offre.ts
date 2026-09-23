@@ -137,6 +137,8 @@ FORMAT DE RÉPONSE :
 PRÉCISIONS :
 - importance 3 = mission centrale du poste, 2 = importante, 1 = accessoire.
 - caractere "indispensable" seulement si l'offre l'exige explicitement (requis, impératif, indispensable, maîtrise exigée).
+- competences : uniquement des savoir-faire ou des connaissances que le candidat pourrait revendiquer sur un CV. Un type d'entreprise, un secteur ou un contexte de travail n'en est pas un : « expérience en environnement industriel » ou « en grand groupe » relève du secteur, pas de la compétence, et n'a rien à faire dans cette liste.
+- Un libellé de compétence tient en quelques mots et se suffit à lui-même. N'y mets pas de phrase entière, et ne mets pas plusieurs compétences dans un même libellé séparées par des virgules : fais-en autant d'entrées distinctes. Une parenthèse d'exemples — « (CIR, subventions, brevets) » — reste attachée à son libellé, elle ne se découpe pas.
 - annees_experience : le nombre minimal demandé. Si l'offre dit "débutant accepté" ou ne précise rien, mets null.
 - seniorite : le niveau d'exigence du poste. "junior" si débutant accepté ou première expérience, "confirme" si autonomie attendue sur le métier, "senior" si expertise ou référent, "responsable" si le poste encadre ou pilote une équipe. Mets null si l'annonce ne permet pas de trancher — ne devine pas à partir du seul intitulé.
 - encadrement : le nombre de personnes encadrées, uniquement s'il est écrit. Sinon null.

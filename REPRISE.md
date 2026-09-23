@@ -21,7 +21,7 @@
 | 5 | Lettre de motivation et email | en ligne |
 | 6 | Statuts, envois, relances, suivi | en ligne |
 | — | Dix améliorations (D53–D62) | en ligne |
-| — | Score, marché caché, entretien (D64–D70) | à déployer |
+| — | Score, marché caché, entretien (D64–D72) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -240,7 +240,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D70 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D72 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

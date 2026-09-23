@@ -191,7 +191,7 @@ export default async function DetailOffre({
   // répondre à chaque fois.
   const couverture = analyse
     ? await detailCouverture(analyse, offre.volet as CodeVolet)
-    : { manquantes: [], connues: [], ignorees: [] };
+    : { manquantes: [], connues: [], ignorees: [], contextes: [] };
   const manquantes = couverture.manquantes;
 
   const statut = STATUTS[offre.statut as string] ?? {
@@ -475,7 +475,7 @@ export default async function DetailOffre({
         rappelle pas l&apos;IA et ne coûte rien.
       </p>
 
-      {analyse && manquantes.length === 0 && (
+      {analyse && manquantes.length === 0 && couverture.contextes.length === 0 && (
         <>
           <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
             Réclamé par l&apos;offre, absent de ton profil
@@ -516,16 +516,47 @@ export default async function DetailOffre({
         </>
       )}
 
+      {couverture.contextes.length > 0 && (
+        <>
+          <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
+            Exigences de contexte ({couverture.contextes.length})
+          </h2>
+          <Carte className="border-dashed">
+            <p className="text-sm text-ardoise-600">
+              L&apos;annonce pose des conditions sur le parcours ou le type
+              d&apos;entreprise, pas sur un savoir-faire :
+            </p>
+            <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm text-ardoise-700">
+              {couverture.contextes.map((x) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs leading-relaxed text-ardoise-400">
+              Ce ne sont pas des compétences et elles ne s&apos;ajoutent pas à
+              ton profil : une expérience sectorielle se lit dans tes
+              employeurs, pas dans une ligne de compétence. Si le secteur te
+              correspond, le sous-score « secteur » le mesure déjà.
+            </p>
+          </Carte>
+        </>
+      )}
+
       {manquantes.length > 0 && (
         <>
           <h2 className="mb-3 mt-10 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
             Réclamé par l&apos;offre, absent de ton profil ({manquantes.length})
           </h2>
           <Carte>
-            <p className="mb-4 text-sm text-ardoise-600">
+            <p className="mb-4 text-sm leading-relaxed text-ardoise-600">
               Si tu les maîtrises, ajoute-les : elles serviront à toutes tes
               offres. Sinon, écarte-les et elles ne reviendront plus — un refus
-              se répare depuis Mon profil.
+              se répare depuis Mon profil.{" "}
+              <strong className="font-medium text-ardoise-800">
+                Corrige le libellé avant d&apos;enregistrer
+              </strong>{" "}
+              : c&apos;est lui qui entrera dans ta base et qui pourra paraître
+              sur un CV. Une annonce écrit « Appétence pour les systèmes
+              d&apos;information » ; un CV écrit autre chose.
             </p>
 
             <div className="space-y-4">
@@ -539,16 +570,23 @@ export default async function DetailOffre({
                   <input type="hidden" name="libelle" value={c.libelle} />
                   <input type="hidden" name="retour" value="offre" />
 
-                  <p className="text-sm font-medium text-ardoise-800">
-                    {c.libelle}
-                    <span className="ml-2 text-xs font-normal text-ardoise-400">
-                      {c.origine === "indispensable"
-                        ? "exigée par l'offre"
-                        : c.origine === "outil"
+                  <p className="text-xs text-ardoise-400">
+                    L&apos;annonce écrit «&nbsp;{c.libelle}&nbsp;» —{" "}
+                    {c.origine === "indispensable"
+                      ? "exigée"
+                      : c.origine === "outil"
                         ? "outil cité"
                         : "souhaitée"}
-                    </span>
                   </p>
+
+                  {/* Le libellé qui entrera en base, corrigeable avant d'être
+                      enregistré (D72) : une formulation d'annonce n'est pas une
+                      formulation de CV. */}
+                  <input
+                    name="libelleRetenu"
+                    defaultValue={c.libelle}
+                    className="mt-1 w-full rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm font-medium text-ardoise-800 outline-none focus:border-ardoise-500"
+                  />
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <select

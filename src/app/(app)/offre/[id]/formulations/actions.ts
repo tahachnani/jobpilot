@@ -142,7 +142,18 @@ export async function adopterCommeReference(formData: FormData) {
  */
 export async function repondreCompetence(formData: FormData) {
   const offreId = String(formData.get("offreId") ?? "");
-  const libelle = String(formData.get("libelle") ?? "").trim();
+  /**
+   * Deux libellés, et ce n'est pas un doublon (D72).
+   *
+   * `libelle` est celui de l'annonce : il sert à retenir ce qui a été traité,
+   * pour ne pas le reproposer. `libelleRetenu` est celui que tu as corrigé
+   * avant d'enregistrer — c'est lui qui entre en base et qui paraîtra sur un
+   * CV. Une annonce écrit « Appétence pour les systèmes d'information » ; un
+   * CV écrit autre chose, ou rien.
+   */
+  const libelleOffre = String(formData.get("libelle") ?? "").trim();
+  const retenu = String(formData.get("libelleRetenu") ?? "").trim();
+  const libelle = retenu || libelleOffre;
   const action = String(formData.get("action") ?? "");
   const categorie = String(formData.get("categorie") ?? "transversale");
   // Niveau 1 par défaut (D67) : une compétence lue dans une annonce entre
@@ -150,6 +161,7 @@ export async function repondreCompetence(formData: FormData) {
   // défaut, le profil se notait lui-même au fil des offres analysées.
   const niveau = Number(formData.get("niveau") ?? 1);
   if (!offreId || !libelle) return;
+  void libelleOffre;
 
   const supabase = creerClientServeur();
 
