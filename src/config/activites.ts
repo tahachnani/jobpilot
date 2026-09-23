@@ -1,10 +1,18 @@
 /**
- * Taxonomie fermée des activités (spécification §8).
+ * Le socle de la taxonomie des activités (spécification §8, puis D74).
  *
  * C'est le pivot du scoring : l'IA ne compare rien, elle classe dans cette
  * liste. La comparaison devient ensuite purement arithmétique, donc
- * reproductible. Toute évolution de cette liste impose de faire évoluer
- * `version_bareme` et de recalculer les scores existants.
+ * reproductible.
+ *
+ * Depuis D74, la vérité du moteur est la table `activites`, modifiable depuis
+ * l'onglet « Taxonomie ». Ce fichier garde deux rôles, et deux seulement :
+ * il **amorce** la table à la migration 0011, et il sert de **repli** quand
+ * celle-ci est vide ou inatteignable — un score doit rester calculable.
+ *
+ * Il ne faut donc plus lire cette liste pour afficher un libellé : passer par
+ * `libelleDe` de `@/lib/taxonomie`, sans quoi un code ajouté à l'usage
+ * s'afficherait sous sa forme brute.
  */
 
 export type CodeActivite = keyof typeof ACTIVITES;
@@ -46,11 +54,6 @@ export const ACTIVITES = {
   parametrage_erp: { libelle: "Paramétrage ERP", famille: "transverse" },
   automatisation: { libelle: "Automatisation", famille: "transverse" },
 } as const;
-
-/** Libellé lisible d'un code, ou le code brut s'il est inconnu. */
-export function libelleActivite(code: string): string {
-  return (ACTIVITES as Record<string, { libelle: string }>)[code]?.libelle ?? code;
-}
 
 export const CATEGORIES_COMPETENCE: Record<string, string> = {
   outil: "Outils et logiciels",

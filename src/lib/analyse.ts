@@ -6,6 +6,7 @@ import {
   type ProfilPourScoring,
 } from "@/lib/scoring";
 import type { OffreExtraite } from "@/lib/extraction-offre";
+import { chargerTaxonomie } from "@/lib/taxonomie";
 
 /**
  * Charge le barème depuis `parametres`, avec des valeurs de repli si la ligne
@@ -133,12 +134,19 @@ export async function enregistrerScore(options: {
 }) {
   const supabase = creerClientServeur();
 
-  const [profil, bareme] = await Promise.all([
+  const [profil, bareme, taxonomie] = await Promise.all([
     chargerProfil(options.volet),
     chargerBareme(options.volet),
+    chargerTaxonomie(),
   ]);
 
-  const score = calculerScore(options.donnees, profil, options.volet, bareme);
+  const score = calculerScore(
+    options.donnees,
+    profil,
+    options.volet,
+    bareme,
+    taxonomie
+  );
 
   // Un seul score courant par offre : on remplace au lieu d'empiler.
   await supabase.from("scores").delete().eq("offre_id", options.offreId);

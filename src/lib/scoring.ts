@@ -1,5 +1,5 @@
-import { ACTIVITES, libelleActivite } from "@/config/activites";
 import { noteSecteur } from "@/config/secteurs";
+import { SOCLE, libelleDe, type Taxonomie } from "@/lib/taxonomie";
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { dureeMois } from "@/lib/base-pro";
@@ -22,6 +22,15 @@ export interface DetailLigne {
   libelle: string;
   note: number;
   explication: string;
+  /**
+   * Faux quand la ligne est hors du calcul (D73).
+   *
+   * Sans cette marque, une exigence écartée faute de code d'activité
+   * s'affichait « 0 » en rouge, exactement comme une exigence réellement non
+   * couverte. Deux choses opposées — « je ne sais pas mesurer » et « tu ne
+   * l'as pas » — portaient le même signe.
+   */
+  mesuree?: boolean;
 }
 
 export interface SousScore {
@@ -104,8 +113,11 @@ function correspond(a: string, b: string): boolean {
 
 function sousScoreMissions(
   offre: OffreExtraite,
-  profil: ProfilPourScoring
+  profil: ProfilPourScoring,
+  taxonomie: Taxonomie
 ): SousScore {
+  const libelle = (code: string) => libelleDe(taxonomie, code);
+
   if (offre.missions.length === 0) {
     return {
       note: 0,
@@ -131,8 +143,9 @@ function sousScoreMissions(
       lignes.push({
         libelle: m.texte.length > 110 ? m.texte.slice(0, 110) + "…" : m.texte,
         note: 0,
+        mesuree: false,
         explication:
-          "Aucun code d'activité identifié : ligne écartée du calcul, elle ne compte ni en bien ni en mal.",
+          "Hors taxonomie : aucun code d'activité ne correspond, la ligne est écartée du calcul. Elle ne compte ni en bien ni en mal — et si le sujet revient souvent, c'est qu'il manque un code.",
       });
       continue;
     }
@@ -192,10 +205,10 @@ function sousScoreMissions(
               missionCouvrante.length > 90
                 ? missionCouvrante.slice(0, 90) + "…"
                 : missionCouvrante
-            } » — ${couvertsMax.map(libelleActivite).join(", ")}. Vocabulaire commun : ${Math.round(
+            } » — ${couvertsMax.map(libelle).join(", ")}. Vocabulaire commun : ${Math.round(
               vocabulaireRetenu * 100
             )} %.`
-          : `Non couvert. Attendu : ${m.codes.map(libelleActivite).join(", ")}.`,
+          : `Non couvert. Attendu : ${m.codes.map(libelle).join(", ")}.`,
     });
   }
 
@@ -253,7 +266,8 @@ const FAMILLES: Record<string, string> = {
 
 function sousScoreCompetences(
   offre: OffreExtraite,
-  profil: ProfilPourScoring
+  profil: ProfilPourScoring,
+  taxonomie: Taxonomie
 ): { sous: SousScore; manquantesIndispensables: string[] } {
   if (offre.competences.length === 0) {
     return {
@@ -275,11 +289,6 @@ function sousScoreCompetences(
   let total = 0;
 
   const codesProfil = new Set(profil.missions.flatMap((m) => m.codes));
-
-  const taxonomie = ACTIVITES as Record<
-    string,
-    { libelle: string; famille: string }
-  >;
 
   /** Familles réellement couvertes par les missions du parcours. */
   const famillesProfil = new Set(
@@ -339,7 +348,8 @@ function sousScoreCompetences(
     if (codeDemontre && codesProfil.has(codeDemontre)) {
       // Le parcours réel prime sur le déclaratif.
       note = 100;
-      explication = `Démontrée par tes missions — activité « ${libelleActivite(
+      explication = `Démontrée par tes missions — activité « ${libelleDe(
+        taxonomie,
         codeDemontre
       )} ».`;
     } else if (familleDemontree && famillesProfil.has(familleDemontree)) {
@@ -427,6 +437,7 @@ function sousScoreExperience(
         {
           libelle: "Exigence non précisée",
           note: 0,
+          mesuree: false,
           explication: `${detail} ${niveau.explication}`,
         },
       ],
@@ -503,16 +514,24 @@ function sousScoreExperience(
   };
 }
 
+/**
+ * @param taxonomie La liste fermée des activités, telle qu'elle est en base
+ * (D74). Le socle versionné sert de valeur par défaut : un score doit rester
+ * calculable même si la table n'a pas encore été créée, et les tests n'ont pas
+ * à monter une base pour vérifier une arithmétique.
+ */
 export function calculerScore(
   offre: OffreExtraite,
   profil: ProfilPourScoring,
   volet: CodeVolet,
-  bareme: Bareme
+  bareme: Bareme,
+  taxonomie: Taxonomie = SOCLE
 ): Resultat {
-  const missions = sousScoreMissions(offre, profil);
+  const missions = sousScoreMissions(offre, profil, taxonomie);
   const { sous: competences, manquantesIndispensables } = sousScoreCompetences(
     offre,
-    profil
+    profil,
+    taxonomie
   );
   const experience = sousScoreExperience(offre, profil, bareme.coefficients);
 

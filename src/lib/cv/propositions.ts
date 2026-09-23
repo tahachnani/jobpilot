@@ -2,7 +2,7 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
 import { extraireJson } from "@/lib/extraction-json";
 import { VOLETS, type CodeVolet } from "@/config/volets";
-import { ACTIVITES } from "@/config/activites";
+import { chargerTaxonomie, codesActifs } from "@/lib/taxonomie";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV } from "@/lib/cv/generer";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
@@ -224,8 +224,13 @@ export async function proposerMissionsPourOffre(
     );
   }
 
+  // La taxonomie vivante (D74) : le modèle propose des codes de la liste
+  // d'aujourd'hui, et le filtre ci-dessous juge sur la même liste.
+  const taxonomie = await chargerTaxonomie();
+  const codesAutorises = codesActifs(taxonomie);
+
   const message = [
-    `CODES D'ACTIVITÉ AUTORISÉS : ${Object.keys(ACTIVITES).join(", ")}`,
+    `CODES D'ACTIVITÉ AUTORISÉS : ${codesAutorises.join(", ")}`,
     "",
     `POSTE VISÉ : ${offre.intitule ?? ""} — volet ${VOLETS[offre.volet].nom}`,
     "",
@@ -291,7 +296,7 @@ export async function proposerMissionsPourOffre(
     // le moteur de sélection compare une mission à une offre. Le modèle en a
     // inventé — « analyse financière », « Orientation business » — et les
     // missions acceptées n'atteignaient jamais un CV, faute de correspondance.
-    let codes = (p.codes ?? []).filter((c) => c in ACTIVITES);
+    let codes = (p.codes ?? []).filter((c) => codesAutorises.includes(c));
 
     // À défaut, on reprend ceux des entrées de corpus qui fondent la mission :
     // elles décrivent le même travail.
@@ -302,7 +307,9 @@ export async function proposerMissionsPourOffre(
           lignes
             .filter((l) => textesFondateurs.includes(l.texte))
             .flatMap((l) => l.codes)
-            .filter((c) => c in ACTIVITES)
+            // Un code retiré du service reste recevable ici : il vient de ton
+            // corpus, pas du modèle, et il décrit un travail réel.
+            .filter((c) => c in taxonomie)
         ),
       ];
     }

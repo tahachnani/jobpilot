@@ -2,11 +2,10 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import { Carte, TitrePage } from "@/components/ui";
 import { LISTE_VOLETS, VOLETS, type CodeVolet } from "@/config/volets";
 import {
-  ACTIVITES,
   CATEGORIES_COMPETENCE,
   LIBELLES_CONTRAT,
-  libelleActivite,
 } from "@/config/activites";
+import { chargerTaxonomie, codesActifs, libelleDe } from "@/lib/taxonomie";
 import { chargerBasePro, dureeMois } from "@/lib/base-pro";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import {
@@ -17,6 +16,7 @@ import {
   modifierAccroche,
   modifierFormulation,
   ajouterEntreeCorpus,
+  modifierCodesMission,
   modifierEntreeCorpus,
   supprimerEntreeCorpus,
   supprimerCompetences,
@@ -94,11 +94,20 @@ function BoutonMasquer({
 export default async function Profil({
   searchParams,
 }: {
-  searchParams: { volet?: string; menage?: string };
+  searchParams: {
+    volet?: string;
+    menage?: string;
+    refuses?: string;
+    codes?: string;
+  };
 }) {
   const volet: CodeVolet = searchParams.volet === "compta" ? "compta" : "cdg";
   const config = VOLETS[volet];
   const base = await chargerBasePro(volet);
+
+  // La taxonomie vient de la base (D74) : les codes proposés à la saisie sont
+  // ceux d'aujourd'hui, pas ceux du dernier déploiement.
+  const taxonomie = await chargerTaxonomie();
 
   // La matière première de la reformulation et des missions proposées. Elle
   // n'apparaît sur aucun CV : sans écran de lecture, une phrase fausse y
@@ -190,6 +199,42 @@ export default async function Profil({
         ))}
       </div>
 
+      {searchParams.codes === "ok" && (
+        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">
+            Codes enregistrés. Les scores déjà calculés ne les connaissent pas
+            encore :{" "}
+            <Link href="/parametres" className="underline" prefetch={false}>
+              renote tes offres
+            </Link>{" "}
+            — aucun appel IA, aucun coût.
+          </p>
+        </Carte>
+      )}
+
+      {/* D75 — un code refusé se dit. Avant, il disparaissait sans un mot, et
+          l'entrée de corpus repartait avec zéro code. */}
+      {searchParams.refuses && (
+        <Carte className="mb-4 border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-900">
+            Code
+            {searchParams.refuses.includes(",") ? "s" : ""} refusé
+            {searchParams.refuses.includes(",") ? "s" : ""}, absent
+            {searchParams.refuses.includes(",") ? "s" : ""} de la taxonomie :{" "}
+            <strong>{searchParams.refuses.split(",").join(", ")}</strong>. Le
+            reste de l&apos;entrée est enregistré.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-amber-800">
+            Un code doit exister avant d&apos;être utilisé : ajoute-le depuis
+            l&apos;onglet{" "}
+            <Link href="/taxonomie" className="underline" prefetch={false}>
+              Taxonomie
+            </Link>
+            , puis reviens l&apos;affecter ici.
+          </p>
+        </Carte>
+      )}
+
       <Carte className="mb-4">
         <p className="text-lg font-medium text-ardoise-900">
           {base.profil?.prenom} {base.profil?.nom}
@@ -249,12 +294,13 @@ export default async function Profil({
         </Carte>
       )}
 
-      {/* La taxonomie est fermée : un code hors liste est écarté à
-          l'enregistrement et l'entrée devient muette pour le moteur. */}
+      {/* La taxonomie est fermée, mais elle se modifie depuis l'onglet
+          « Taxonomie » : un code hors liste est refusé à l'enregistrement, et
+          désormais signalé au lieu d'être écarté en silence (D75). */}
       <datalist id="codes-activite">
-        {Object.entries(ACTIVITES).map(([code, a]) => (
+        {codesActifs(taxonomie).map((code) => (
           <option key={code} value={code}>
-            {a.libelle}
+            {taxonomie[code].libelle}
           </option>
         ))}
       </datalist>
@@ -301,7 +347,7 @@ export default async function Profil({
                         key={c}
                         className="rounded bg-ardoise-100 px-1.5 py-0.5 text-[10px] font-medium text-ardoise-600"
                       >
-                        {libelleActivite(c)}
+                        {libelleDe(taxonomie, c)}
                       </span>
                     ))}
                     {m.contient_chiffre && (
@@ -345,6 +391,38 @@ export default async function Profil({
                       )}
                     </div>
                   </form>
+
+                  {/* D74 — les codes d'une mission deviennent modifiables.
+                      Ils étaient en lecture seule : ajouter un code à la
+                      taxonomie ne servait à rien, faute de pouvoir
+                      l'affecter. Ce sont eux, et eux seuls, que le score
+                      compare aux missions d'une offre. */}
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-[11px] text-ardoise-400">
+                      Codes d&apos;activité — ce que le score compare
+                    </summary>
+                    <form
+                      action={modifierCodesMission}
+                      key={`c-${volet}-${m.id}`}
+                      className="mt-1.5"
+                    >
+                      <input type="hidden" name="id" value={m.id} />
+                      <input type="hidden" name="volet" value={volet} />
+                      <input
+                        name="codes"
+                        defaultValue={m.activites_codes.join(", ")}
+                        placeholder="codes d'activité, séparés par une virgule"
+                        list="codes-activite"
+                        className="w-full rounded-lg border border-ardoise-200 p-2 text-xs outline-none focus:border-ardoise-500"
+                      />
+                      <button
+                        type="submit"
+                        className="mt-1.5 rounded-lg border border-ardoise-300 px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+                      >
+                        Enregistrer les codes
+                      </button>
+                    </form>
+                  </details>
                 </div>
               ))}
               </div>
@@ -368,6 +446,19 @@ export default async function Profil({
                 cette expérience.
               </p>
 
+              {/* D76 — dit une bonne fois ce que le corpus ne fait pas. Un
+                  code ajouté ici et nulle part ailleurs reste à zéro dans le
+                  score, et rien ne le disait. */}
+              <p className="mt-1.5 rounded-lg bg-ardoise-50 p-2 text-xs leading-relaxed text-ardoise-500">
+                <strong className="text-ardoise-700">
+                  Le corpus ne compte pas dans le score.
+                </strong>{" "}
+                Le calcul lit les codes des <em>missions</em> ci-dessus, pas
+                ceux du corpus. Un code posé seulement ici reste à zéro dans la
+                note d&apos;une offre : pour qu&apos;il compte, il faut aussi
+                l&apos;affecter à la mission correspondante.
+              </p>
+
               <div className="mt-3 space-y-3">
                 {(corpusParExperience.get(e.id) ?? []).map((l) => (
                   <div
@@ -380,7 +471,7 @@ export default async function Profil({
                           key={c}
                           className="rounded bg-ardoise-100 px-1.5 py-0.5 text-[10px] font-medium text-ardoise-600"
                         >
-                          {libelleActivite(c)}
+                          {libelleDe(taxonomie, c)}
                         </span>
                       ))}
                       {l.codes.length === 0 && (

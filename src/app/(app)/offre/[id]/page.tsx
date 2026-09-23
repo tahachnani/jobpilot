@@ -79,13 +79,22 @@ function BlocSousScore({ titre, s }: { titre: string; s: SousScore }) {
               <li key={i} className="border-b border-ardoise-50 pb-2 last:border-0">
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-xs text-ardoise-700">{l.libelle}</span>
-                  <span
-                    className={`shrink-0 text-xs font-semibold tabular-nums ${couleurNote(
-                      l.note
-                    )}`}
-                  >
-                    {l.note}
-                  </span>
+                  {l.mesuree === false ? (
+                    <span
+                      className="shrink-0 rounded bg-ardoise-100 px-1.5 py-0.5 text-[10px] font-medium text-ardoise-500"
+                      title="Hors du calcul : ni en bien ni en mal"
+                    >
+                      hors calcul
+                    </span>
+                  ) : (
+                    <span
+                      className={`shrink-0 text-xs font-semibold tabular-nums ${couleurNote(
+                        l.note
+                      )}`}
+                    >
+                      {l.note}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-ardoise-400">{l.explication}</p>
               </li>

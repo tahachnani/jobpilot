@@ -1,6 +1,6 @@
 # JobPilot — reprise de projet
 
-État du projet au 21 septembre 2026, étape 6 et deux passes d'amélioration comprises.
+État du projet au 23 septembre 2026, étape 6 et trois passes d'amélioration comprises.
 À joindre au premier message d'une nouvelle conversation.
 
 ---
@@ -21,7 +21,8 @@
 | 5 | Lettre de motivation et email | en ligne |
 | 6 | Statuts, envois, relances, suivi | en ligne |
 | — | Dix améliorations (D53–D62) | en ligne |
-| — | Score, marché caché, entretien (D64–D72) | à déployer |
+| — | Score, marché caché, entretien (D64–D73) | à déployer |
+| — | Taxonomie éditable (D74–D76) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -71,6 +72,14 @@ remontaient mécaniquement tous les scores, et l'un d'eux figeait 35 % du total.
 Le niveau du poste, lu ou déduit de l'intitulé et de l'encadrement, sert
 d'exigence quand aucune durée n'est chiffrée. Et le vocabulaire départage deux
 missions qui partagent un code : la note n'est plus binaire. `docs/AMELIORATIONS_SCORE.md`.
+
+**La taxonomie** des activités vit désormais en base et se modifie depuis son
+propre onglet : ajouter un code, corriger un libellé, mettre un code hors
+service. La liste reste fermée — le moteur compare des codes, pas des mots —
+mais c'est toi qui la fermes. Les codes d'une mission sont modifiables dans
+« Mon profil » : ce sont les seuls que le score compare. Toute modification
+incrémente la version du barème et appelle un recalcul.
+`docs/TAXONOMIE_EDITABLE.md`.
 
 **Le marché caché** tient la liste des entreprises visées sans annonce
 publiée, avec l'état de la démarche. Rien n'y est collecté automatiquement.
@@ -130,6 +139,10 @@ copiable et réécrivable seul.
   sa règle RLS et son déclencheur d'horodatage.
 - `0010_type_preparation.sql` — ajoute `preparation` à `type_document`. **À
   lancer seule**, même raison que la 0007.
+- `0011_taxonomie.sql` — table `activites`, amorcée avec les trente codes du
+  socle. Sans elle, l'onglet Taxonomie s'affiche en lecture seule et
+  l'application continue sur le fichier versionné : rien de cassé, rien de
+  modifiable.
 - `0005_corpus_experience.sql` — reconstituée après coup : elle avait été
   appliquée à la main à l'étape 4ter sans être versionnée. Sans effet sur la
   base existante, indispensable pour repartir d'un projet Supabase neuf.
@@ -159,7 +172,19 @@ remonter le début de la réponse brute dans le message d'erreur.
 **Les codes d'activité sont une taxonomie fermée.** Trois missions proposées
 portaient « analyse financière » au lieu de `analyse_financiere` : acceptées en
 base, invisibles au moteur de sélection, absentes de tous les CV. Tout code
-écrit par un modèle ou saisi à la main passe par un filtre sur `ACTIVITES`.
+écrit par un modèle ou saisi à la main passe par un filtre — sur la table
+`activites` depuis D74, sur le socle versionné en repli.
+
+**Un filtre qui se tait transforme une saisie en perte de données.** Le même
+filtre écartait en silence un code hors liste : une entrée de corpus portant
+« amélioration continue » a été enregistrée avec zéro code, sans un mot, et le
+sujet est resté à zéro dans les missions pendant qu'on cherchait la panne
+ailleurs. Un refus se dit, toujours, avec le moyen de le lever.
+
+**Le corpus ne compte dans aucun score.** Le calcul lit les codes des
+*missions*. Le corpus autorise un terme en reformulation et mesure ce qui est
+récupérable — rien d'autre. C'est écrit à l'écran depuis D76, parce que rien ne
+le laissait deviner.
 
 **Ce qui est écrit dans `documents.selection` est figé pour toujours.** Un
 document généré avant l'étape 4ter n'a pas de `potentiel` à la forme attendue :
@@ -216,7 +241,9 @@ Il n'y a plus d'étape prévue. Ce qui reste en suspens, par ordre de gêne :
 
 - Le **coût IA du mois** du tableau de bord est encore écrit en dur à
   « 0,00 $ », alors que `appels_ia` porte les coûts réels.
-- Le **marché caché** est une page annoncée et vide.
+- Neuf lignes de mission sur 305 (3 %) ne sont rattachées à aucun code : elles
+  sortent du calcul depuis D66, et s'affichent « hors calcul » depuis D73.
+  L'onglet Taxonomie est fait pour les rattraper une à une.
 - Les CV et lettres déjà produits gardent la forme qu'ils avaient : un
   document d'avant l'étape 4ter n'a pas de `potentiel` exploitable.
 
@@ -224,9 +251,10 @@ Il n'y a plus d'étape prévue. Ce qui reste en suspens, par ordre de gêne :
 
 ## Les tests
 
-`npm test`, ou automatiquement avant `npm run build`. Quarante cas sur le
-contrôle de reformulation, le barème, l'ordre des compétences, l'estimateur de
-page, la comparaison de termes et le suivi. Ils **bloquent en local et jamais
+`npm test`, ou automatiquement avant `npm run build`. Soixante et onze cas sur
+le contrôle de reformulation, le barème, l'ordre des compétences, l'estimateur
+de page, la comparaison de termes, le découpage des libellés d'annonce, la
+taxonomie et le suivi. Ils **bloquent en local et jamais
 sur Vercel** : le lanceur se retire quand il détecte la construction en ligne.
 Aucune dépendance — Node exécute le TypeScript directement depuis la 22.6, et
 les chemins `@/…` passent par `scripts/alias-hooks.mjs`.
@@ -240,7 +268,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D72 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D76 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

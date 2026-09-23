@@ -32,6 +32,7 @@ export default function Navigation({ email }: { email: string }) {
     { href: "/marche-cache", libelle: "Marché caché", emoji: "🕵️" },
     { href: "/mes-cv", libelle: "Mes CV", emoji: "📄" },
     { href: "/profil", libelle: "Mon profil", emoji: "👤" },
+    { href: "/taxonomie", libelle: "Taxonomie", emoji: "🧭" },
     { href: "/parametres", libelle: "Paramètres", emoji: "⚙️" },
   ];
 

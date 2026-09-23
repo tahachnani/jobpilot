@@ -1,4 +1,4 @@
-# Sept améliorations — décisions D64 à D70
+# Le score remis d'aplomb — décisions D64 à D73
 
 Passe demandée le 21 septembre 2026, après un constat d'usage : **presque
 toutes les offres analysées obtenaient plus de 70 %**.
@@ -187,6 +187,25 @@ gestion ».
 
 Dix tests couvrent ces cas, dont la liste des contextes tirée d'annonces
 réelles.
+
+---
+
+## D73 — Un zéro rouge ne peut pas vouloir dire deux choses
+
+Question du 23 septembre : *« pourquoi une mission avec un 0 ne me pénalise
+pas ? Normalement ce n'est pas fidèle non ? »*
+
+La réponse est que l'affichage mentait. Depuis D66, une ligne que l'annonce ne
+permet pas de mesurer — une mission qu'aucun code ne classe — sort du calcul :
+elle ne compte ni en bien ni en mal, et son poids passe aux autres. Mais elle
+s'affichait « 0 » en rouge, **exactement comme une exigence réellement non
+couverte**. Deux choses opposées — « je ne sais pas mesurer » et « tu ne l'as
+pas » — portaient le même signe. Le calcul était juste, l'écran ne l'était pas.
+
+Le détail d'une ligne porte désormais `mesuree`. Quand il est faux, la ligne
+affiche une pastille grise « hors calcul » au lieu d'une note, et son
+explication dit pourquoi — en ajoutant que si le sujet revient souvent, c'est
+qu'il manque un code à la taxonomie. C'est ce constat qui a conduit à D74.
 
 ---
 

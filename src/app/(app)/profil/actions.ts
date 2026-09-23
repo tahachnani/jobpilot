@@ -1,6 +1,6 @@
 "use server";
 
-import { ACTIVITES } from "@/config/activites";
+import { chargerTaxonomie } from "@/lib/taxonomie";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -192,22 +192,85 @@ export async function retablirCompetence(formData: FormData) {
 }
 
 /**
- * Les codes d'activité saisis à la main, filtrés sur la taxonomie fermée.
+ * Les codes d'activité saisis à la main, triés sur la taxonomie vivante.
  *
  * Le scoring et la sélection comparent des codes, pas des libellés : un code
  * hors liste rend l'entrée muette pour le moteur. Les missions proposées ont
  * déjà payé cette leçon — trois d'entre elles portaient « analyse financière »
  * au lieu de `analyse_financiere` et n'atteignaient aucun CV.
+ *
+ * Ce qui change ici (D75) : un code refusé est **rendu à l'appelant**, qui le
+ * dit. L'ancienne version le laissait tomber en silence. Le 23 septembre, une
+ * entrée de corpus portant « amélioration continue » a donc été enregistrée
+ * avec zéro code, sans un mot — et le sujet est resté à zéro dans les missions
+ * pendant qu'on cherchait la panne ailleurs. Un filtre muet transforme une
+ * saisie en perte de données.
+ *
+ * Un code retiré du service reste recevable : il décrit un travail réel, et le
+ * champ est prérempli avec l'existant — un simple réenregistrement ne doit pas
+ * l'effacer.
  */
-function codesValides(brut: string): string[] {
-  return [
+async function trierCodes(
+  brut: string
+): Promise<{ codes: string[]; refuses: string[] }> {
+  const taxonomie = await chargerTaxonomie();
+
+  const saisis = [
     ...new Set(
       brut
         .split(/[,\s]+/)
         .map((c) => c.trim().toLowerCase())
-        .filter((c) => c in ACTIVITES)
+        .filter(Boolean)
     ),
   ];
+
+  return {
+    codes: saisis.filter((c) => c in taxonomie),
+    refuses: saisis.filter((c) => !(c in taxonomie)),
+  };
+}
+
+/** Le retour d'écran après une écriture de corpus : muet si tout est passé. */
+function retourCorpus(volet: string, refuses: string[]): never {
+  revalidatePath("/profil");
+  redirect(
+    refuses.length > 0
+      ? `/profil?volet=${volet}&refuses=${encodeURIComponent(
+          refuses.join(",")
+        )}`
+      : `/profil?volet=${volet}`
+  );
+}
+
+/**
+ * Change les codes d'activité d'une mission du parcours (D74).
+ *
+ * Ce sont les seuls codes que le score compare à ceux d'une offre. Ils étaient
+ * en lecture seule depuis l'étape 1 : la taxonomie avait beau s'enrichir, un
+ * nouveau code ne pouvait être affecté à rien, et le sujet restait à zéro.
+ *
+ * Le texte de la mission n'est pas touché ici : on classe, on ne réécrit pas.
+ * Après modification, les scores existants ne reflètent plus le parcours —
+ * l'écran invite donc à renoter depuis Paramètres, ce qui ne coûte rien.
+ */
+export async function modifierCodesMission(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (!id) return;
+
+  const { codes, refuses } = await trierCodes(
+    String(formData.get("codes") ?? "")
+  );
+
+  const supabase = creerClientServeur();
+  await supabase.from("missions").update({ activites_codes: codes }).eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(
+    refuses.length > 0
+      ? `/profil?volet=${volet}&refuses=${encodeURIComponent(refuses.join(","))}`
+      : `/profil?volet=${volet}&codes=ok`
+  );
 }
 
 /** Corrige une entrée de corpus : son texte et ses codes d'activité. */
@@ -217,17 +280,17 @@ export async function modifierEntreeCorpus(formData: FormData) {
   const texte = String(formData.get("texte") ?? "").trim();
   if (!id || !texte) return;
 
+  const { codes, refuses } = await trierCodes(
+    String(formData.get("codes") ?? "")
+  );
+
   const supabase = creerClientServeur();
   await supabase
     .from("corpus_experience")
-    .update({
-      texte,
-      activites_codes: codesValides(String(formData.get("codes") ?? "")),
-    })
+    .update({ texte, activites_codes: codes })
     .eq("id", id);
 
-  revalidatePath("/profil");
-  redirect(`/profil?volet=${volet}`);
+  retourCorpus(volet, refuses);
 }
 
 /**
@@ -256,6 +319,10 @@ export async function ajouterEntreeCorpus(formData: FormData) {
   const texte = String(formData.get("texte") ?? "").trim();
   if (!experienceId || !texte) return;
 
+  const { codes, refuses } = await trierCodes(
+    String(formData.get("codes") ?? "")
+  );
+
   const supabase = creerClientServeur();
 
   const { data: derniere } = await supabase
@@ -269,13 +336,12 @@ export async function ajouterEntreeCorpus(formData: FormData) {
   await supabase.from("corpus_experience").insert({
     experience_id: experienceId,
     texte,
-    activites_codes: codesValides(String(formData.get("codes") ?? "")),
+    activites_codes: codes,
     source: "saisie_manuelle",
     ordre: ((derniere as { ordre: number } | null)?.ordre ?? 0) + 1,
   });
 
-  revalidatePath("/profil");
-  redirect(`/profil?volet=${volet}`);
+  retourCorpus(volet, refuses);
 }
 
 /**

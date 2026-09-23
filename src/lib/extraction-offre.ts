@@ -1,4 +1,4 @@
-import { ACTIVITES } from "@/config/activites";
+import { chargerTaxonomie, codesActifs } from "@/lib/taxonomie";
 import { SECTEURS } from "@/config/secteurs";
 import {
   appelIA,
@@ -48,7 +48,6 @@ export interface OffreExtraite {
   mots_cles_ats: string[];
 }
 
-const CODES_ACTIVITES = Object.keys(ACTIVITES);
 
 /**
  * Ces trois champs partent directement dans des colonnes typées côté base.
@@ -95,7 +94,14 @@ function nombreValide(v: unknown): number | null {
 }
 const CODES_SECTEURS = Object.keys(SECTEURS);
 
-const SYSTEME = `Tu extrais des données structurées d'offres d'emploi françaises en finance, contrôle de gestion et comptabilité.
+/**
+ * Le prompt système est désormais construit à l'appel (D74).
+ *
+ * La liste des codes vient de la table, pas du fichier : ajouter
+ * « amélioration continue » depuis l'écran Taxonomie doit suffire pour que le
+ * modèle sache classer une mission dedans, sans redéploiement.
+ */
+const systeme = (codes: string[]) => `Tu extrais des données structurées d'offres d'emploi françaises en finance, contrôle de gestion et comptabilité.
 
 RÈGLES ABSOLUES :
 - Tu n'inventes rien. Un champ absent de l'offre vaut null, jamais une estimation.
@@ -104,7 +110,7 @@ RÈGLES ABSOLUES :
 - Tu réponds uniquement par un objet JSON, sans texte autour, sans balises de code.
 
 CODES D'ACTIVITÉ AUTORISÉS :
-${CODES_ACTIVITES.join(", ")}
+${codes.join(", ")}
 
 CODES DE SECTEUR AUTORISÉS :
 ${CODES_SECTEURS.join(", ")}
@@ -161,9 +167,14 @@ export async function extraireOffre(
     );
   }
 
+  // La taxonomie est lue à chaque extraction : le modèle doit classer dans la
+  // liste d'aujourd'hui, pas dans celle du dernier déploiement.
+  const taxonomie = await chargerTaxonomie();
+  const codesAutorises = codesActifs(taxonomie);
+
   const r = await appelIA({
     modele: MODELE_EXTRACTION,
-    systeme: SYSTEME,
+    systeme: systeme(codesAutorises),
     message: `Voici l'offre d'emploi à extraire :\n\n${contenu.slice(0, 40000)}`,
     // 4000 a été la limite exacte de trois troncatures ailleurs dans l'app :
     // une offre longue avec beaucoup de missions y arrive aussi.
@@ -179,7 +190,7 @@ export async function extraireOffre(
     .filter((m) => m && typeof m.texte === "string" && m.texte.trim().length > 0)
     .map((m) => ({
       texte: m.texte.trim(),
-      codes: (m.codes ?? []).filter((c) => CODES_ACTIVITES.includes(c)),
+      codes: (m.codes ?? []).filter((c) => codesAutorises.includes(c)),
       importance: Math.min(3, Math.max(1, Number(m.importance) || 1)),
     }));
 
