@@ -23,6 +23,7 @@ import {
 import {
   supprimerOffre,
   recalculerScore,
+  reanalyserOffre,
   genererCV,
   marquerEnvoyee,
   changerStatut,
@@ -117,6 +118,9 @@ export default async function DetailOffre({
     message?: string;
     suivi?: string;
     competence?: string;
+    analyse?: string;
+    avant?: string;
+    apres?: string;
   };
 }) {
   const supabase = creerClientServeur();
@@ -467,6 +471,23 @@ export default async function DetailOffre({
           />
         </form>
 
+        {/* D77 — le seul bouton de ce bloc qui dépense, d'où la
+            confirmation. Il existe parce que le recalcul ne reclasse rien :
+            une offre analysée avant l'ajout d'un code gardait ses lignes
+            « hors calcul » pour toujours. */}
+        <form action={reanalyserOffre}>
+          <input type="hidden" name="id" value={params.id} />
+          <BoutonSoumettre
+            libelle="Réanalyser l'offre"
+            libelleEnCours="Réanalyse… (30 s)"
+            confirmation={
+              "Rappeler le modèle sur le texte de l'annonce pour reclasser ses missions ?\n\n" +
+              "Coût : environ 0,01 $. L'analyse actuelle est conservée, et ni le statut, ni les CV, ni les lettres ne changent."
+            }
+            className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-50"
+          />
+        </form>
+
         <form action={supprimerOffre}>
           <input type="hidden" name="id" value={params.id} />
           <input type="hidden" name="volet" value={String(offre.volet)} />
@@ -479,9 +500,42 @@ export default async function DetailOffre({
         </form>
       </div>
 
+      {searchParams.analyse === "erreur" && (
+        <Carte className="mt-3 border-rose-200 bg-rose-50">
+          <p className="text-sm text-rose-900">
+            {searchParams.message ?? "La réanalyse a échoué."}
+          </p>
+          <p className="mt-1 text-xs text-rose-800">
+            L&apos;analyse précédente est intacte : rien n&apos;a été perdu.
+          </p>
+        </Carte>
+      )}
+
+      {searchParams.analyse === "ok" && (
+        <Carte className="mt-3 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-900">
+            Offre réanalysée et renotée.{" "}
+            {searchParams.avant === searchParams.apres
+              ? `Le classement n'a pas bougé : ${
+                  searchParams.apres ?? "0"
+                } ligne(s) restent hors calcul.`
+              : `Lignes hors calcul : ${searchParams.avant ?? "?"} avant, ${
+                  searchParams.apres ?? "?"
+                } après.`}
+          </p>
+          <p className="mt-1 text-xs text-emerald-800">
+            L&apos;analyse précédente est conservée : une réanalyse peut être
+            moins bonne que celle qu&apos;elle remplace.
+          </p>
+        </Carte>
+      )}
+
       <p className="mt-3 text-xs text-ardoise-400">
         Le recalcul rejoue le barème sur l&apos;analyse déjà stockée : il ne
-        rappelle pas l&apos;IA et ne coûte rien.
+        rappelle pas l&apos;IA et ne coûte rien. La réanalyse, elle, redemande
+        au modèle de classer les missions de l&apos;annonce — c&apos;est le
+        seul moyen de rattraper une ligne « hors calcul » après avoir ajouté un
+        code à la taxonomie.
       </p>
 
       {analyse && manquantes.length === 0 && couverture.contextes.length === 0 && (

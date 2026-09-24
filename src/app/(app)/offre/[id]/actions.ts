@@ -3,7 +3,11 @@
 import { creerClientServeur } from "@/lib/supabase/server";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import { enregistrerScore } from "@/lib/analyse";
-import type { OffreExtraite } from "@/lib/extraction-offre";
+import {
+  extraireOffre,
+  extractionSuffisante,
+  type OffreExtraite,
+} from "@/lib/extraction-offre";
 import { ErreurCV, genererCVPourOffre } from "@/lib/cv/generer";
 import { ErreurIA } from "@/lib/anthropic";
 import { genererRelancePourOffre } from "@/lib/relance/generer";
@@ -79,6 +83,154 @@ export async function recalculerScore(formData: FormData) {
   });
 
   revalidatePath(`/offre/${id}`);
+}
+
+/**
+ * Rappelle le modèle sur le texte de l'annonce et reclasse ses missions (D77).
+ *
+ * Le recalcul ne reclasse rien : il rejoue l'arithmétique sur une analyse
+ * figée le jour de l'ajout. Une offre analysée avec trente codes gardait donc
+ * ses lignes « hors calcul » indéfiniment, même après l'ajout du code qui
+ * manquait — et rien ne disait pourquoi. C'était le seul chemin manquant :
+ * l'extraction n'existait qu'à l'ajout d'une offre, où le contrôle anti-doublon
+ * renvoie vers l'offre existante sans rien relancer.
+ *
+ * Le seul bouton de cet écran qui dépense, d'où la confirmation côté écran.
+ *
+ * Trois prudences :
+ * - l'ancienne analyse est **conservée**. Une réanalyse peut être moins bonne
+ *   que la précédente ; on doit pouvoir comparer, et le coût déjà payé ne
+ *   disparaît pas parce qu'on recommence.
+ * - le **statut ne bouge pas**. Réanalyser n'est pas revenir en arrière : une
+ *   candidature envoyée le reste (D43).
+ * - un champ que la nouvelle extraction ne retrouve pas **n'écrase pas**
+ *   l'ancien. Une réanalyse ne doit pas effacer ce qu'elle ne sait plus lire.
+ */
+export async function reanalyserOffre(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+
+  const { data: offre } = await supabase
+    .from("offres")
+    .select("id, volet, contenu_brut")
+    .eq("id", id)
+    .maybeSingle();
+  if (!offre) return;
+
+  const o = offre as {
+    volet: CodeVolet;
+    contenu_brut: string | null;
+  };
+
+  if (!o.contenu_brut || o.contenu_brut.trim().length < 200) {
+    redirect(
+      `/offre/${id}?analyse=erreur&message=${encodeURIComponent(
+        "Le texte de l'annonce n'est plus en base, ou il est trop court pour être réanalysé."
+      )}`
+    );
+  }
+
+  // Ce que l'analyse courante ne savait pas classer : c'est la seule mesure
+  // qui dise si la réanalyse a servi à quelque chose.
+  const { data: precedente } = await supabase
+    .from("offre_analyses")
+    .select("resultat")
+    .eq("offre_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const avant = compterNonClassees(
+    (precedente as { resultat?: OffreExtraite } | null)?.resultat
+  );
+
+  let donnees: OffreExtraite | null = null;
+  let modele = "";
+  let erreur = "";
+
+  // Le `redirect` reste hors du `try` : une redirection Next passe par une
+  // exception, et le `catch` la transformerait en message d'erreur.
+  try {
+    const r = await extraireOffre(o.contenu_brut, id);
+    donnees = r.donnees;
+    modele = r.modele;
+  } catch (e) {
+    erreur =
+      e instanceof ErreurIA
+        ? e.message
+        : `La réanalyse a échoué : ${
+            e instanceof Error ? e.message : String(e)
+          }`;
+  }
+
+  if (erreur || !donnees) {
+    redirect(
+      `/offre/${id}?analyse=erreur&message=${encodeURIComponent(
+        (erreur || "Extraction vide.").slice(0, 300)
+      )}`
+    );
+  }
+
+  if (!extractionSuffisante(donnees)) {
+    redirect(
+      `/offre/${id}?analyse=erreur&message=${encodeURIComponent(
+        "Ni mission ni compétence identifiée : l'analyse précédente est conservée."
+      )}`
+    );
+  }
+
+  // Les seuls champs réécrits, et seulement quand la nouvelle lecture a
+  // trouvé quelque chose. `statut`, `contenu_brut` et l'empreinte ne sont
+  // jamais touchés.
+  const misAJour: Record<string, unknown> = {};
+  for (const [champ, valeur] of [
+    ["intitule", donnees.intitule],
+    ["entreprise", donnees.entreprise],
+    ["localisation", donnees.localisation],
+    ["departement", donnees.departement],
+    ["contrat", donnees.contrat],
+    ["salaire_min", donnees.salaire_min],
+    ["salaire_max", donnees.salaire_max],
+    ["salaire_periode", donnees.salaire_periode],
+    ["teletravail", donnees.teletravail],
+    ["date_publication", donnees.date_publication],
+  ] as [string, unknown][]) {
+    if (valeur !== null && valeur !== undefined) misAJour[champ] = valeur;
+  }
+  if (Object.keys(misAJour).length > 0) {
+    await supabase.from("offres").update(misAJour).eq("id", id);
+  }
+
+  const { data: creee } = await supabase
+    .from("offre_analyses")
+    .insert({
+      offre_id: id,
+      resultat: donnees as unknown as Record<string, unknown>,
+      modele,
+      prompt_version: "1",
+    })
+    .select("id")
+    .single();
+
+  await enregistrerScore({
+    offreId: id,
+    analyseId: (creee as { id: string } | null)?.id ?? null,
+    volet: o.volet,
+    donnees,
+  });
+
+  const apres = compterNonClassees(donnees);
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?analyse=ok&avant=${avant}&apres=${apres}`);
+}
+
+/** Les lignes de mission qu'aucun code d'activité ne classe. */
+function compterNonClassees(resultat: OffreExtraite | undefined | null): number {
+  return (resultat?.missions ?? []).filter((m) => (m.codes ?? []).length === 0)
+    .length;
 }
 
 /**

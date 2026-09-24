@@ -22,7 +22,7 @@
 | 6 | Statuts, envois, relances, suivi | en ligne |
 | — | Dix améliorations (D53–D62) | en ligne |
 | — | Score, marché caché, entretien (D64–D73) | à déployer |
-| — | Taxonomie éditable (D74–D76) | à déployer |
+| — | Taxonomie éditable et réanalyse (D74–D77) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -186,6 +186,13 @@ ailleurs. Un refus se dit, toujours, avec le moyen de le lever.
 récupérable — rien d'autre. C'est écrit à l'écran depuis D76, parce que rien ne
 le laissait deviner.
 
+**La taxonomie sert à la lecture de l'annonce, pas à sa notation.** Le modèle
+classe une fois, à l'ajout ; le score ne fait ensuite que compter. Ajouter un
+code ne rattrape donc **aucune** offre déjà analysée, et recalculer n'y change
+rien — c'est ce qu'il fallait comprendre avant de chercher un bug là où il n'y
+en avait pas. Le bouton « Réanalyser l'offre » (D77) est le seul chemin, et il
+coûte un centime.
+
 **Ce qui est écrit dans `documents.selection` est figé pour toujours.** Un
 document généré avant l'étape 4ter n'a pas de `potentiel` à la forme attendue :
 l'écran Formulations plantait dessus. Tout lecteur doit tolérer les formes
@@ -268,7 +275,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D76 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D77 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

@@ -1,4 +1,4 @@
-# La taxonomie éditable — décisions D74 à D76
+# La taxonomie éditable — décisions D74 à D77
 
 Passe demandée le 23 septembre 2026, à partir d'un constat d'usage précis :
 
@@ -95,6 +95,48 @@ corpus reste à zéro dans la note d'une offre.
 
 Aucun code n'est modifié pour cela : c'est une lacune d'interface, pas de
 moteur. Le corpus garde exactement le rôle qu'il a toujours eu.
+
+## D77 — Réanalyser une offre
+
+Constat du 24 septembre, une fois la taxonomie ouverte. Une offre analysée le
+22 septembre affichait toujours « Proposition d'actions d'amélioration
+continue — hors calcul », alors que le code existait désormais. Plusieurs
+recalculs n'y ont rien changé, et c'était normal : **la taxonomie sert au
+moment où l'annonce est lue, pas au moment où elle est notée.** Le recalcul
+rejoue l'arithmétique sur une classification figée le jour de l'ajout.
+
+Vérifié dans les données avant de conclure : l'offre ajoutée juste après la
+création des codes porte `amelioration_continue` et `controle_interne`, sans
+une seule ligne non classée. Le mécanisme fonctionnait ; il manquait le
+chemin pour en faire profiter l'existant.
+
+Car l'extraction n'existait qu'à **l'ajout** d'une offre, où le contrôle
+anti-doublon sur l'empreinte du contenu renvoie vers l'offre existante sans
+rien relancer. Une offre analysée l'était donc pour toujours.
+
+Le bouton « Réanalyser l'offre » rappelle le modèle sur le `contenu_brut` déjà
+stocké — rien à recoller —, écrit une nouvelle analyse et renote. Il annonce
+son coût et demande confirmation : c'est le seul bouton de ce bloc qui
+dépense, environ un centime.
+
+Trois prudences le distinguent d'un simple « refaire » :
+
+- **L'analyse précédente est conservée.** Une réanalyse peut être moins bonne
+  que celle qu'elle remplace ; on doit pouvoir comparer, et le coût déjà payé
+  ne disparaît pas parce qu'on recommence.
+- **Le statut ne bouge pas.** Réanalyser n'est pas revenir en arrière : une
+  candidature envoyée le reste (D43).
+- **Un champ que la nouvelle lecture ne retrouve pas n'écrase pas l'ancien.**
+  Une réanalyse ne doit pas effacer ce qu'elle ne sait plus lire.
+
+L'écran annonce le résultat par la seule mesure qui dise si l'opération a
+servi : le nombre de lignes hors calcul avant et après.
+
+Portée réelle mesurée le 24 septembre : 9 lignes non classées sur 305, réparties
+sur 7 offres, dont 4 relèvent des codes ajoutés depuis. Les cinq autres — la
+veille réglementaire, par exemple — ne sont pas des activités du parcours et
+doivent rester hors calcul. « Hors calcul » n'est pas toujours un défaut de la
+taxonomie.
 
 ---
 
