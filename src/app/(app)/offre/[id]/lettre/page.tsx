@@ -263,6 +263,7 @@ export default async function Lettre({
                   Télécharger
                 </a>
                 <BoutonCopier
+                  quoi="la lettre"
                   texte={[
                     modele.objet,
                     "",

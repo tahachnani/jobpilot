@@ -134,6 +134,33 @@ export function controler(
     );
   }
 
+  /**
+   * Une reformulation doit **ajouter**, pas **échanger** (D79).
+   *
+   * La règle d'apport ci-dessus a laissé passer la moitié des propositions :
+   * il suffisait de glisser un mot de l'annonce pour être accepté, quitte à
+   * réécrire le reste. « Suivi chaque semaine des résidences à enjeux »
+   * devenait « Pilotage hebdomadaire du patrimoine sensible » — un terme
+   * gagné, quatre perdus, et des mots que l'original disait mieux.
+   *
+   * Ce qui disparaît était vrai et lisible par un analyseur de CV. On tolère
+   * une perte de plus que d'apports — une reformulation resserre parfois — et
+   * pas davantage. Le rejet n'est jamais définitif : la proposition reste
+   * affichée avec son motif et s'accepte à la main.
+   */
+  const motsPerdus = [...motsOriginal].filter((m) => !motsProposition.has(m));
+  if (apports.length > 0 && motsPerdus.length > apports.length + 1) {
+    motifs.push(
+      `Échange plus qu'elle n'apporte : ${motsPerdus.length} terme${
+        motsPerdus.length > 1 ? "s" : ""
+      } de l'original perdu${motsPerdus.length > 1 ? "s" : ""} — ${motsPerdus
+        .slice(0, 5)
+        .join(", ")} — pour ${apports.length} apporté${
+        apports.length > 1 ? "s" : ""
+      }.`
+    );
+  }
+
   if (normaliser(texte) === normaliser(original)) {
     motifs.push("Identique à l'original : n'apporte rien.");
   }

@@ -45,11 +45,19 @@ CE QUE TU NE PEUX PAS INVENTER
 - aucun trait de caractère, aucune qualité relationnelle, aucune manière de travailler présentés comme acquis : "habitué à défendre un chiffre avec diplomatie", "reconnu pour sa rigueur" sont des affirmations invérifiables. Décris ce qui a été fait, pas la façon dont le candidat le ferait.
 - aucun secteur, marché ou métier attribué à un employeur du parcours s'il n'est pas nommément dans les données. Si l'annonce parle de distribution et que le candidat a travaillé dans l'industrie, tu n'écris pas qu'il vient de la distribution. Les mots de l'annonce décrivent l'entreprise visée, jamais rétroactivement le parcours.
 
-CE QUE TU PRODUIS
-Une lettre de quatre paragraphes, une page maximum, qui progresse. Elle ne commence JAMAIS par "Votre annonce", "Votre offre" ni par une description de l'entreprise : on se présente avant de commenter autrui.
+LA FORMATION — CE QUI NE SE DIT PAS
+Tu n'écris JAMAIS que le candidat détient deux masters, ni "double master", ni "mes deux formations". Le cumul de diplômes ne prouve rien à un recruteur et se lit comme une exhibition ; le CV le dit déjà, en une ligne, sans insister.
+Tu ne nommes AUCUN établissement, et en particulier jamais "Le Mans Université" : la candidature vise toute la France, et nommer une université régionale ancre le profil là où il ne veut pas l'être.
+Si la formation doit apparaître, elle apparaît par sa SPÉCIALITÉ et rien d'autre — "formé au contrôle de gestion et à l'audit", "de formation comptabilité contrôle audit". Jamais l'intitulé complet, jamais l'école, jamais l'année.
 
-1. QUI EST LE CANDIDAT, et pourquoi ce poste précisément. Une phrase d'ouverture qui pose le profil — formation, ancrage métier, situation — puis le lien avec le poste visé. On part de soi, on arrive à l'offre.
-2. CE QUE LE PARCOURS APPORTE à ces missions-là, avec deux faits précis tirés des expériences. C'est le cœur, le paragraphe le plus dense.
+CE QUE TU PRODUIS
+Une lettre de quatre paragraphes courts qui progresse. Elle ne commence JAMAIS par "Votre annonce", "Votre offre" ni par une description de l'entreprise : on se présente avant de commenter autrui.
+
+LONGUEUR — CONTRAINTE FERME
+Les quatre paragraphes réunis tiennent en 2 000 signes, espaces compris. Ce n'est pas un objectif, c'est un plafond. Budget indicatif par paragraphe : 350, 700, 600, 300 signes. Une lettre qui déborde n'est pas plus convaincante, elle est moins lue — et ce qu'on coupe en dernier, c'est toujours le paragraphe 2, celui qui porte les faits.
+
+1. QUI EST LE CANDIDAT, et pourquoi ce poste précisément. Une phrase d'ouverture qui pose le profil — spécialité de formation, ancrage métier, situation — puis le lien avec le poste visé. On part de soi, on arrive à l'offre.
+2. CE QUE LE PARCOURS APPORTE à ces missions-là, avec deux faits précis tirés des expériences. C'est le cœur, le paragraphe le plus dense et le plus long.
 3. CE QUI DISTINGUE : un angle, une double compétence, une expérience que d'autres candidats n'auront pas. C'est ici que la lettre dit ce que le CV ne peut pas dire.
 4. DISPONIBILITÉ ET PROJET, bref, tourné vers la suite.
 
@@ -183,18 +191,21 @@ async function contexteParcours(volet: CodeVolet): Promise<{
 }
 
 /**
- * Consignes de style, tirées au sort à chaque réécriture.
+ * Consignes de style, parcourues dans l'ordre à chaque réécriture (D80).
  *
  * Régénérer donnait presque la même lettre : mêmes phrases, mêmes tournures.
- * Le modèle retombe naturellement sur sa formulation la plus probable ; pour
- * qu'il change, il faut lui demander autre chose, pas la même chose une
- * seconde fois.
+ * Deux causes, corrigées ensemble — le style était tiré au sort, donc
+ * répétable, et le modèle ne voyait pas la version qu'on lui demandait de ne
+ * pas reproduire.
+ *
+ * Les consignes se contredisent délibérément entre elles : un style qui
+ * n'interdit rien ne change rien.
  */
 const STYLES = [
-  "Écris plus direct et plus court : phrases brèves, peu de subordonnées, aucun connecteur décoratif.",
-  "Écris de façon plus narrative : pars d'une situation concrète vécue et déroule, sans jamais inventer de fait.",
-  "Écris de façon plus analytique : pose le problème que le poste doit résoudre, puis montre en quoi le parcours y répond.",
-  "Écris plus sobre et factuel : aucune formule d'enthousiasme, le raisonnement seul, le ton d'une note interne.",
+  "Écris plus direct et plus court : phrases brèves, aucune subordonnée de plus d'une par phrase, aucun connecteur décoratif. Commence par une affirmation, jamais par une circonstance.",
+  "Écris de façon narrative : ouvre sur une situation concrète vécue — un chantier, un écart trouvé, une procédure reprise — et déroule à partir d'elle, sans jamais inventer de fait. Aucune phrase de présentation générale.",
+  "Écris de façon analytique : pose d'abord le problème que ce poste doit résoudre, tel que l'annonce le laisse voir, puis montre en quoi le parcours y répond. Structure avant style.",
+  "Écris sobre et factuel, sur le ton d'une note interne : aucune formule d'enthousiasme, aucun adjectif sur soi, le raisonnement seul. Chaque paragraphe commence par un fait.",
 ];
 
 export async function genererLettrePourOffre(
@@ -248,6 +259,31 @@ export async function genererLettrePourOffre(
   const modeleCV = (cvBrut as { selection: { modele?: ModeleCV } } | null)
     ?.selection?.modele;
 
+  /**
+   * La lettre précédente, quand on demande un autre style (D80).
+   *
+   * « Réécrire dans un autre style » ne changeait presque rien, et la raison
+   * était bête : on demandait au modèle de ne pas reprendre les tournures
+   * d'une version qu'il n'avait jamais vue. Il retombait donc sur sa
+   * formulation la plus probable — la même. On la lui montre désormais, avec
+   * la consigne de s'en écarter.
+   */
+  const { data: lettrePrecedenteBrute } = changerDeStyle
+    ? await supabase
+        .from("documents")
+        .select("contenu_texte, version")
+        .eq("offre_id", offreId)
+        .eq("type", "lettre")
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  const lettrePrecedente = lettrePrecedenteBrute as {
+    contenu_texte: string | null;
+    version: number;
+  } | null;
+
   const parcours = await contexteParcours(offre.volet);
 
   // Sans la date du jour, le modèle a écrit « actuellement en poste jusqu'en
@@ -279,13 +315,24 @@ export async function genererLettrePourOffre(
           .flatMap((e) => e.missions.map((m) => `  • ${m.texte}`))
           .join("\n")}`
       : "",
+    lettrePrecedente?.contenu_texte
+      ? `VERSION PRÉCÉDENTE DE CETTE LETTRE — tu dois t'en écarter nettement. N'en reprends aucune phrase, aucune ouverture, aucune transition. Les faits, eux, restent les mêmes :\n${lettrePrecedente.contenu_texte.slice(
+          0,
+          3000
+        )}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
 
-  // Une consigne de style différente à chaque réécriture, choisie au hasard.
+  /**
+   * Le style tourne avec la version, au lieu d'être tiré au sort.
+   *
+   * Quatre styles tirés au hasard, c'est une chance sur quatre de retomber
+   * sur le même — et l'impression, justifiée, que le bouton ne fait rien.
+   */
   const style = changerDeStyle
-    ? STYLES[Math.floor(Math.random() * STYLES.length)]
+    ? STYLES[(lettrePrecedente?.version ?? 0) % STYLES.length]
     : "";
 
   const reponse = await appelIA({

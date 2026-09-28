@@ -19,6 +19,7 @@ import {
   dateDansNJours,
 } from "@/lib/suivi";
 import { STATUTS } from "@/config/volets";
+import { CANAUX_RELANCE, ORIGINES } from "@/config/origines";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -262,7 +263,6 @@ export async function genererCV(formData: FormData) {
   await avancerPreparation(id, "cv_genere");
 
   revalidatePath(`/offre/${id}`);
-  revalidatePath("/mes-cv");
   redirect(`/offre/${id}?cv=ok`);
 }
 
@@ -281,6 +281,16 @@ export async function marquerEnvoyee(formData: FormData) {
   const dateEnvoi = saisie ? new Date(saisie) : new Date();
   if (Number.isNaN(dateEnvoi.getTime())) return;
 
+  /**
+   * L'origine remplace le commentaire libre (D84).
+   *
+   * Au moment où l'on clique « envoyée », on n'a rien à écrire — d'où un champ
+   * resté vide sur quarante-deux candidatures. En revanche on sait toujours
+   * d'où l'on a postulé, et cette information-là se compte : croisée avec les
+   * issues, elle dit quel canal donne des entretiens.
+   */
+  const origine = String(formData.get("origine") ?? "").trim();
+
   const supabase = creerClientServeur();
   await supabase
     .from("offres")
@@ -288,13 +298,33 @@ export async function marquerEnvoyee(formData: FormData) {
       statut: "envoyee",
       date_candidature: dateEnvoi.toISOString(),
       relance_prevue_le: dateDeRelanceParDefaut(dateEnvoi),
+      ...(origine in ORIGINES ? { origine } : {}),
     })
     .eq("id", id);
 
-  await commenterDernierStatut(id, String(formData.get("commentaire") ?? ""));
-
   revalidatePath(`/offre/${id}`);
   redirect(`/offre/${id}?suivi=envoyee`);
+}
+
+/** Corrige l'origine et le canal de relance d'une candidature déjà partie. */
+export async function modifierCanaux(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const origine = String(formData.get("origine") ?? "").trim();
+  const canal = String(formData.get("canal_relance") ?? "").trim();
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({
+      origine: origine in ORIGINES ? origine : null,
+      canal_relance: canal in CANAUX_RELANCE ? canal : null,
+    })
+    .eq("id", id);
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?suivi=canaux`);
 }
 
 /**

@@ -11,7 +11,13 @@ import {
 } from "./actions";
 import { chargerCorpus, type LigneCorpus } from "@/lib/cv/corpus";
 import { fondements } from "@/lib/cv/propositions";
-import { LIBELLES_POTENTIEL, type Potentiel } from "@/lib/cv/ecart";
+import {
+  ACTIONS_PAR_SOURCE,
+  LIBELLES_POTENTIEL,
+  LIBELLES_SOURCE,
+  lirePotentiel,
+  type Potentiel,
+} from "@/lib/cv/ecart";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -62,19 +68,25 @@ export default async function Formulations({
   const potentielBrut = (cvBrut as { selection: { potentiel?: Potentiel } } | null)
     ?.selection?.potentiel;
 
-  // Un potentiel stocké avant l'étape 4ter n'a ni `recuperables` ni
-  // `horsPortee` : il est figé au moment de la génération du CV. Lire ces
-  // champs sans précaution faisait planter la page entière.
-  const potentiel = potentielBrut
-    ? {
-        ...potentielBrut,
-        recuperables: potentielBrut.recuperables ?? [],
-        horsPortee: potentielBrut.horsPortee ?? [],
-      }
-    : undefined;
+  // Un document est figé le jour de sa génération : celui d'avant l'étape 4ter
+  // n'a ni `recuperables` ni `horsPortee`, celui d'avant D78 n'a pas
+  // `parSource`. La lecture est centralisée plutôt que devinée ici.
+  const { potentiel: potentielLu, sansSource } = lirePotentiel(potentielBrut);
+  const potentiel = potentielLu ?? undefined;
 
   const potentielObsolete =
     potentielBrut !== undefined && potentielBrut.recuperables === undefined;
+
+  /**
+   * D79 — ce que la reformulation peut réellement aller chercher.
+   *
+   * L'appel est payé avant tout filtrage : durcir l'acceptation ne fait pas
+   * économiser un centime, seul le fait de ne pas cliquer le fait. Le bouton
+   * dit donc ce qu'il en est, et demande confirmation quand le corpus est
+   * muet.
+   */
+  const dansLeCorpus = potentiel?.parSource?.corpus ?? [];
+  const reformulationVaine = potentiel !== undefined && dansLeCorpus.length === 0;
 
   const { data: adapteesBrutes } = await supabase
     .from("mission_formulations")
@@ -213,14 +225,55 @@ export default async function Formulations({
                 hors-portée.
               </p>
             )}
-            {potentiel.recuperables.length > 0 && (
-              <p className="mt-1 text-xs text-ardoise-700">
-                Récupérable de ton parcours :{" "}
+
+            {/* D78 — chaque source dit ce qu'elle autorise. Les confondre
+                annonçait « fort » pour un terme qu'aucun bouton ne pouvait
+                exploiter : un potentiel fort sans aucune proposition. */}
+            {sansSource && !potentielObsolete && (
+              <p className="mt-1 text-xs text-ardoise-500">
+                Ce CV a été composé avant que l&apos;origine des termes soit
+                distinguée. Régénère-le pour savoir lesquels viennent du
+                corpus — les seuls exploitables. Les voici en attendant :{" "}
                 {potentiel.recuperables.join(" · ")}
               </p>
             )}
+
+            {!sansSource && potentiel.parSource && (
+              <div className="mt-2 space-y-1.5">
+                {(
+                  ["corpus", "mission", "competence", "formation"] as const
+                ).map((source) =>
+                  potentiel.parSource![source].length > 0 ? (
+                    <div key={source} className="text-xs">
+                      <span
+                        className={`font-medium ${
+                          source === "corpus"
+                            ? "text-ardoise-800"
+                            : "text-ardoise-500"
+                        }`}
+                      >
+                        {LIBELLES_SOURCE[source]} :
+                      </span>{" "}
+                      <span
+                        className={
+                          source === "corpus"
+                            ? "text-ardoise-700"
+                            : "text-ardoise-500"
+                        }
+                      >
+                        {potentiel.parSource![source].join(" · ")}
+                      </span>
+                      <p className="mt-0.5 leading-relaxed text-ardoise-400">
+                        {ACTIONS_PAR_SOURCE[source]}
+                      </p>
+                    </div>
+                  ) : null
+                )}
+              </div>
+            )}
+
             {potentiel.horsPortee.length > 0 && (
-              <p className="mt-1 text-xs text-ardoise-400">
+              <p className="mt-2 text-xs text-ardoise-400">
                 Hors de portée, absent de tout ton parcours :{" "}
                 {potentiel.horsPortee.join(" · ")}
               </p>
@@ -228,7 +281,7 @@ export default async function Formulations({
             {potentiel.niveau === "faible" && (
               <p className="mt-1 text-xs text-ardoise-500">
                 Tu peux postuler tel quel : la reformulation n&apos;a rien à
-                aller chercher.
+                aller chercher dans ton corpus.
               </p>
             )}
           </div>
@@ -248,6 +301,20 @@ export default async function Formulations({
           </p>
         </form>
 
+        {/* D79 — l'appel est facturé avant tout filtrage : durcir le contrôle
+            ne fait rien économiser, seul le fait de ne pas cliquer le fait.
+            D'où l'avertissement et le second clic quand le corpus est muet. */}
+        {reformulationVaine && (
+          <p className="mt-4 rounded-lg bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-900">
+            <strong>Aucun terme de l&apos;annonce n&apos;est dans ton corpus.</strong>{" "}
+            La reformulation n&apos;a donc rien de neuf à faire entrer dans tes
+            missions : elle produira au mieux des variantes de forme, qui seront
+            écartées — et l&apos;appel sera facturé quand même, environ 6 ¢. Tu
+            peux passer outre si tu as une raison, le bouton demandera
+            confirmation.
+          </p>
+        )}
+
         <form action={lancerReformulation} className="mt-4">
           <input type="hidden" name="offreId" value={params.id} />
           <BoutonSoumettre
@@ -257,7 +324,16 @@ export default async function Formulations({
                 : "Adapter les formulations à l'offre"
             }
             libelleEnCours="Reformulation…"
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${volet.classeAccent} hover:opacity-90`}
+            confirmation={
+              reformulationVaine
+                ? "Aucun terme de l'annonce n'est dans ton corpus : cette reformulation ne devrait rien produire d'exploitable.\n\nLancer quand même ? L'appel coûtera environ 6 ¢."
+                : undefined
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
+              reformulationVaine
+                ? "bg-ardoise-400"
+                : volet.classeAccent
+            } hover:opacity-90`}
           />
         </form>
         <p className="mt-2 text-xs text-ardoise-400">

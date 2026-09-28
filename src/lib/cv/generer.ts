@@ -72,14 +72,19 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
   // Ligne à ligne, et non en un seul bloc : un terme n'est récupérable que si
   // tous ses mots se trouvent dans la même ligne. Éparpillés sur deux entrées
   // sans rapport, ils ne prouvent rien.
-  const parcours = [
-    ...donnees.experiences.flatMap((e) =>
+  // Les quatre sources restent séparées (D78) : elles n'autorisent pas le même
+  // geste, et les fondre en une seule liste faisait annoncer « potentiel fort »
+  // pour un terme qu'aucun bouton ne pouvait exploiter.
+  const parcours = {
+    corpus: donnees.experiences.flatMap((e) =>
       (corpusParExperience.get(e.id) ?? []).map((l) => l.texte)
     ),
-    ...donnees.experiences.flatMap((e) => e.missions.map((m) => m.texte)),
-    ...donnees.competences.map((c) => `${c.libelle} ${c.precision ?? ""}`),
-    ...donnees.formations.map((f) => f.diplome),
-  ];
+    missions: donnees.experiences.flatMap((e) => e.missions.map((m) => m.texte)),
+    competences: donnees.competences.map(
+      (c) => `${c.libelle} ${c.precision ?? ""}`
+    ),
+    formations: donnees.formations.map((f) => f.diplome),
+  };
   if (donnees.experiences.length === 0) {
     throw new ErreurCV(
       `Aucune expérience n'est visible dans le volet ${offre.volet}. ` +

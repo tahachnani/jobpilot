@@ -11,9 +11,19 @@ import { useState } from "react";
 export default function BoutonCopier({
   texte,
   className = "",
+  quoi = "l'email",
 }: {
   texte: string;
   className?: string;
+  /**
+   * Ce qui est copié, au génitif : « la lettre », « la préparation ».
+   *
+   * Le composant a été écrit pour l'email puis réutilisé partout sans que le
+   * libellé suive : la lettre de motivation et la fiche d'entretien
+   * proposaient toutes deux « Copier l'email » (D86). Un bouton qui nomme
+   * autre chose que ce qu'il fait finit par être cru.
+   */
+  quoi?: string;
 }) {
   const [copie, setCopie] = useState(false);
 
@@ -31,7 +41,7 @@ export default function BoutonCopier({
       }}
       className={className}
     >
-      {copie ? "Copié" : "Copier l'email"}
+      {copie ? "Copié" : `Copier ${quoi}`}
     </button>
   );
 }

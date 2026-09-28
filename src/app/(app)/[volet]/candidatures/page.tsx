@@ -2,6 +2,7 @@ import { TitrePage, EtatVide, Carte } from "@/components/ui";
 import { STATUTS, STATUTS_ENVOYES, voletDepuisSlug } from "@/config/volets";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
+import { libelleOrigine } from "@/config/origines";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -19,7 +20,10 @@ export default async function Candidatures({
   const { data } = await supabase
     .from("offres")
     .select(
-      "id, intitule, entreprise, statut, date_candidature, relance_prevue_le, derniere_relance_le, relances, scores ( score_global, created_at )"
+      `id, intitule, entreprise, statut, date_candidature, relance_prevue_le,
+       derniere_relance_le, relances, origine,
+       scores ( score_global, created_at ),
+       documents ( id, type, version )`
     )
     .eq("volet", volet.code)
     .in("statut", STATUTS_ENVOYES)
@@ -34,8 +38,16 @@ export default async function Candidatures({
     relance_prevue_le: string | null;
     derniere_relance_le: string | null;
     relances: number | null;
+    origine: string | null;
     scores: { score_global: number | null; created_at: string }[] | null;
+    documents: { id: string; type: string; version: number }[] | null;
   }[];
+
+  /** Le CV réellement parti : la dernière version composée pour cette offre. */
+  const cvDe = (c: (typeof candidatures)[number]) =>
+    [...(c.documents ?? [])]
+      .filter((d) => d.type === "cv")
+      .sort((a, b) => b.version - a.version)[0] ?? null;
 
   /** Le score le plus récent de l'offre, celui qui a été affiché au moment du choix. */
   const scoreDe = (c: (typeof candidatures)[number]) =>
@@ -71,6 +83,29 @@ export default async function Candidatures({
   const aRelancer = candidatures.filter((c) =>
     relanceDue(c.statut, c.relance_prevue_le)
   ).length;
+
+  /**
+   * L'ordre par urgence, et non par date (D81).
+   *
+   * Quarante-deux candidatures rangées par date d'envoi ne se lisent plus
+   * comme une liste, mais comme une file d'attente. Cet écran répond à une
+   * seule question — qu'est-ce que je dois faire aujourd'hui — et l'ordre doit
+   * y répondre avant le contenu des cartes.
+   */
+  const urgence = (c: (typeof candidatures)[number]): number => {
+    if (relanceDue(c.statut, c.relance_prevue_le)) return 0;
+    if (c.statut === "entretien") return 1;
+    if (c.statut === "envoyee") return 2;
+    return 3;
+  };
+
+  const rangees = [...candidatures].sort((a, b) => {
+    const u = urgence(a) - urgence(b);
+    if (u !== 0) return u;
+    // À urgence égale, la plus ancienne d'abord : c'est elle qui attend depuis
+    // le plus longtemps, et c'est elle qu'on oublie.
+    return (a.date_candidature ?? "").localeCompare(b.date_candidature ?? "");
+  });
 
   return (
     <>
@@ -130,65 +165,91 @@ export default async function Candidatures({
         />
       ) : (
         <div className="space-y-3">
-          {candidatures.map((c) => {
+          {rangees.map((c) => {
             const s = STATUTS[c.statut] ?? {
               libelle: c.statut,
               classe: "bg-ardoise-100 text-ardoise-700",
             };
             const jours = joursDepuis(c.date_candidature);
             const due = relanceDue(c.statut, c.relance_prevue_le);
+            const cv = cvDe(c);
+            const note = scoreDe(c);
 
             return (
-              <Link key={c.id} href={`/offre/${c.id}`}>
-                <Carte className="transition hover:border-ardoise-400">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-ardoise-900">
-                        {c.intitule ?? "Sans intitulé"}
-                      </p>
-                      <p className="mt-0.5 text-sm text-ardoise-500">
-                        {c.entreprise}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {scoreDe(c) !== null && (
-                        <span className="text-sm font-semibold tabular-nums text-ardoise-700">
-                          {scoreDe(c)} %
-                        </span>
-                      )}
-                      {due && (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
-                          À relancer
-                        </span>
-                      )}
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${s.classe}`}
-                      >
-                        {s.libelle}
+              <Carte key={c.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ardoise-900">
+                      {c.intitule ?? "Sans intitulé"}
+                    </p>
+                    <p className="mt-0.5 text-sm text-ardoise-500">
+                      {c.entreprise}
+                      {c.origine && ` · ${libelleOrigine(c.origine)}`}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {note !== null && (
+                      <span className="text-sm font-semibold tabular-nums text-ardoise-700">
+                        {note} %
                       </span>
-                    </div>
+                    )}
+                    {due && (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+                        À relancer
+                      </span>
+                    )}
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${s.classe}`}
+                    >
+                      {s.libelle}
+                    </span>
                   </div>
+                </div>
 
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-ardoise-100 pt-3 text-xs text-ardoise-500">
+                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ardoise-100 pt-3 text-xs text-ardoise-500">
+                  <span>
+                    Envoyée le {jour(c.date_candidature)}
+                    {jours !== null && ` · il y a ${jours} j`}
+                  </span>
+                  <span>
+                    {c.statut === "envoyee" && c.relance_prevue_le
+                      ? `Relance prévue le ${jour(c.relance_prevue_le)}`
+                      : "Aucune relance prévue"}
+                  </span>
+                  {(c.relances ?? 0) > 0 && (
                     <span>
-                      Envoyée le {jour(c.date_candidature)}
-                      {jours !== null && ` · il y a ${jours} j`}
+                      {c.relances} relance{(c.relances ?? 0) > 1 ? "s" : ""} ·
+                      dernière le {jour(c.derniere_relance_le)}
                     </span>
-                    <span>
-                      {c.statut === "envoyee" && c.relance_prevue_le
-                        ? `Relance prévue le ${jour(c.relance_prevue_le)}`
-                        : "Aucune relance prévue"}
-                    </span>
-                    <span>
-                      {(c.relances ?? 0) === 0
-                        ? "Jamais relancée"
-                        : `${c.relances} relance${
-                            (c.relances ?? 0) > 1 ? "s" : ""
-                          } · dernière le ${jour(c.derniere_relance_le)}`}
-                    </span>
-                  </div>
-                </Carte>
-              </Link>
+                  )}
+
+                  {/* D81 — deux portes explicites plutôt qu'une carte cliquable.
+                      Le suivi n'a pas à redire ce que la fiche d'offre dit
+                      déjà ; il doit y conduire. */}
+                  <span className="ml-auto flex flex-wrap gap-2">
+                    {cv ? (
+                      <Link
+                        href={`/document/${cv.id}`}
+                        prefetch={false}
+                        className="rounded-lg border border-ardoise-300 px-3 py-1.5 font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+                      >
+                        Voir le CV envoyé
+                      </Link>
+                    ) : (
+                      <span className="rounded-lg border border-dashed border-ardoise-200 px-3 py-1.5 text-ardoise-400">
+                        Aucun CV composé
+                      </span>
+                    )}
+                    <Link
+                      href={`/offre/${c.id}`}
+                      prefetch={false}
+                      className="rounded-lg border border-ardoise-300 px-3 py-1.5 font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+                    >
+                      Ouvrir l&apos;offre →
+                    </Link>
+                  </span>
+                </div>
+              </Carte>
             );
           })}
         </div>

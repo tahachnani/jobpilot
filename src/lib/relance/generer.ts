@@ -3,6 +3,11 @@ import { appelIA, analyserJson, ErreurIA, MODELE_REDACTION } from "@/lib/anthrop
 import { ErreurCV } from "@/lib/cv/generer";
 import { purgerAnciennesVersions } from "@/lib/documents";
 import { jour, joursDepuis } from "@/lib/suivi";
+import {
+  CANAL_PAR_DEFAUT,
+  CANAUX_RELANCE,
+  CONSIGNES_CANAL,
+} from "@/config/origines";
 
 /**
  * L'email de relance.
@@ -23,7 +28,12 @@ export interface Relance {
   corps: string;
 }
 
-const SYSTEME = `Tu écris des emails de relance de candidature, en français, pour un candidat en contrôle de gestion et comptabilité.
+const systeme = (consigneCanal: string) =>
+  `Tu écris des relances de candidature, en français, pour un candidat en contrôle de gestion et comptabilité.
+
+LE CANAL — IL COMMANDE LA FORME
+${consigneCanal}
+Respecte-le avant toute autre considération de style. Une relance écrite comme un email formel dans une messagerie LinkedIn se repère immédiatement.
 
 RÈGLES ABSOLUES :
 - Six lignes maximum, idéalement quatre. Une relance longue ne se lit pas.
@@ -36,7 +46,7 @@ FORMAT DE RÉPONSE :
 { "objet": string, "corps": string }
 
 PRÉCISIONS :
-- L'objet reprend l'intitulé du poste et signale qu'il s'agit d'un suivi.
+- L'objet reprend l'intitulé du poste et signale qu'il s'agit d'un suivi. Si le canal n'en comporte pas — messagerie de plateforme, LinkedIn, téléphone — l'objet sert quand même de titre court à l'écran : mets-y l'intitulé du poste, rien de plus.
 - Le corps commence par "Bonjour," et finit par une formule courte suivie du nom du candidat.
 - S'il s'agit d'une deuxième relance ou plus, le ton reste identique : on ne durcit pas.`;
 
@@ -48,7 +58,7 @@ export async function genererRelancePourOffre(
   const { data: offreBrute } = await supabase
     .from("offres")
     .select(
-      "id, volet, intitule, entreprise, contact_nom, date_candidature, relances, derniere_relance_le"
+      "id, volet, intitule, entreprise, contact_nom, date_candidature, relances, derniere_relance_le, canal_relance"
     )
     .eq("id", offreId)
     .maybeSingle();
@@ -62,6 +72,7 @@ export async function genererRelancePourOffre(
     date_candidature: string | null;
     relances: number | null;
     derniere_relance_le: string | null;
+    canal_relance: string | null;
   };
 
   if (!offre.date_candidature) {
@@ -97,7 +108,18 @@ export async function genererRelancePourOffre(
   const rang = (offre.relances ?? 0) + 1;
   const jours = joursDepuis(offre.date_candidature);
 
-  const message = `CANDIDATURE À RELANCER
+  /**
+   * Le canal, avec la messagerie de plateforme par défaut (D83).
+   *
+   * C'est le cas le plus fréquent et le moins bien servi : la plupart des
+   * sites d'emploi ne donnent aucune adresse, et un email formel y détonne.
+   */
+  const canal = offre.canal_relance ?? CANAL_PAR_DEFAUT;
+  const consigne = CONSIGNES_CANAL[canal] ?? CONSIGNES_CANAL[CANAL_PAR_DEFAUT];
+
+  const message = `CANAL DE RELANCE : ${CANAUX_RELANCE[canal] ?? canal}
+
+CANDIDATURE À RELANCER
 
 Candidat : ${[profil.prenom, profil.nom].filter(Boolean).join(" ") || "—"}
 Poste : ${offre.intitule ?? "—"}
@@ -119,7 +141,7 @@ Rédige la relance.`;
 
   const reponse = await appelIA({
     modele: MODELE_REDACTION,
-    systeme: SYSTEME,
+    systeme: systeme(consigne),
     message,
     // Large : le modèle produit un raisonnement invisible compté en sortie, et
     // trois troncatures de cette application ont eu exactement cette cause.

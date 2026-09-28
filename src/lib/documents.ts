@@ -24,9 +24,10 @@ export const VERSIONS_CONSERVEES = 3;
  * testant la présence de chaque clé ; ils peuvent désormais la lire.
  *
  * 1 : modèle seul — 2 : + écart — 3 : + potentiel avec `recuperables` et
- * `horsPortee`.
+ * `horsPortee` — 4 : + `potentiel.parSource`, la ventilation des récupérables
+ * par origine (D78).
  */
-export const SCHEMA_SELECTION = 3;
+export const SCHEMA_SELECTION = 4;
 
 /** La forme d'une sélection stockée, 1 si elle ne le dit pas. */
 export function schemaDe(selection: unknown): number {

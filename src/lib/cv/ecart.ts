@@ -39,11 +39,29 @@ export interface Ecart {
   partModifiee: number;
 }
 
+/**
+ * D'où vient un terme récupérable — et donc ce qu'on peut en faire.
+ *
+ * C'est toute la correction de D78. Les quatre sources n'autorisent pas le
+ * même geste, et les confondre promettait une action impossible.
+ */
+export type SourcePotentiel = "corpus" | "mission" | "competence" | "formation";
+
+export interface SourcesParcours {
+  /** Les entrées de corpus : la seule matière dont une mission puisse naître. */
+  corpus: string[];
+  /** Les missions du volet, y compris celles que le quota n'a pas retenues. */
+  missions: string[];
+  competences: string[];
+  formations: string[];
+}
+
 export interface Potentiel {
   niveau: "faible" | "moyen" | "fort";
   /**
-   * Absent du CV mais présent ailleurs dans le parcours — corpus, formations,
-   * compétences. Une reformulation peut le faire apparaître.
+   * Absent du CV mais présent ailleurs dans le parcours — corpus, missions non
+   * retenues, compétences, formations. Conservé tel quel : les documents
+   * générés avant D78 portent cette liste, et ils sont figés pour toujours.
    */
   recuperables: string[];
   /**
@@ -53,7 +71,33 @@ export interface Potentiel {
   horsPortee: string[];
   /** Part des termes de l'annonce déjà présents dans le CV, en pourcentage. */
   couverture: number;
+  /**
+   * Schéma 4 — les récupérables ventilés par source (D78).
+   *
+   * Absent des documents antérieurs : les écrans doivent le traiter comme
+   * facultatif, exactement comme `recuperables` l'a été avant l'étape 4ter.
+   */
+  parSource?: Record<SourcePotentiel, string[]>;
 }
+
+/** Ce que chaque source autorise réellement. Affiché tel quel. */
+export const ACTIONS_PAR_SOURCE: Record<SourcePotentiel, string> = {
+  corpus:
+    "Une mission peut être proposée à partir de cette matière : c'est le seul cas où payer une génération a un sens.",
+  mission:
+    "La mission existe déjà dans ton parcours — elle n'a pas passé le quota de cette offre. Ni reformulation ni proposition n'y changeront rien.",
+  competence:
+    "Tu le revendiques déjà en compétence. Rien à générer : au mieux, le faire remonter dans la sélection.",
+  formation:
+    "C'est dans ta formation. Rien à générer, et le diplôme le dit déjà.",
+};
+
+export const LIBELLES_SOURCE: Record<SourcePotentiel, string> = {
+  corpus: "Dans ton corpus",
+  mission: "Dans une mission non retenue",
+  competence: "Dans tes compétences",
+  formation: "Dans tes formations",
+};
 
 /**
  * Une offre vidée de ses attentes : toutes les notes tombent à zéro, et la
@@ -147,27 +191,39 @@ function digneDeCompte(terme: string): boolean {
  * répond déjà, et qu'une reformulation dépenserait un appel pour rien.
  */
 /**
- * Mesure ce que l'annonce réclame et que le CV ne dit pas, en séparant ce qui
- * est récupérable de ce qui ne l'est pas.
+ * Mesure ce que l'annonce réclame et que le CV ne dit pas, en disant **d'où**
+ * chaque terme est récupérable.
  *
  * Un terme est récupérable si tous ses mots se trouvent dans **une même ligne**
- * du parcours — une mission, une entrée de corpus, une compétence. La première
- * version les cherchait n'importe où dans le parcours entier : « finance »
- * dans une ligne, « entreprise » dans une autre, et « Finance d'entreprise »
- * était déclaré récupérable alors que rien ne le portait. D'où un potentiel
- * fort suivi d'aucune proposition.
+ * du parcours. La première version les cherchait n'importe où dans le parcours
+ * entier : « finance » dans une ligne, « entreprise » dans une autre, et
+ * « Finance d'entreprise » était déclaré récupérable alors que rien ne le
+ * portait.
  *
- * Le niveau affiché ne dépend que du récupérable : c'est le seul sur lequel
- * une reformulation peut agir. Crier « fort » pour du hors-portée pousserait à
- * payer un appel qui ne pouvait rien produire.
+ * D78 corrige la seconde moitié du problème. Le parcours a quatre sources, et
+ * **une seule peut produire une mission** : le corpus. Une compétence, un
+ * diplôme ou une mission recalée par le quota rendaient le terme
+ * « récupérable » et le niveau « fort », alors qu'aucun bouton ne pouvait rien
+ * en faire. D'où le constat d'usage : potentiel fort, zéro proposition, et
+ * l'impression que l'application se contredisait.
  *
- * @param parcours Corpus, formations et compétences — tout ce que Taha a fait
- * ou appris, au-delà de ce que le CV a la place de dire.
+ * Le niveau ne compte donc plus que le corpus. En valeur absolue et non en
+ * part : ce qui décide, c'est la quantité de matière disponible pour écrire
+ * une mission, et le générateur n'en propose jamais plus de trois.
+ *
+ * La couverture, elle, ne change pas : elle répond à une autre question —
+ * « combien de ce que l'annonce réclame est déjà sur le CV » — et cette
+ * question-là n'a rien à voir avec les sources.
  */
 export function potentielAdaptation(
   analyse: OffreExtraite,
   selectionOffre: Selection,
-  lignesParcours: string[] = []
+  sources: SourcesParcours = {
+    corpus: [],
+    missions: [],
+    competences: [],
+    formations: [],
+  }
 ): Potentiel {
   const attendus = [
     ...analyse.mots_cles_ats,
@@ -181,8 +237,21 @@ export function potentielAdaptation(
     .filter(estSavoirFaire)
     .map(noyauDuTerme);
 
+  const vide: Record<SourcePotentiel, string[]> = {
+    corpus: [],
+    mission: [],
+    competence: [],
+    formation: [],
+  };
+
   if (attendus.length === 0) {
-    return { niveau: "faible", recuperables: [], horsPortee: [], couverture: 100 };
+    return {
+      niveau: "faible",
+      recuperables: [],
+      horsPortee: [],
+      couverture: 100,
+      parSource: vide,
+    };
   }
 
   const motsDuCv = motsSignificatifs(
@@ -191,7 +260,18 @@ export function potentielAdaptation(
       ...selectionOffre.competences.map((c) => c.libelle),
     ].join(" ")
   );
-  const motsParLigne = lignesParcours.map((l) => motsSignificatifs(l));
+  /**
+   * Les quatre sources, préparées ligne à ligne et **dans l'ordre de ce
+   * qu'elles autorisent**. Un terme présent à la fois dans le corpus et dans
+   * une compétence est attribué au corpus : c'est la source qui ouvre une
+   * action, et c'est celle-là qu'il faut montrer.
+   */
+  const parLigne: [SourcePotentiel, Set<string>[]][] = [
+    ["corpus", sources.corpus.map(motsSignificatifs)],
+    ["mission", sources.missions.map(motsSignificatifs)],
+    ["competence", sources.competences.map(motsSignificatifs)],
+    ["formation", sources.formations.map(motsSignificatifs)],
+  ];
 
   const vus = new Set<string>();
   const absents = attendus.filter((terme) => {
@@ -201,30 +281,88 @@ export function potentielAdaptation(
     return !termePresent(terme, motsDuCv);
   });
 
-  const porte = (t: string) => motsParLigne.some((mots) => termePresent(t, mots));
-  const recuperables = absents.filter(porte);
-  const horsPortee = absents.filter((t) => !porte(t));
+  const origine = (t: string): SourcePotentiel | null => {
+    for (const [source, lignes] of parLigne) {
+      if (lignes.some((mots) => termePresent(t, mots))) return source;
+    }
+    return null;
+  };
+
+  const parSource: Record<SourcePotentiel, string[]> = {
+    corpus: [],
+    mission: [],
+    competence: [],
+    formation: [],
+  };
+  const recuperables: string[] = [];
+  const horsPortee: string[] = [];
+
+  for (const t of absents) {
+    const source = origine(t);
+    if (source) {
+      parSource[source].push(t);
+      recuperables.push(t);
+    } else {
+      horsPortee.push(t);
+    }
+  }
 
   const total = vus.size;
   const couverture = Math.round(((total - absents.length) / total) * 100);
 
-  // Seuils empiriques, réglables ici. Comptés sur le récupérable seul.
-  const partRecuperable = recuperables.length / total;
-  const niveau =
-    partRecuperable >= 0.25 ? "fort" : partRecuperable >= 0.1 ? "moyen" : "faible";
+  /**
+   * Le niveau ne compte que le corpus, en valeur absolue.
+   *
+   * Trois termes, c'est le plafond de propositions du générateur : au-delà,
+   * annoncer « très fort » n'apporterait rien de plus. Un seul terme suffit à
+   * justifier un essai, sans mériter qu'on crie au potentiel.
+   */
+  const n = parSource.corpus.length;
+  const niveau = n >= 3 ? "fort" : n >= 1 ? "moyen" : "faible";
 
   return {
     niveau,
     recuperables: recuperables.slice(0, 12),
     horsPortee: horsPortee.slice(0, 12),
     couverture,
+    parSource: {
+      corpus: parSource.corpus.slice(0, 12),
+      mission: parSource.mission.slice(0, 12),
+      competence: parSource.competence.slice(0, 12),
+      formation: parSource.formation.slice(0, 12),
+    },
   };
 }
 
 export const LIBELLES_POTENTIEL: Record<Potentiel["niveau"], string> = {
-  faible: "Rien de récupérable : ton CV dit déjà ce que ton parcours permet",
-  moyen: "Quelques termes de l'annonce sont récupérables de ton parcours",
-  fort: "Ton parcours couvre plusieurs termes que ton CV ne dit pas",
+  faible: "Rien à tirer de ton corpus : une reformulation ne produira rien",
+  moyen: "Un ou deux termes de l'annonce dorment dans ton corpus",
+  fort: "Plusieurs termes de l'annonce sont dans ton corpus, absents du CV",
 };
+
+/**
+ * Le potentiel d'un document, quel que soit son âge.
+ *
+ * Un document d'avant l'étape 4ter n'a ni `recuperables` ni `horsPortee` ;
+ * un document d'avant D78 n'a pas `parSource`. Les deux sont figés pour
+ * toujours — ce qui est écrit dans `documents.selection` ne se recalcule
+ * jamais. Tout écran passe donc par ici plutôt que de deviner la forme.
+ */
+export function lirePotentiel(brut: Potentiel | undefined | null): {
+  potentiel: Potentiel | null;
+  /** Vrai quand le document est antérieur à D78 : la ventilation manque. */
+  sansSource: boolean;
+} {
+  if (!brut) return { potentiel: null, sansSource: false };
+
+  return {
+    potentiel: {
+      ...brut,
+      recuperables: brut.recuperables ?? [],
+      horsPortee: brut.horsPortee ?? [],
+    },
+    sansSource: brut.parSource === undefined,
+  };
+}
 
 export type { CodeVolet };

@@ -71,10 +71,28 @@ export default async function Parametres({
   searchParams: { etat?: string };
 }) {
   const supabase = creerClientServeur();
-  const [{ data }, budget] = await Promise.all([
+  const [{ data }, budget, { data: docs }] = await Promise.all([
     supabase.from("parametres").select("cle, valeur").order("cle"),
     budgetDuMois(),
+    supabase.from("documents").select("type, storage_path"),
   ]);
+
+  /**
+   * L'état du stockage, seule chose que « Mes CV » faisait vraiment (D85).
+   *
+   * Cette page ne servait qu'une fois — mais sérieusement : c'est elle qui a
+   * révélé que 54 CV sur 54 n'avaient aucun fichier, faute d'une règle
+   * d'écriture sur le bucket. La fiche d'offre ne voyait rien, puisque le CV
+   * se recompose à la demande. L'écran disparaît, le filet reste.
+   */
+  const documents = (docs ?? []) as {
+    type: string;
+    storage_path: string | null;
+  }[];
+  const stockage = {
+    total: documents.length,
+    sansFichier: documents.filter((d) => d.storage_path === null).length,
+  };
 
   const m = message(searchParams.etat, montant(budget.depense));
 
@@ -125,6 +143,33 @@ export default async function Parametres({
             />
           </form>
         </div>
+      </Carte>
+
+      <Carte
+        className={`mb-4 ${
+          stockage.sansFichier > 0 ? "border-rose-200 bg-rose-50" : ""
+        }`}
+      >
+        <p className="text-sm font-medium text-ardoise-800">
+          Documents et fichiers
+        </p>
+        <p className="mt-0.5 text-sm text-ardoise-500">
+          {stockage.total} document{stockage.total > 1 ? "s" : ""} enregistré
+          {stockage.total > 1 ? "s" : ""}
+          {stockage.sansFichier === 0
+            ? ", tous avec leur fichier."
+            : ` — dont ${stockage.sansFichier} sans fichier stocké.`}
+        </p>
+        {stockage.sansFichier > 0 && (
+          <p className="mt-2 text-xs leading-relaxed text-rose-800">
+            Un document sans fichier se recompose encore à la demande, donc
+            rien n&apos;est perdu et rien ne se voit à l&apos;écran — c&apos;est
+            précisément le piège. En septembre, 54 CV sur 54 étaient dans cet
+            état parce qu&apos;une règle d&apos;écriture manquait sur le
+            stockage. Régénère le document concerné depuis sa fiche d&apos;offre,
+            et si le compteur ne descend pas, le problème est côté règles.
+          </p>
+        )}
       </Carte>
 
       {!data || data.length === 0 ? (

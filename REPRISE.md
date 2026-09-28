@@ -1,6 +1,6 @@
 # JobPilot — reprise de projet
 
-État du projet au 23 septembre 2026, étape 6 et trois passes d'amélioration comprises.
+État du projet au 28 septembre 2026, étape 6 et quatre passes d'amélioration comprises.
 À joindre au premier message d'une nouvelle conversation.
 
 ---
@@ -22,7 +22,8 @@
 | 6 | Statuts, envois, relances, suivi | en ligne |
 | — | Dix améliorations (D53–D62) | en ligne |
 | — | Score, marché caché, entretien (D64–D73) | à déployer |
-| — | Taxonomie éditable et réanalyse (D74–D77) | à déployer |
+| — | Taxonomie éditable et réanalyse (D74–D77) | en ligne |
+| — | Neuf constats d'usage (D78–D86, sans D82) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -143,6 +144,8 @@ copiable et réécrivable seul.
   socle. Sans elle, l'onglet Taxonomie s'affiche en lecture seule et
   l'application continue sur le fichier versionné : rien de cassé, rien de
   modifiable.
+- `0012_origine_et_canal.sql` — colonnes `origine` et `canal_relance` sur
+  `offres`. **À lancer avant le déploiement** : le code les sélectionne.
 - `0005_corpus_experience.sql` — reconstituée après coup : elle avait été
   appliquée à la main à l'étape 4ter sans être versionnée. Sans effet sur la
   base existante, indispensable pour repartir d'un projet Supabase neuf.
@@ -185,6 +188,17 @@ ailleurs. Un refus se dit, toujours, avec le moyen de le lever.
 *missions*. Le corpus autorise un terme en reformulation et mesure ce qui est
 récupérable — rien d'autre. C'est écrit à l'écran depuis D76, parce que rien ne
 le laissait deviner.
+
+**Un indicateur doit nommer ce sur quoi il porte.** Le « potentiel fort
+d'adaptation » comptait quatre sources, dont trois qu'aucun bouton ne pouvait
+exploiter : d'où un potentiel fort suivi d'aucune proposition, et deux semaines
+à croire que l'application se contredisait. Un indicateur qui agrège des choses
+qui n'appellent pas le même geste ment par agrégation.
+
+**Ce qui est payé avant d'être filtré ne s'économise pas en filtrant mieux.**
+L'appel de reformulation est facturé avant tout contrôle : durcir la règle
+d'acceptation améliore ce qu'on voit, jamais la facture. Seul le fait de ne pas
+cliquer économise, donc l'avertissement va sur le bouton, pas dans le résultat.
 
 **La taxonomie sert à la lecture de l'annonce, pas à sa notation.** Le modèle
 classe une fois, à l'ajout ; le score ne fait ensuite que compter. Ajouter un
@@ -258,10 +272,10 @@ Il n'y a plus d'étape prévue. Ce qui reste en suspens, par ordre de gêne :
 
 ## Les tests
 
-`npm test`, ou automatiquement avant `npm run build`. Soixante et onze cas sur
+`npm test`, ou automatiquement avant `npm run build`. Soixante-dix-neuf cas sur
 le contrôle de reformulation, le barème, l'ordre des compétences, l'estimateur
 de page, la comparaison de termes, le découpage des libellés d'annonce, la
-taxonomie et le suivi. Ils **bloquent en local et jamais
+taxonomie, le potentiel d'adaptation et le suivi. Ils **bloquent en local et jamais
 sur Vercel** : le lanceur se retire quand il détecte la construction en ligne.
 Aucune dépendance — Node exécute le TypeScript directement depuis la 22.6, et
 les chemins `@/…` passent par `scripts/alias-hooks.mjs`.
@@ -275,7 +289,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D77 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D86 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

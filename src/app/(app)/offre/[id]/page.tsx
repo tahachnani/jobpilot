@@ -7,6 +7,12 @@ import {
   type CodeVolet,
 } from "@/config/volets";
 import { SECTEURS } from "@/config/secteurs";
+import {
+  CANAL_PAR_DEFAUT,
+  CANAUX_RELANCE,
+  GROUPES_ORIGINE,
+  ORIGINES,
+} from "@/config/origines";
 import { creerClientServeur } from "@/lib/supabase/server";
 import type { Resultat, SousScore } from "@/lib/scoring";
 import type { OffreExtraite } from "@/lib/extraction-offre";
@@ -26,6 +32,7 @@ import {
   reanalyserOffre,
   genererCV,
   marquerEnvoyee,
+  modifierCanaux,
   changerStatut,
   planifierRelance,
   marquerRelancee,
@@ -1086,13 +1093,27 @@ export default async function DetailOffre({
                   className="mt-1 block rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
                 />
               </label>
+              {/* D84 — l'origine remplace le commentaire libre, qui restait
+                  vide sur quarante-deux candidatures. Croisée avec les issues,
+                  elle dit quel canal donne des entretiens. */}
               <label className="flex-1 text-xs text-ardoise-500">
-                Commentaire (facultatif)
-                <input
-                  name="commentaire"
-                  placeholder="Candidature déposée sur le site, référence…"
+                D&apos;où as-tu postulé ?
+                <select
+                  name="origine"
+                  defaultValue={(offre.origine as string | null) ?? ""}
                   className="mt-1 block w-full rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
-                />
+                >
+                  <option value="">Non renseigné</option>
+                  {GROUPES_ORIGINE.map((g) => (
+                    <optgroup key={g.titre} label={g.titre}>
+                      {g.codes.map((code) => (
+                        <option key={code} value={code}>
+                          {ORIGINES[code]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </label>
               <BoutonSoumettre
                 libelle="Marquer comme envoyée"
@@ -1129,6 +1150,63 @@ export default async function DetailOffre({
                 )}
               </span>
             </div>
+
+            {/* D83/D84 — l'origine et le canal se corrigent après coup : les
+                candidatures d'avant cette version n'en portent aucun, et le
+                canal décide de ce que la relance écrira. */}
+            <form
+              action={modifierCanaux}
+              className="mt-4 flex flex-wrap items-end gap-3 border-t border-ardoise-100 pt-4"
+            >
+              <input type="hidden" name="id" value={params.id} />
+              <label className="text-xs text-ardoise-500">
+                Origine
+                <select
+                  name="origine"
+                  defaultValue={(offre.origine as string | null) ?? ""}
+                  className="mt-1 block rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                >
+                  <option value="">Non renseignée</option>
+                  {GROUPES_ORIGINE.map((g) => (
+                    <optgroup key={g.titre} label={g.titre}>
+                      {g.codes.map((code) => (
+                        <option key={code} value={code}>
+                          {ORIGINES[code]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-ardoise-500">
+                Relancer par
+                <select
+                  name="canal_relance"
+                  defaultValue={
+                    (offre.canal_relance as string | null) ?? CANAL_PAR_DEFAUT
+                  }
+                  className="mt-1 block rounded-lg border border-ardoise-200 px-2 py-1.5 text-sm outline-none focus:border-ardoise-500"
+                >
+                  {Object.entries(CANAUX_RELANCE).map(([code, libelle]) => (
+                    <option key={code} value={code}>
+                      {libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                className="mb-0.5 rounded-lg border border-ardoise-300 px-3 py-1.5 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
+              >
+                Enregistrer
+              </button>
+              <p className="w-full text-xs text-ardoise-400">
+                La plupart des plateformes ne donnent aucune adresse : la
+                relance passe par leur messagerie ou par LinkedIn. Le canal
+                choisi décide de ce que le modèle écrira — quatre lignes ou
+                quinze.
+              </p>
+            </form>
 
             <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-ardoise-100 pt-4">
               <form action={planifierRelance} className="flex items-end gap-2">
@@ -1187,6 +1265,7 @@ export default async function DetailOffre({
                     · version {relanceRedigee.version}
                   </p>
                   <BoutonCopier
+                    quoi="la relance"
                     texte={`${relanceRedigee.selection.relance.objet}\n\n${relanceRedigee.selection.relance.corps}`}
                     className="rounded-lg border border-ardoise-300 bg-white px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
                   />
@@ -1306,6 +1385,7 @@ export default async function DetailOffre({
                   {preparation.attendu || "Fiche de préparation"}
                 </p>
                 <BoutonCopier
+                  quoi="la préparation"
                   texte={preparationEnTexte(preparation)}
                   className="shrink-0 rounded-lg border border-ardoise-300 bg-white px-3 py-1 text-xs font-medium text-ardoise-700 hover:bg-ardoise-50"
                 />

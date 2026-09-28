@@ -57,6 +57,38 @@ test("une reformulation qui fait entrer un terme de l'offre est acceptée", () =
   assert.ok(v.apports.length > 0);
 });
 
+/**
+ * D79 — une reformulation ajoute, elle n'échange pas.
+ *
+ * La règle d'apport seule a laissé passer la moitié des propositions : il
+ * suffisait de glisser un mot de l'annonce pour être accepté, quitte à
+ * réécrire tout le reste. Ce qui disparaît était vrai, et lisible par un
+ * analyseur de CV.
+ */
+test("une réécriture qui perd plus de termes qu'elle n'en apporte est refusée", () => {
+  const v = controler(
+    "Suivi chaque semaine des résidences à enjeux et des patrimoines à risque",
+    "Reporting mensuel du parc",
+    { termesOffre: OFFRE }
+  );
+  assert.equal(v.accepte, false, v.motifs.join(" / "));
+  assert.ok(
+    v.motifs.some((m) => /Échange plus qu'elle n'apporte/.test(m)),
+    v.motifs.join(" / ")
+  );
+});
+
+test("une reformulation qui resserre d'un cran reste acceptée", () => {
+  // Un terme perdu pour un apporté : la tolérance est d'une perte de plus que
+  // d'apports, parce qu'une reformulation resserre parfois légitimement.
+  const v = controler(
+    "Production des états mensuels de suivi budgétaire",
+    "Production du reporting mensuel budgétaire",
+    { termesOffre: OFFRE }
+  );
+  assert.equal(v.accepte, true, v.motifs.join(" / "));
+});
+
 test("un outil connu qui disparaît est refusé", () => {
   const v = controler(
     "Construction des tableaux de bord sous Excel",
