@@ -24,6 +24,32 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 /**
+ * Où revenir après une action de suivi (D88).
+ *
+ * Ces actions sont maintenant déclenchées depuis deux écrans : la fiche
+ * d'offre et la fiche de candidature. Renvoyer toujours vers l'offre faisait
+ * sortir du suivi celui qui y travaillait — exactement ce qu'on cherchait à
+ * corriger.
+ *
+ * Le chemin de retour est vérifié : il doit être relatif à l'application.
+ * Un `//exemple.fr` est un chemin absolu déguisé, et le refuser coûte une
+ * ligne.
+ */
+function destination(formData: FormData, id: string, suffixe: string): string {
+  const retour = String(formData.get("retour") ?? "").trim();
+  const sur =
+    retour.startsWith("/") && !retour.startsWith("//") ? retour : `/offre/${id}`;
+  return `${sur}${suffixe}`;
+}
+
+/** Rafraîchit l'écran d'où vient l'action, en plus de la fiche d'offre. */
+function rafraichirSuivi(formData: FormData, id: string) {
+  revalidatePath(`/offre/${id}`);
+  const retour = String(formData.get("retour") ?? "").trim();
+  if (retour.startsWith("/") && !retour.startsWith("//")) revalidatePath(retour);
+}
+
+/**
  * Supprime une offre et tout ce qui en dépend.
  *
  * Les analyses, scores, documents et historiques de statut partent en
@@ -302,8 +328,8 @@ export async function marquerEnvoyee(formData: FormData) {
     })
     .eq("id", id);
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=envoyee`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=envoyee"));
 }
 
 /** Corrige l'origine et le canal de relance d'une candidature déjà partie. */
@@ -323,8 +349,8 @@ export async function modifierCanaux(formData: FormData) {
     })
     .eq("id", id);
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=canaux`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=canaux"));
 }
 
 /**
@@ -352,8 +378,8 @@ export async function changerStatut(formData: FormData) {
 
   await commenterDernierStatut(id, String(formData.get("commentaire") ?? ""));
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=statut`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=statut"));
 }
 
 /** Change ou efface la date de relance prévue (D46). */
@@ -369,8 +395,8 @@ export async function planifierRelance(formData: FormData) {
     .update({ relance_prevue_le: saisie || null })
     .eq("id", id);
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=relance`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=relance"));
 }
 
 /**
@@ -401,9 +427,9 @@ export async function marquerRelancee(formData: FormData) {
     })
     .eq("id", id);
 
-  revalidatePath(`/offre/${id}`);
+  rafraichirSuivi(formData, id);
   revalidatePath("/");
-  redirect(`/offre/${id}?suivi=relancee`);
+  redirect(destination(formData, id, "?suivi=relancee"));
 }
 
 /**
@@ -433,8 +459,8 @@ export async function genererRelance(formData: FormData) {
     );
   }
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=relance-redigee`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=relance-redigee"));
 }
 
 /**
@@ -477,7 +503,7 @@ export async function revenirEnArriere(formData: FormData) {
   )?.statut;
 
   if (!precedent || !(precedent in STATUTS)) {
-    redirect(`/offre/${id}?suivi=sans-retour`);
+    redirect(destination(formData, id, "?suivi=sans-retour"));
   }
 
   const dateEnvoi = (offre as { date_candidature: string | null })
@@ -501,9 +527,9 @@ export async function revenirEnArriere(formData: FormData) {
 
   await commenterDernierStatut(id, "Retour en arrière depuis l'écran de suivi.");
 
-  revalidatePath(`/offre/${id}`);
+  rafraichirSuivi(formData, id);
   revalidatePath("/");
-  redirect(`/offre/${id}?suivi=retour`);
+  redirect(destination(formData, id, "?suivi=retour"));
 }
 
 /**
@@ -532,6 +558,6 @@ export async function genererPreparation(formData: FormData) {
     );
   }
 
-  revalidatePath(`/offre/${id}`);
-  redirect(`/offre/${id}?suivi=preparation`);
+  rafraichirSuivi(formData, id);
+  redirect(destination(formData, id, "?suivi=preparation"));
 }

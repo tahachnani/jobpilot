@@ -1,4 +1,4 @@
-# Neuf constats d'usage — décisions D78 à D86
+# Neuf constats d'usage — décisions D78 à D88
 
 Passe du 28 septembre 2026, après deux semaines d'usage réel : 67 offres
 analysées, 42 candidatures envoyées, 9,66 $ dépensés. Ce ne sont plus des
@@ -154,6 +154,40 @@ Le composant de copie avait été écrit pour l'email puis réutilisé tel quel 
 lettre de motivation et la fiche d'entretien proposaient toutes deux « Copier
 l'email ». Il prend désormais ce qu'il copie en paramètre. Un bouton qui nomme
 autre chose que ce qu'il fait finit par être cru.
+
+---
+
+## D87 — Le tableau de bord se replie
+
+Reprendre les vingt-cinq anciennes candidatures a fait apparaître vingt-cinq
+relances dues le même jour. La rubrique « À relancer » poussait tout le reste
+du tableau de bord sous la ligne de flottaison : indicateurs, refus, taux de
+réponse, plus rien n'était visible.
+
+La liste devient repliable. Le compte reste affiché — c'est lui l'information —
+et le détail s'ouvre à la demande. Elle reste dépliée tant qu'il y a cinq
+relances ou moins : en dessous de ce seuil, la liste *est* l'information.
+
+## D88 — La fiche de candidature
+
+D81 avait raison sur le principe et tort dans les faits. En allégeant la liste,
+elle renvoyait vers la fiche d'offre pour la moindre action de suivi — préparer
+un entretien, choisir un canal, déclarer une issue. Or ces gestes appartiennent
+au suivi, pas à l'analyse de l'annonce, et l'aller-retour se payait à chaque
+fois.
+
+Chaque candidature retrouve donc **sa page**, sous `candidatures/`, qui porte
+ce qui vient après l'envoi et rien d'autre : l'envoi (date, origine, canal,
+interlocuteur), la relance (date, marquer relancée, rédiger, relire), l'issue
+(statut, commentaire, retour en arrière, historique), l'entretien (préparer,
+relire) et les documents réellement partis.
+
+Ce qui appartient à l'offre — score détaillé, compétences, écart au CV de
+référence — reste sur l'offre, à un clic en haut de page.
+
+Les actions de suivi sont les mêmes des deux côtés : elles prennent désormais
+un chemin de retour, vérifié comme relatif à l'application, et rafraîchissent
+l'écran d'où vient le clic. Agir depuis le suivi ne fait plus sortir du suivi.
 
 ---
 

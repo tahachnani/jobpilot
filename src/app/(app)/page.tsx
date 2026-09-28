@@ -70,11 +70,23 @@ export default async function TableauDeBord() {
         <Indicateur libelle="Entretiens" valeur={entretiens.length} />
       </div>
 
+      {/* D87 — la liste se replie.
+          Vingt-cinq relances dues d'un coup, après la reprise des anciennes
+          candidatures, poussaient tout le reste du tableau de bord sous la
+          ligne de flottaison. Un tableau de bord dont on ne voit qu'une seule
+          rubrique n'en est plus un. Le compte reste visible ; le détail
+          s'ouvre à la demande. */}
       {relances.length > 0 && (
-        <>
-          <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-ardoise-500">
-            À relancer ({relances.length})
-          </h2>
+        <details className="mt-8" open={relances.length <= 5}>
+          <summary className="mb-3 cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-ardoise-500 hover:text-ardoise-700">
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
+              {relances.length}
+            </span>{" "}
+            à relancer
+            <span className="ml-2 font-normal normal-case tracking-normal text-ardoise-400">
+              {relances.length <= 5 ? "— replier" : "— déplier"}
+            </span>
+          </summary>
           <div className="space-y-2">
             {relances.map((o) => {
               const jours = joursDepuis(o.date_candidature);
@@ -107,7 +119,7 @@ export default async function TableauDeBord() {
               );
             })}
           </div>
-        </>
+        </details>
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">

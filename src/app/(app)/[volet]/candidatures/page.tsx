@@ -241,11 +241,11 @@ export default async function Candidatures({
                       </span>
                     )}
                     <Link
-                      href={`/offre/${c.id}`}
+                      href={`/${volet.slug}/candidatures/${c.id}`}
                       prefetch={false}
-                      className="rounded-lg border border-ardoise-300 px-3 py-1.5 font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+                      className="rounded-lg bg-ardoise-900 px-3 py-1.5 font-medium text-white transition hover:bg-ardoise-800"
                     >
-                      Ouvrir l&apos;offre →
+                      Ouvrir la candidature →
                     </Link>
                   </span>
                 </div>
