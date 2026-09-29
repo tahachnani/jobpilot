@@ -7,6 +7,8 @@ import { ErreurCV } from "@/lib/cv/generer";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
+import { verifierStyle, type DefautStyle } from "@/lib/lettre/style";
+import { formuleAppel } from "@/lib/lettre/destinataire";
 import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
 import {
   lettreEnTexte,
@@ -63,6 +65,26 @@ Les quatre paragraphes réunis tiennent en 2 000 signes, espaces compris. Ce n'e
 
 Chaque paragraphe doit être plus engageant que le précédent. Le dernier appelle un entretien sans le quémander.
 
+LA VOIX — C'EST LA RÈGLE LA PLUS IMPORTANTE
+Le candidat écrit cette lettre. Il est donc le SUJET des verbes principaux. Au moins trois paragraphes sur quatre ont "j'ai" ou "je" comme sujet de leur phrase principale.
+
+INTERDIT : les noms d'action en sujet, qui font disparaître celui qui a fait le travail.
+- "Le pilotage des indicateurs s'est accompagné de l'automatisation du reporting" → "J'ai piloté les indicateurs et automatisé le reporting"
+- "La construction des tableaux de bord a nécessité de comparer les évolutions" → "J'ai construit les tableaux de bord en comparant les évolutions"
+- "Le parcours traverse trois secteurs" → "J'ai travaillé dans l'industrie, le logement social et en cabinet"
+- "Ce passage par plusieurs ERP a construit une capacité à" → "Passer d'un ERP à l'autre m'a appris à"
+Sont notamment proscrits comme sujets : le pilotage, la construction, le calcul, le parcours, ce passage, l'élaboration, la mise en place, la montée en compétence, cette expérience, ces missions.
+
+Écris des phrases courtes. Une phrase de plus de trente mots est presque toujours une phrase nominale déguisée.
+
+CE QUI EST INTERDIT, EN PLUS
+- COMPTER. Jamais "Quatre expériences en…", "Deux expériences illustrent…", "trois secteurs distincts", "deux points". Compter structure un rapport ; une lettre se lit d'un trait. Nomme les choses, ne les dénombre pas.
+- ANNONCER SON PLAN. Pas de "Deux expériences illustrent cette contribution", pas de "Je vais détailler". On démontre, on n'annonce pas.
+- RECOPIER L'ANNONCE EN LE DISANT. Jamais "Ces missions recouvrent les besoins identifiés dans l'annonce : …" suivi de la liste de l'offre. Le recruteur sait ce qu'il a écrit ; c'est à lui de conclure que le candidat correspond. Employer le vocabulaire de l'annonce, oui ; le lui resservir en liste, non.
+- "vs", "&", "cf.", et toute abréviation anglaise.
+- Dire deux fois la disponibilité : "Disponible immédiatement, je peux rejoindre sans délai" est une redondance.
+- Les clôtures administratives : "Je reste à votre disposition pour échanger sur les modalités d'un entretien", "n'hésitez pas", "dans cette continuité". La dernière phrase demande un entretien, simplement et debout.
+
 Exigences de fond :
 - pas de généralités interchangeables : chaque phrase doit être invalide pour une autre offre
 - pas de recopie du CV, qui est joint : la lettre dit ce que la page n'a pas pu contenir
@@ -91,6 +113,8 @@ export interface ResultatLettre {
   modele: ModeleLettre;
   email: { objet: string; corps: string };
   ancrage: Ancrage;
+  /** Les tournures repérées par le contrôle de style (D93). */
+  style: DefautStyle[];
   coutUsd: number;
 }
 
@@ -303,6 +327,11 @@ export async function genererLettrePourOffre(
     `ANNONCE INTÉGRALE :\n${(offre.contenu_brut ?? "").slice(0, 8000)}`,
     "",
     `POSTE VISÉ : ${offre.intitule ?? ""} chez ${offre.entreprise ?? ""}`,
+    // Le destinataire n'était pas transmis (D92) : le modèle rendait donc
+    // toujours « Madame, Monsieur », et le code lui faisait confiance.
+    offre.contact_nom
+      ? `DESTINATAIRE : ${offre.contact_nom}. La lettre s'adresse à une personne identifiée : tu peux la citer dans le corps si c'est naturel, jamais de "Madame, Monsieur" à l'intérieur du texte.`
+      : "DESTINATAIRE : inconnu. N'invente aucun nom et n'écris aucune formule nominative.",
     `VOLET : ${VOLETS[offre.volet].nom}`,
     "",
     `MISSIONS ATTENDUES : ${analyse.missions.map((m) => m.texte).join(" | ")}`,
@@ -400,11 +429,9 @@ export async function genererLettrePourOffre(
       }
     )}`,
     objet: brut.lettre.objet,
-    // Si le destinataire est connu, on s'adresse à lui ; sinon la formule
-    // reste générique — mieux vaut neutre qu'un nom inventé.
-    formuleAppel: offre.contact_nom
-      ? brut.lettre.formuleAppel
-      : "Madame, Monsieur,",
+    // La formule d'appel est calculée, plus demandée au modèle (D92) : une
+    // civilité est un fait, elle n'a pas à dépendre d'une génération.
+    formuleAppel: formuleAppel(offre.contact_nom),
     paragraphes: brut.lettre.paragraphes,
     formulePolitesse: brut.lettre.formulePolitesse,
     signature: nettoyer([p.prenom, p.nom], " "),
@@ -420,6 +447,11 @@ export async function genererLettrePourOffre(
     [...modele.paragraphes, modele.objet].join("\n"),
     corpus
   );
+
+  // Style : ce que l'ancrage ne voit pas (D93). Formules d'appel et de
+  // politesse exclues — elles ont leurs propres conventions, et « Madame,
+  // Monsieur » n'est pas une phrase nominale à corriger.
+  const defautsStyle = verifierStyle(modele.paragraphes);
 
   const { data: derniere } = await supabase
     .from("documents")
@@ -449,7 +481,7 @@ export async function genererLettrePourOffre(
       version,
       storage_path: erreurStockage ? null : chemin,
       contenu_texte: lettreEnTexte(modele),
-      selection: { schema: SCHEMA_SELECTION, modele, ancrage },
+      selection: { schema: SCHEMA_SELECTION, modele, ancrage, style: defautsStyle },
       cout_usd: reponse.coutUsd,
     },
     {
@@ -480,6 +512,7 @@ export async function genererLettrePourOffre(
     modele,
     email: brut.email,
     ancrage,
+    style: defautsStyle,
     coutUsd: reponse.coutUsd,
   };
 }

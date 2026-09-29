@@ -1,4 +1,4 @@
-# Neuf constats d'usage — décisions D78 à D91
+# Neuf constats d'usage — décisions D78 à D93
 
 Passe du 28 septembre 2026, après deux semaines d'usage réel : 67 offres
 analysées, 42 candidatures envoyées, 9,66 $ dépensés. Ce ne sont plus des
@@ -259,6 +259,67 @@ Un troisième rejet muet disparaît au passage : une proposition dont aucun code
 d'activité n'était exploitable était écartée sans un mot. C'est maintenant un
 motif comme les autres — et depuis D74, un code manquant s'ajoute en trente
 secondes.
+
+---
+
+## D92 — Le destinataire servait à l'en-tête, jamais à la lettre
+
+Constat du 29 septembre : le nom du contact était saisi, enregistré, affiché
+dans le bloc destinataire — et le corps de la lettre disait toujours
+« Madame, Monsieur ».
+
+La cause tient en une ligne. Le nom **n'était pas transmis au modèle**. Celui-ci
+rendait donc la formule générique de l'exemple du prompt, et le code la
+reprenait telle quelle *à condition qu'un contact existe* — en croyant qu'elle
+avait été personnalisée. La condition était juste, l'information manquait.
+
+Deux corrections. Le destinataire est désormais donné au modèle, avec
+l'interdiction d'écrire « Madame, Monsieur » dans le corps quand une personne
+est identifiée. Et la **formule d'appel est calculée**, plus demandée : une
+civilité est un fait, elle n'a pas à dépendre d'une génération.
+
+Aucune civilité n'est déduite d'un prénom — c'est faux une fois sur dix et
+vexant à tous les coups. Elle se lit dans ce qui est saisi : « Monsieur Dupont »
+donne « Monsieur, », l'usage français voulant que le patronyme reste dans
+l'en-tête et non dans la formule. Sans civilité écrite, la lettre garde
+« Madame, Monsieur, », et l'écran dit comment obtenir mieux.
+
+## D93 — Le contrôle de style
+
+L'ancrage vérifie que la lettre ne ment pas. Il ne dit rien de la façon dont
+elle est écrite, et c'est là que la lettre déçoit — pour la moitié de la
+dépense IA de l'application.
+
+Sur une lettre réelle du 29 septembre, deux défauts dominaient.
+
+**Aucune phrase principale n'avait de sujet humain.** « Le pilotage des
+indicateurs s'est accompagné de… », « la construction des tableaux de bord a
+nécessité de… », « Le parcours traverse trois secteurs », « Ce passage par
+plusieurs ERP a construit une capacité à… ». Des travaux qui se font tout
+seuls, une prose de note de service — et c'est cela, bien plus que le
+vocabulaire, qui fait sentir la machine.
+
+**Et le texte comptait.** « Quatre expériences », « Deux expériences
+illustrent », « trois secteurs distincts » : une énumération annoncée à chaque
+paragraphe. Compter structure un rapport ; une lettre se lit d'un trait.
+
+Le prompt gagne donc une section **LA VOIX**, placée comme la règle la plus
+importante : le candidat est le sujet des verbes principaux, trois paragraphes
+sur quatre commencent par « j'ai », et les noms d'action en sujet sont
+nommément proscrits, exemples à l'appui. S'y ajoutent l'interdiction de
+compter, d'annoncer son plan, de resservir les besoins de l'annonce en liste,
+d'écrire « vs », de dire deux fois la disponibilité, et de clore sur « je reste
+à disposition pour échanger sur les modalités d'un entretien ».
+
+Un prompt ne se vérifie pas tout seul : `src/lib/lettre/style.ts` relit la
+lettre produite et nomme ce qu'il trouve, sans appel IA. Le résultat s'affiche
+au-dessus du texte, à côté du contrôle d'ancrage, et **ne bloque rien** : une
+lettre se corrige à la main, dans le champ modifiable, sans repayer une
+génération.
+
+Neuf tests figent ces cas, tirés mot pour mot de la lettre fautive — et un
+dixième vérifie qu'une lettre correctement écrite ne déclenche rien. Un
+contrôle qui crie sur tout ne sert à rien.
 
 ---
 

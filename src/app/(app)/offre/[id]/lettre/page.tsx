@@ -4,6 +4,7 @@ import { VOLETS, type CodeVolet } from "@/config/volets";
 import { creerClientServeur } from "@/lib/supabase/server";
 import type { ModeleLettre } from "@/lib/lettre/document";
 import type { Ancrage } from "@/lib/lettre/ancrage";
+import type { DefautStyle } from "@/lib/lettre/style";
 import {
   corrigerLettre,
   enregistrerContact,
@@ -52,11 +53,17 @@ export default async function Lettre({
     id: string;
     version: number;
     created_at: string;
-    selection: { modele?: ModeleLettre; ancrage?: Ancrage } | null;
+    selection: {
+      modele?: ModeleLettre;
+      ancrage?: Ancrage;
+      style?: DefautStyle[];
+    } | null;
   }[];
   const derniere = lettres[0] ?? null;
   const modele = derniere?.selection?.modele ?? null;
   const ancrage = derniere?.selection?.ancrage ?? null;
+  // Les lettres d'avant D93 n'ont pas de contrôle de style : elles sont figées.
+  const style = derniere?.selection?.style ?? [];
 
   const { data: emailBrut } = await supabase
     .from("documents")
@@ -126,8 +133,18 @@ export default async function Lettre({
           </summary>
           <p className="mt-2 text-xs text-ardoise-500">
             Facultatif, mais une lettre nommément adressée se remarque. Sans
-            nom d&apos;entreprise, l&apos;en-tête indique « Service recrutement »
-            et la formule d&apos;appel reste générique.
+            nom d&apos;entreprise, l&apos;en-tête indique « Service recrutement ».
+          </p>
+          {/* D92 — la civilité n'est jamais déduite d'un prénom : c'est faux
+              une fois sur dix et vexant à tous les coups. Elle se lit, ou la
+              formule reste neutre. */}
+          <p className="mt-1 text-xs leading-relaxed text-ardoise-500">
+            <strong>Commence le nom par « Monsieur » ou « Madame »</strong> pour
+            que la formule d&apos;appel s&apos;adresse à lui : « Monsieur Dupont »
+            donne <em>Monsieur,</em> — l&apos;usage français ne met pas le nom
+            de famille dans la formule, il reste dans l&apos;en-tête. Sans
+            civilité écrite, la lettre garde « Madame, Monsieur, » : rien ne
+            permet de deviner un genre à partir d&apos;un prénom.
           </p>
           <form action={enregistrerContact} className="mt-3 space-y-2">
             <input type="hidden" name="offreId" value={params.id} />
@@ -140,7 +157,7 @@ export default async function Lettre({
             <input
               name="contactNom"
               defaultValue={offre.contact_nom ?? ""}
-              placeholder="Destinataire — Madame Dupont, Responsable RH"
+              placeholder="Monsieur Dupont, Responsable financier"
               className="w-full rounded-lg border border-ardoise-300 px-3 py-2 text-sm"
             />
             <textarea
@@ -204,6 +221,31 @@ export default async function Lettre({
         />
       ) : (
         <div className="space-y-6">
+          {/* D93 — ce que l'ancrage ne voit pas : la façon dont c'est écrit.
+              Signalé, jamais bloquant : une lettre se corrige à la main, et la
+              nommer ne coûte aucun appel. */}
+          {style.length > 0 && (
+            <Carte className="border-sky-200 bg-sky-50">
+              <p className="text-sm font-medium text-sky-900">
+                Contrôle de style — {style.length} tournure
+                {style.length > 1 ? "s" : ""} à reprendre
+              </p>
+              <ul className="mt-2 space-y-2">
+                {style.map((d, i) => (
+                  <li key={i} className="text-xs leading-relaxed text-sky-900">
+                    <span className="font-medium">{d.tournure}</span> —{" "}
+                    <span className="italic text-sky-800">« {d.extrait} »</span>
+                    <p className="mt-0.5 text-sky-700">{d.pourquoi}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-sky-700">
+                Le texte est modifiable plus bas : corrige et enregistre, sans
+                repasser par le modèle.
+              </p>
+            </Carte>
+          )}
+
           {orphelins.length > 0 && (
             <Carte className="border-amber-200 bg-amber-50">
               <p className="text-sm font-medium text-amber-900">
