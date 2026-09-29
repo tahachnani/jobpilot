@@ -23,7 +23,7 @@
 | — | Dix améliorations (D53–D62) | en ligne |
 | — | Score, marché caché, entretien (D64–D73) | à déployer |
 | — | Taxonomie éditable et réanalyse (D74–D77) | en ligne |
-| — | Neuf constats d'usage (D78–D88, sans D82) | à déployer |
+| — | Neuf constats d'usage (D78–D89, sans D82) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -289,7 +289,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D88 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D89 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

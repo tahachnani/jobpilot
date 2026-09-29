@@ -1,4 +1,4 @@
-# Neuf constats d'usage — décisions D78 à D88
+# Neuf constats d'usage — décisions D78 à D89
 
 Passe du 28 septembre 2026, après deux semaines d'usage réel : 67 offres
 analysées, 42 candidatures envoyées, 9,66 $ dépensés. Ce ne sont plus des
@@ -188,6 +188,28 @@ référence — reste sur l'offre, à un clic en haut de page.
 Les actions de suivi sont les mêmes des deux côtés : elles prennent désormais
 un chemin de retour, vérifié comme relatif à l'application, et rafraîchissent
 l'écran d'où vient le clic. Agir depuis le suivi ne fait plus sortir du suivi.
+
+---
+
+## D89 — L'indice là où se prend la décision
+
+D78 avait corrigé ce que l'indice raconte, pas l'endroit où il se lit. Le
+détail par source vivait sur l'écran Formulations — c'est-à-dire **derrière le
+clic qu'il était censé éclairer**. Sur la fiche d'offre, là où l'on décide, il
+ne restait qu'une ligne inchangée depuis l'étape 4ter.
+
+Le bloc complet remonte donc à côté du bouton « Adapter les formulations » : le
+verdict en une phrase — « ne lance pas d'adaptation » ou les termes du corpus
+nommés un par un —, la couverture, et le reste replié derrière un détail.
+
+La couleur est corrigée par la même occasion. Depuis D78, « fort » signifie
+qu'il y a de la matière exploitable ; il s'affichait en rouge, comme une
+alerte. Le bleu dit une occasion, l'ambre une occasion mince, le gris qu'il n'y
+a rien à aller chercher — et que c'est très bien ainsi.
+
+Enfin, une offre **sans CV composé** dit désormais pourquoi elle n'a pas
+d'indice : il se mesure entre l'annonce et le CV réellement sélectionné, il ne
+peut donc pas exister avant lui. Le silence laissait croire à une panne.
 
 ---
 

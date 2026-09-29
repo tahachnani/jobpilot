@@ -22,7 +22,10 @@ import BoutonSoumettre from "@/components/BoutonSoumettre";
 import BoutonCopier from "@/components/BoutonCopier";
 import type { ModeleCV } from "@/lib/cv/modele";
 import {
+  ACTIONS_PAR_SOURCE,
   LIBELLES_POTENTIEL,
+  LIBELLES_SOURCE,
+  lirePotentiel,
   type Ecart,
   type Potentiel,
 } from "@/lib/cv/ecart";
@@ -197,6 +200,23 @@ export default async function DetailOffre({
 
   const dernierCV = cvs[0] ?? null;
 
+  /**
+   * L'indice d'adaptation, lu une fois pour toutes (D89).
+   *
+   * Il est figé dans le document le jour de sa composition : celui d'avant
+   * l'étape 4ter n'a pas de listes, celui d'avant D78 pas de ventilation. La
+   * lecture passe par `lirePotentiel` plutôt que de deviner la forme ici.
+   */
+  const { potentiel, sansSource: potentielSansSource } = lirePotentiel(
+    dernierCV?.potentiel
+  );
+
+  const termesCorpus = potentiel?.parSource?.corpus ?? [];
+
+  /** Les sources qui ne permettent aucune action, repliées derrière un détail. */
+  const autresSources = (["mission", "competence", "formation"] as const)
+    .map((source) => [source, potentiel?.parSource?.[source] ?? []] as const)
+    .filter(([, termes]) => termes.length > 0);
 
   const lettres = tousDocuments.filter((d) => d.type === "lettre");
   const derniereLettre = lettres[0] ?? null;
@@ -731,22 +751,6 @@ export default async function DetailOffre({
                 : "La sélection des missions est déterministe et n'appelle pas l'IA : générer ne coûte rien."}
             </p>
 
-            {dernierCV?.potentiel && (
-              <p
-                className={`mt-2 inline-block rounded px-2 py-1 text-xs font-medium ${
-                  dernierCV.potentiel.niveau === "faible"
-                    ? "bg-emerald-100 text-emerald-900"
-                    : dernierCV.potentiel.niveau === "moyen"
-                    ? "bg-amber-100 text-amber-900"
-                    : "bg-rose-100 text-rose-900"
-                }`}
-              >
-                Potentiel d&apos;adaptation{" "}
-                {dernierCV.potentiel.niveau} —{" "}
-                {dernierCV.potentiel.couverture} % du vocabulaire de
-                l&apos;annonce déjà présent
-              </p>
-            )}
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -766,6 +770,100 @@ export default async function DetailOffre({
             </form>
           </div>
         </div>
+
+        {/* D89 — l'indice à l'endroit où se prend la décision.
+            Il vivait sur l'écran Formulations, c'est-à-dire derrière le clic
+            qu'il était censé éclairer. Et la couleur mentait depuis D78 :
+            « fort » s'affichait en rouge, comme une alerte, alors qu'il
+            signale de la matière exploitable. */}
+        {potentiel ? (
+          <div
+            className={`mt-4 rounded-lg border p-3 ${
+              potentiel.niveau === "fort"
+                ? "border-sky-200 bg-sky-50"
+                : potentiel.niveau === "moyen"
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-ardoise-200 bg-ardoise-50"
+            }`}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-medium text-ardoise-900">
+                {LIBELLES_POTENTIEL[potentiel.niveau]}
+              </p>
+              <p className="text-xs text-ardoise-500">
+                {potentiel.couverture} % du vocabulaire de l&apos;annonce est
+                déjà sur ton CV
+              </p>
+            </div>
+
+            {potentielSansSource ? (
+              <p className="mt-2 text-xs leading-relaxed text-ardoise-500">
+                Ce CV a été composé avant que l&apos;origine des termes soit
+                distinguée : impossible de dire lesquels viennent du corpus.
+                Régénère-le — c&apos;est gratuit — pour avoir le verdict.
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm leading-relaxed text-ardoise-700">
+                  {termesCorpus.length === 0 ? (
+                    <>
+                      <strong>Ne lance pas d&apos;adaptation.</strong> Aucun
+                      terme de l&apos;annonce ne dort dans ton corpus : la
+                      reformulation n&apos;aurait rien de neuf à faire entrer,
+                      et l&apos;appel serait facturé quand même.
+                    </>
+                  ) : (
+                    <>
+                      <strong>
+                        {termesCorpus.length} terme
+                        {termesCorpus.length > 1 ? "s" : ""} à aller chercher
+                        dans ton corpus :
+                      </strong>{" "}
+                      {termesCorpus.join(" · ")}.
+                    </>
+                  )}
+                </p>
+
+                {autresSources.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-ardoise-400">
+                      Le reste de ce que l&apos;annonce réclame et que ton CV
+                      ne dit pas
+                    </summary>
+                    <div className="mt-1.5 space-y-1.5">
+                      {autresSources.map(([source, termes]) => (
+                        <div key={source} className="text-xs">
+                          <span className="font-medium text-ardoise-600">
+                            {LIBELLES_SOURCE[source]} :
+                          </span>{" "}
+                          <span className="text-ardoise-500">
+                            {termes.join(" · ")}
+                          </span>
+                          <p className="mt-0.5 leading-relaxed text-ardoise-400">
+                            {ACTIONS_PAR_SOURCE[source]}
+                          </p>
+                        </div>
+                      ))}
+                      {potentiel.horsPortee.length > 0 && (
+                        <p className="text-xs text-ardoise-400">
+                          Hors de portée, absent de tout ton parcours :{" "}
+                          {potentiel.horsPortee.join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-lg bg-ardoise-50 p-3 text-xs leading-relaxed text-ardoise-500">
+            L&apos;indice d&apos;adaptation se mesure entre l&apos;annonce et le
+            CV réellement sélectionné : il n&apos;existe donc qu&apos;une fois le
+            CV composé. Génère-le — c&apos;est gratuit et sans appel IA — et il
+            te dira si payer une reformulation a un sens.
+          </p>
+        )}
 
         {dernierCV && (
           <>
