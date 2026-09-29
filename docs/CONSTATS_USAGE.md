@@ -1,4 +1,4 @@
-# Neuf constats d'usage — décisions D78 à D93
+# Neuf constats d'usage — décisions D78 à D95
 
 Passe du 28 septembre 2026, après deux semaines d'usage réel : 67 offres
 analysées, 42 candidatures envoyées, 9,66 $ dépensés. Ce ne sont plus des
@@ -320,6 +320,61 @@ génération.
 Neuf tests figent ces cas, tirés mot pour mot de la lettre fautive — et un
 dixième vérifie qu'une lettre correctement écrite ne déclenche rien. Un
 contrôle qui crie sur tout ne sert à rien.
+
+---
+
+## D94 — L'adresse de candidature était dans l'annonce, et on la jetait
+
+Certaines offres ne passent pas par un formulaire : « Comment postuler ? Un
+simple mail avec un CV à Jonathan THIRIONET, Responsable Recrutement :
+j.thirionet@… ». Cette phrase était dans `contenu_brut` depuis le premier jour,
+lue et payée avec le reste. Il fallait rouvrir l'annonce pour la retrouver.
+
+La question posée — « sans payer ? » — a changé la conception. Une adresse mail
+est un **motif**, pas une question de langue : l'expression régulière la trouve
+gratuitement, **rétroactivement sur toutes les offres déjà analysées**, et,
+contrairement à un modèle, elle ne peut pas en inventer une. Le champ a donc
+été retiré de l'extraction IA avant même d'y être ajouté.
+
+Le tri fait tout le travail. Sur les sept adresses présentes dans la base au
+29 septembre, **deux seulement** servaient à candidater :
+
+| Trouvé | Verdict |
+|---|---|
+| `j.thirionet@auditionconseil.com` | retenu — « Un simple mail avec un CV à Jonathan THIRIONET » |
+| `direction@boulangeriemillet.com` | retenu — « Envoyez-nous votre CV […] à l'adresse suivante » |
+| `dpo@septeo.com` (trois offres) | écarté — mention RGPD |
+| `diversite.fr@siemens.com` | écarté — référent Mission Handicap |
+| `exemple@exemple.fr` | écarté — placeholder d'un formulaire de connexion |
+
+Sont exclus d'office : les `noreply`, les `dpo@`/`rgpd@`, les `exemple@`, les
+domaines des plateformes, et toute adresse dont la phrase parle de RGPD, de
+handicap ou d'espace candidat. Sont classées en tête celles dont la phrase
+parle de candidature, de CV ou d'envoi, et celles dont la partie locale
+ressemble à un patronyme.
+
+Le **nom n'est pas deviné** : il n'est retenu que sur la forme « à Prénom NOM »,
+et c'est la **phrase de l'annonce** qui est affichée en dessous. Ses mots, donc
+faux zéro fois.
+
+## D95 — Tout ce qu'il faut pour coller, au même endroit
+
+L'application n'envoie rien et ne prétend pas le faire. Elle met les morceaux à
+portée de deux clics.
+
+Sur la **fiche d'offre**, bloc « Lettre et email » : l'adresse, le nom quand il
+est sûr, et la phrase source. On sait avant même de rédiger que cette offre-là
+part par mail.
+
+Sur l'écran **Lettre**, sous l'email : l'adresse en clair et trois boutons de
+copie — l'adresse, l'objet, le corps. Plus **« Adresser la lettre à … »**, qui
+reprend le nom extrait dans le champ destinataire et referme ce que D92 a
+corrigé : la formule d'appel devient nominative.
+
+L'envoi automatique depuis l'application a été écarté après examen : OAuth
+Google, jetons en base, et surtout des jetons de rafraîchissement qui expirent
+au bout de sept jours tant que l'application reste en mode test — une corvée
+hebdomadaire pour économiser un clic sur « Envoyer ».
 
 ---
 

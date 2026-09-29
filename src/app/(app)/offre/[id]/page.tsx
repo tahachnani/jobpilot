@@ -45,6 +45,7 @@ import {
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { schemaDe } from "@/lib/documents";
+import { contactPrincipal } from "@/lib/offre/contact";
 import { budgetDuMois, montant } from "@/lib/couts";
 import { repondreCompetence } from "./formulations/actions";
 import { detailCouverture } from "@/lib/cv/competences-manquantes";
@@ -221,6 +222,10 @@ export default async function DetailOffre({
   const autresSources = (["mission", "competence", "formation"] as const)
     .map((source) => [source, potentiel?.parSource?.[source] ?? []] as const)
     .filter(([, termes]) => termes.length > 0);
+
+  // L'adresse de candidature écrite dans l'annonce (D94) : trouvée par motif
+  // dans le texte déjà stocké, sans appel ni réanalyse.
+  const contactAnnonce = contactPrincipal(offre.contenu_brut as string | null);
 
   const lettres = tousDocuments.filter((d) => d.type === "lettre");
   const derniereLettre = lettres[0] ?? null;
@@ -1100,6 +1105,28 @@ export default async function DetailOffre({
           que le CV a pu contenir. L&apos;email de candidature est rédigé dans
           la foulée.
         </p>
+
+        {/* D94 — cette offre se candidate par mail, et l'annonce le disait.
+            L'adresse était dans le texte brut depuis le premier jour : il
+            fallait rouvrir l'annonce pour la retrouver. */}
+        {contactAnnonce && (
+          <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3">
+            <p className="text-sm font-medium text-sky-900">
+              Candidature par email
+              {contactAnnonce.nom && ` — ${contactAnnonce.nom}`}
+            </p>
+            <p className="mt-0.5 font-mono text-sm text-sky-900">
+              {contactAnnonce.email}
+            </p>
+            <p className="mt-1.5 text-xs italic leading-relaxed text-sky-700">
+              « {contactAnnonce.phrase} »
+            </p>
+            <p className="mt-1.5 text-xs text-sky-700">
+              Les coordonnées et les boutons de copie sont sur l&apos;écran
+              Lettre, sous l&apos;email.
+            </p>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-3">
           <Link

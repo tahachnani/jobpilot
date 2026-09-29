@@ -5,6 +5,7 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import type { ModeleLettre } from "@/lib/lettre/document";
 import type { Ancrage } from "@/lib/lettre/ancrage";
 import type { DefautStyle } from "@/lib/lettre/style";
+import { contactPrincipal } from "@/lib/offre/contact";
 import {
   corrigerLettre,
   enregistrerContact,
@@ -28,7 +29,9 @@ export default async function Lettre({
 
   const { data: offreBrute } = await supabase
     .from("offres")
-    .select("id, volet, intitule, entreprise, contact_nom, contact_adresse")
+    .select(
+      "id, volet, intitule, entreprise, contact_nom, contact_adresse, contenu_brut"
+    )
     .eq("id", params.id)
     .maybeSingle();
   if (!offreBrute) notFound();
@@ -39,6 +42,7 @@ export default async function Lettre({
     entreprise: string | null;
     contact_nom: string | null;
     contact_adresse: string | null;
+    contenu_brut: string | null;
   };
   const volet = VOLETS[offre.volet];
 
@@ -64,6 +68,10 @@ export default async function Lettre({
   const ancrage = derniere?.selection?.ancrage ?? null;
   // Les lettres d'avant D93 n'ont pas de contrôle de style : elles sont figées.
   const style = derniere?.selection?.style ?? [];
+
+  // L'adresse de candidature écrite dans l'annonce (D94) : trouvée par motif,
+  // sans appel ni réanalyse, sur toutes les offres même les plus anciennes.
+  const contactAnnonce = contactPrincipal(offre.contenu_brut);
 
   const { data: emailBrut } = await supabase
     .from("documents")
@@ -356,6 +364,79 @@ export default async function Lettre({
               <p className="mt-2 text-xs text-ardoise-400">
                 Réécrire l&apos;email ne touche pas à la lettre.
               </p>
+
+              {/* D95 — tout ce qu'il faut pour coller dans sa boîte, au même
+                  endroit. L'application n'envoie rien et ne prétend pas le
+                  faire : elle met les morceaux à portée de deux clics. */}
+              {contactAnnonce && (
+                <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3">
+                  <p className="text-sm font-medium text-sky-900">
+                    Destinataire indiqué dans l&apos;annonce
+                    {contactAnnonce.nom && ` — ${contactAnnonce.nom}`}
+                  </p>
+                  <p className="mt-1.5 text-xs italic leading-relaxed text-sky-700">
+                    « {contactAnnonce.phrase} »
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <code className="rounded bg-white px-2 py-1 text-sm text-sky-900">
+                      {contactAnnonce.email}
+                    </code>
+                    <BoutonCopier
+                      quoi="l'adresse"
+                      texte={contactAnnonce.email}
+                      className="rounded-lg border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                    />
+                    <BoutonCopier
+                      quoi="l'objet"
+                      texte={email.objet}
+                      className="rounded-lg border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                    />
+                    <BoutonCopier
+                      quoi="le corps"
+                      texte={email.corps}
+                      className="rounded-lg border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                    />
+                  </div>
+
+                  {contactAnnonce.nom && offre.contact_nom !== contactAnnonce.nom && (
+                    <form action={enregistrerContact} className="mt-3">
+                      <input type="hidden" name="offreId" value={params.id} />
+                      <input
+                        type="hidden"
+                        name="entreprise"
+                        value={offre.entreprise ?? ""}
+                      />
+                      <input
+                        type="hidden"
+                        name="contactAdresse"
+                        value={offre.contact_adresse ?? ""}
+                      />
+                      <input
+                        type="hidden"
+                        name="contactNom"
+                        value={contactAnnonce.nom}
+                      />
+                      <BoutonSoumettre
+                        libelle={`Adresser la lettre à ${contactAnnonce.nom}`}
+                        libelleEnCours="Enregistrement…"
+                        className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                      />
+                      <span className="ml-2 text-xs text-sky-700">
+                        Ajoute « Monsieur » ou « Madame » devant le nom pour que
+                        la formule d&apos;appel s&apos;adresse à lui.
+                      </span>
+                    </form>
+                  )}
+
+                  <p className="mt-3 text-xs leading-relaxed text-sky-700">
+                    L&apos;application n&apos;envoie rien : colle ces éléments
+                    dans ta boîte et joins les deux PDF ci-dessus. Une fois
+                    parti, marque la candidature comme envoyée depuis la fiche
+                    d&apos;offre.
+                  </p>
+                </div>
+              )}
             </Carte>
           )}
 
