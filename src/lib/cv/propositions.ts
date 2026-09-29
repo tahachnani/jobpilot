@@ -287,11 +287,6 @@ export async function proposerMissionsPourOffre(
       experience.missions.map((m) => m.texte)
     );
 
-    if (!verdict.accepte) {
-      rejetees += 1;
-      continue;
-    }
-
     // Les codes doivent appartenir à la taxonomie fermée : c'est sur eux que
     // le moteur de sélection compare une mission à une offre. Le modèle en a
     // inventé — « analyse financière », « Orientation business » — et les
@@ -314,13 +309,33 @@ export async function proposerMissionsPourOffre(
       ];
     }
 
+    /**
+     * Les motifs complets, codes compris (D91).
+     *
+     * Un code introuvable était jusqu'ici un troisième rejet muet, après ceux
+     * du contrôle : la mission disparaissait sans que rien ne le dise. Il
+     * devient un motif comme les autres.
+     */
+    const motifs = [...verdict.motifs];
     if (codes.length === 0) {
-      rejetees += 1;
-      continue;
+      motifs.push(
+        "Aucun code d'activité exploitable : la mission serait invisible au moteur de sélection."
+      );
     }
+    const accepte = motifs.length === 0;
 
-    // La mission est créée inactive : elle existe, mais aucune sélection ne la
-    // voit tant que Taha n'a pas dit oui.
+    /**
+     * Une proposition écartée est **conservée** (D91).
+     *
+     * Elle l'était déjà pour une reformulation — visible avec son motif,
+     * acceptable à la main. Ici elle était jetée : l'appel était payé pour une
+     * phrase que personne ne lirait jamais, et sans savoir lequel des six
+     * contrôles s'était déclenché.
+     *
+     * La mission est créée inactive dans les deux cas : aucune sélection ne la
+     * voit tant que Taha n'a pas dit oui, et « écarter » la supprime pour de
+     * bon.
+     */
     const { data: creee, error } = await supabase
       .from("missions")
       .insert({
@@ -330,7 +345,7 @@ export async function proposerMissionsPourOffre(
         contient_chiffre: /\d/.test(texte),
         pertinence_cdg: 3,
         pertinence_compta: 3,
-        ordre: 900 + proposees,
+        ordre: 900 + proposees + rejetees,
         actif: false,
       })
       .select("id")
@@ -345,9 +360,11 @@ export async function proposerMissionsPourOffre(
       texte,
       origine: "ia_reformulee",
       validee: false,
+      motif_rejet: accepte ? null : motifs.join(" "),
     });
 
-    proposees += 1;
+    if (accepte) proposees += 1;
+    else rejetees += 1;
   }
 
   return { proposees, rejetees, coutUsd: reponse.coutUsd };

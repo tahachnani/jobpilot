@@ -44,6 +44,7 @@ import {
   genererPreparation,
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
+import { schemaDe } from "@/lib/documents";
 import { budgetDuMois, montant } from "@/lib/couts";
 import { repondreCompetence } from "./formulations/actions";
 import { detailCouverture } from "@/lib/cv/competences-manquantes";
@@ -196,6 +197,7 @@ export default async function DetailOffre({
     pages: d.selection?.pages ?? null,
     ecart: d.selection?.ecart ?? null,
     potentiel: d.selection?.potentiel ?? null,
+    schema: schemaDe(d.selection),
   }));
 
   const dernierCV = cvs[0] ?? null;
@@ -207,9 +209,11 @@ export default async function DetailOffre({
    * l'étape 4ter n'a pas de listes, celui d'avant D78 pas de ventilation. La
    * lecture passe par `lirePotentiel` plutôt que de deviner la forme ici.
    */
-  const { potentiel, sansSource: potentielSansSource } = lirePotentiel(
-    dernierCV?.potentiel
-  );
+  const {
+    potentiel,
+    sansSource: potentielSansSource,
+    perime: potentielPerime,
+  } = lirePotentiel(dernierCV?.potentiel, dernierCV?.schema);
 
   const termesCorpus = potentiel?.parSource?.corpus ?? [];
 
@@ -796,11 +800,13 @@ export default async function DetailOffre({
               </p>
             </div>
 
-            {potentielSansSource ? (
+            {potentielSansSource || potentielPerime ? (
               <p className="mt-2 text-xs leading-relaxed text-ardoise-500">
-                Ce CV a été composé avant que l&apos;origine des termes soit
-                distinguée : impossible de dire lesquels viennent du corpus.
-                Régénère-le — c&apos;est gratuit — pour avoir le verdict.
+                {potentielSansSource
+                  ? "Ce CV a été composé avant que l'origine des termes soit distinguée : impossible de dire lesquels viennent du corpus."
+                  : "Cet indice a été mesuré contre les seules missions du CV, sans son titre ni son accroche : il surestime ce qui reste à récupérer."}{" "}
+                Régénère le CV — c&apos;est gratuit et sans appel IA — pour
+                avoir le verdict juste.
               </p>
             ) : (
               <>

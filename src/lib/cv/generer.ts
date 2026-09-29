@@ -163,7 +163,14 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
       // Calculés ici parce que la composition est gratuite et déterministe :
       // les écrans les relisent au lieu de recharger toute la base.
       ecart: comparerAuReference(donnees, analyse, selection.niveau, selection),
-      potentiel: potentielAdaptation(analyse, selection, parcours),
+      // Le CV composé fait foi pour « ce qui est déjà dit » (D90) : c'est le
+      // texte même qui sera imprimé, titre et accroche compris.
+      potentiel: potentielAdaptation(
+        analyse,
+        selection,
+        parcours,
+        modeleEnTexte(modele)
+      ),
       hauteurEstimee: Math.round(estimerHauteur(modele)),
       pages,
       niveau: modele.meta.niveau,

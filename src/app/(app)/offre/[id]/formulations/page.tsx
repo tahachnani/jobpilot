@@ -1,5 +1,6 @@
 import { Carte, TitrePage, EtatVide } from "@/components/ui";
 import BoutonSoumettre from "@/components/BoutonSoumettre";
+import { schemaDe } from "@/lib/documents";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import { creerClientServeur } from "@/lib/supabase/server";
 import {
@@ -71,7 +72,10 @@ export default async function Formulations({
   // Un document est figé le jour de sa génération : celui d'avant l'étape 4ter
   // n'a ni `recuperables` ni `horsPortee`, celui d'avant D78 n'a pas
   // `parSource`. La lecture est centralisée plutôt que devinée ici.
-  const { potentiel: potentielLu, sansSource } = lirePotentiel(potentielBrut);
+  const { potentiel: potentielLu, sansSource, perime } = lirePotentiel(
+    potentielBrut,
+    schemaDe((cvBrut as { selection?: unknown } | null)?.selection)
+  );
   const potentiel = potentielLu ?? undefined;
 
   const potentielObsolete =
@@ -101,7 +105,7 @@ export default async function Formulations({
   const { data: proposeesBrutes } = await supabase
     .from("mission_formulations")
     .select(
-      "id, texte, mission_id, missions!inner ( id, actif, experience_id, experiences ( entreprise ) )"
+      "id, texte, mission_id, motif_rejet, missions!inner ( id, actif, experience_id, experiences ( entreprise ) )"
     )
     .eq("offre_id", params.id)
     .eq("validee", false)
@@ -113,6 +117,7 @@ export default async function Formulations({
     id: string;
     texte: string;
     mission_id: string;
+    motif_rejet: string | null;
     missions: {
       experience_id: string;
       experiences: { entreprise: string } | null;
@@ -121,6 +126,7 @@ export default async function Formulations({
     formulationId: p.id,
     missionId: p.mission_id,
     texte: p.texte,
+    motifRejet: p.motif_rejet,
     entreprise: p.missions?.experiences?.entreprise ?? "",
     fondements: fondements(
       p.texte,
@@ -168,7 +174,12 @@ export default async function Formulations({
   const enAttente = adaptees.filter(
     (a) => !a.validee && !a.motif_rejet && !idsProposees.has(a.id)
   );
-  const ecartees = adaptees.filter((a) => !a.validee && a.motif_rejet);
+  // `idsProposees` exclut aussi les écartées depuis D91 : une mission proposée
+  // et refusée porte désormais un motif elle aussi, et elle apparaîtrait deux
+  // fois — ici en « reformulation écartée », et plus bas dans sa vraie section.
+  const ecartees = adaptees.filter(
+    (a) => !a.validee && a.motif_rejet && !idsProposees.has(a.id)
+  );
   const validees = adaptees.filter((a) => a.validee);
 
   return (
@@ -229,6 +240,14 @@ export default async function Formulations({
             {/* D78 — chaque source dit ce qu'elle autorise. Les confondre
                 annonçait « fort » pour un terme qu'aucun bouton ne pouvait
                 exploiter : un potentiel fort sans aucune proposition. */}
+            {perime && !sansSource && (
+              <p className="mt-1 text-xs text-ardoise-500">
+                Cet indice a été mesuré contre les seules missions du CV, sans
+                son titre ni son accroche : il surestime ce qui reste à
+                récupérer. Régénère le CV, c&apos;est gratuit.
+              </p>
+            )}
+
             {sansSource && !potentielObsolete && (
               <p className="mt-1 text-xs text-ardoise-500">
                 Ce CV a été composé avant que l&apos;origine des termes soit
@@ -448,10 +467,26 @@ export default async function Formulations({
               </h2>
               <div className="space-y-4">
                 {missionsProposees.map((m) => (
-                  <Carte key={m.formulationId} className="border-emerald-200">
+                  <Carte
+                    key={m.formulationId}
+                    className={
+                      m.motifRejet ? "border-amber-200" : "border-emerald-200"
+                    }
+                  >
                     <p className="text-xs font-medium text-ardoise-400">
                       {m.entreprise}
                     </p>
+
+                    {/* D91 — une proposition écartée reste lisible et
+                        acceptable. Elle était jetée : l'appel était payé pour
+                        une phrase que personne ne lirait jamais. */}
+                    {m.motifRejet && (
+                      <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs leading-relaxed text-amber-900">
+                        <strong>Écartée par le contrôle.</strong>{" "}
+                        {m.motifRejet} Tu peux l&apos;accepter quand même si tu
+                        la juges juste — c&apos;est toi qui signes la ligne.
+                      </p>
+                    )}
                     {m.fondements.length > 0 && (
                       <div className="mt-3 rounded-lg bg-ardoise-50 p-3">
                         <p className="text-xs font-medium text-ardoise-600">

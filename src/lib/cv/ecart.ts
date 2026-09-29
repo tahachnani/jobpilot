@@ -223,7 +223,8 @@ export function potentielAdaptation(
     missions: [],
     competences: [],
     formations: [],
-  }
+  },
+  texteCV?: string
 ): Potentiel {
   const attendus = [
     ...analyse.mots_cles_ats,
@@ -254,11 +255,29 @@ export function potentielAdaptation(
     };
   }
 
+  /**
+   * Ce qui compte comme « déjà sur le CV » — le CV composé, en entier (D90).
+   *
+   * La version précédente ne regardait que les missions sélectionnées et les
+   * libellés de compétences. Elle ignorait donc le **titre** du CV, l'accroche
+   * et les intitulés de poste — c'est-à-dire le haut de la page.
+   *
+   * Conséquence mesurée le 29 septembre, sur une offre réelle : « contrôleur
+   * de gestion » — imprimé en majuscules en tête du CV — et « business
+   * partner » — écrit noir sur blanc dans l'accroche — étaient comptés comme
+   * absents. Trois termes fantômes suffisaient à afficher « fort », et à faire
+   * payer 4,4 ¢ une génération qui ne pouvait rien produire.
+   *
+   * Le texte composé est passé en paramètre : c'est littéralement ce qui sera
+   * imprimé, et rien ne peut plus lui échapper. Le repli sur la sélection
+   * existe pour les tests, qui n'ont pas de modèle à composer.
+   */
   const motsDuCv = motsSignificatifs(
-    [
-      ...textesMissions(selectionOffre),
-      ...selectionOffre.competences.map((c) => c.libelle),
-    ].join(" ")
+    texteCV ??
+      [
+        ...textesMissions(selectionOffre),
+        ...selectionOffre.competences.map((c) => c.libelle),
+      ].join(" ")
   );
   /**
    * Les quatre sources, préparées ligne à ligne et **dans l'ordre de ce
@@ -348,12 +367,21 @@ export const LIBELLES_POTENTIEL: Record<Potentiel["niveau"], string> = {
  * toujours — ce qui est écrit dans `documents.selection` ne se recalcule
  * jamais. Tout écran passe donc par ici plutôt que de deviner la forme.
  */
-export function lirePotentiel(brut: Potentiel | undefined | null): {
+export function lirePotentiel(
+  brut: Potentiel | undefined | null,
+  schema = 0
+): {
   potentiel: Potentiel | null;
   /** Vrai quand le document est antérieur à D78 : la ventilation manque. */
   sansSource: boolean;
+  /**
+   * Vrai quand le document est antérieur à D90 : le potentiel a été mesuré
+   * contre une partie du CV seulement, et surestime donc ce qui reste à
+   * récupérer. Recomposer le CV suffit à le corriger, et ne coûte rien.
+   */
+  perime: boolean;
 } {
-  if (!brut) return { potentiel: null, sansSource: false };
+  if (!brut) return { potentiel: null, sansSource: false, perime: false };
 
   return {
     potentiel: {
@@ -362,6 +390,7 @@ export function lirePotentiel(brut: Potentiel | undefined | null): {
       horsPortee: brut.horsPortee ?? [],
     },
     sansSource: brut.parSource === undefined,
+    perime: schema > 0 && schema < 5,
   };
 }
 

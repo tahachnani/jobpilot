@@ -1,4 +1,4 @@
-# Neuf constats d'usage — décisions D78 à D89
+# Neuf constats d'usage — décisions D78 à D91
 
 Passe du 28 septembre 2026, après deux semaines d'usage réel : 67 offres
 analysées, 42 candidatures envoyées, 9,66 $ dépensés. Ce ne sont plus des
@@ -210,6 +210,55 @@ a rien à aller chercher — et que c'est très bien ainsi.
 Enfin, une offre **sans CV composé** dit désormais pourquoi elle n'a pas
 d'indice : il se mesure entre l'annonce et le CV réellement sélectionné, il ne
 peut donc pas exister avant lui. Le silence laissait croire à une panne.
+
+---
+
+## D90 — Le CV composé fait foi pour « ce qui est déjà dit »
+
+Constat du 29 septembre, sur l'offre ARC Europe France. L'indice annonçait
+trois termes à aller chercher dans le corpus :
+
+> contrôleur de gestion · comptabilité · Comptabilité générale
+
+Le premier est le **titre imprimé en majuscules en tête du CV**. Dans le même
+bloc, « business partner » était rangé en compétence alors que l'accroche dit
+mot pour mot *« prêt à intervenir en véritable business partner »*.
+
+La cause : pour décider si un terme est déjà sur le CV, le calcul ne regardait
+que **les missions sélectionnées et les libellés de compétences**. Il ignorait
+le titre, l'accroche et les intitulés de poste — le haut de la page. Trois
+termes fantômes suffisaient à afficher « fort », et à encourager une génération
+facturée 4,4 ¢ qui ne pouvait rien produire.
+
+D78 avait corrigé *d'où* vient un terme, jamais *ce qui compte comme déjà
+présent*. Le défaut datait de l'étape 4ter ; D78 l'a rendu visible en nommant
+les termes, et c'est comme ça qu'il a été trouvé.
+
+Le texte du CV composé — celui-là même qui sera imprimé — est désormais passé
+au calcul. Rien de ce qui figure sur la page ne peut plus être compté comme
+manquant.
+
+`documents.selection` passe au **schéma 5**. La forme ne change pas, les valeurs
+si : un indice de schéma 4 surestime ce qui reste à récupérer, et les deux
+écrans le disent — « régénère le CV, c'est gratuit » — au lieu de l'afficher
+comme s'il valait encore.
+
+## D91 — Une proposition écartée reste lisible
+
+Une **reformulation** rejetée était conservée avec son motif : visible,
+relisible, acceptable à la main. Une **mission proposée** rejetée était jetée.
+L'appel était payé pour une phrase que personne ne lirait jamais, et sans même
+savoir lequel des six contrôles s'était déclenché.
+
+Elle est désormais conservée comme sa cousine : la mission est créée inactive —
+aucune sélection ne la voit — et la proposition s'affiche dans sa section avec
+son motif, sur fond ambre. Tu peux l'accepter quand même si tu la juges juste :
+c'est toi qui signes la ligne. « Refuser » la supprime pour de bon, comme avant.
+
+Un troisième rejet muet disparaît au passage : une proposition dont aucun code
+d'activité n'était exploitable était écartée sans un mot. C'est maintenant un
+motif comme les autres — et depuis D74, un code manquant s'ajoute en trente
+secondes.
 
 ---
 

@@ -25,9 +25,14 @@ export const VERSIONS_CONSERVEES = 3;
  *
  * 1 : modèle seul — 2 : + écart — 3 : + potentiel avec `recuperables` et
  * `horsPortee` — 4 : + `potentiel.parSource`, la ventilation des récupérables
- * par origine (D78).
+ * par origine (D78) — 5 : potentiel mesuré contre le **CV composé entier**,
+ * titre et accroche compris (D90).
+ *
+ * La forme ne change pas entre 4 et 5, les valeurs si : un potentiel de
+ * schéma 4 surestime ce qui reste à récupérer, et les écrans le disent au lieu
+ * de l'afficher comme s'il valait encore.
  */
-export const SCHEMA_SELECTION = 4;
+export const SCHEMA_SELECTION = 5;
 
 /** La forme d'une sélection stockée, 1 si elle ne le dit pas. */
 export function schemaDe(selection: unknown): number {

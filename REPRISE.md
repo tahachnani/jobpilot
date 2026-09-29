@@ -23,7 +23,7 @@
 | — | Dix améliorations (D53–D62) | en ligne |
 | — | Score, marché caché, entretien (D64–D73) | à déployer |
 | — | Taxonomie éditable et réanalyse (D74–D77) | en ligne |
-| — | Neuf constats d'usage (D78–D89, sans D82) | à déployer |
+| — | Neuf constats d'usage (D78–D91, sans D82) | à déployer |
 
 Dépôt `tahachnani/jobpilot`, branche `main`. Travail dans un Codespace GitHub,
 déploiement Vercel déclenché par `git push`. Supabase `lpmafnifheuljzuuerdr`.
@@ -195,6 +195,13 @@ exploiter : d'où un potentiel fort suivi d'aucune proposition, et deux semaines
 à croire que l'application se contredisait. Un indicateur qui agrège des choses
 qui n'appellent pas le même geste ment par agrégation.
 
+**Un indicateur qui juge une page doit lire la page entière.** Le potentiel
+d'adaptation ne regardait que les missions et les compétences : le titre du CV
+et l'accroche lui échappaient, et les termes qui y figurent étaient comptés
+comme absents. Trois termes fantômes ont suffi à faire payer une génération
+vide. Quand un calcul dit « absent du CV », il doit se mesurer contre le
+document composé, pas contre une partie de ses données.
+
 **Ce qui est payé avant d'être filtré ne s'économise pas en filtrant mieux.**
 L'appel de reformulation est facturé avant tout contrôle : durcir la règle
 d'acceptation améliore ce qu'on voit, jamais la facture. Seul le fait de ne pas
@@ -272,7 +279,7 @@ Il n'y a plus d'étape prévue. Ce qui reste en suspens, par ordre de gêne :
 
 ## Les tests
 
-`npm test`, ou automatiquement avant `npm run build`. Soixante-dix-neuf cas sur
+`npm test`, ou automatiquement avant `npm run build`. Quatre-vingt-trois cas sur
 le contrôle de reformulation, le barème, l'ordre des compétences, l'estimateur
 de page, la comparaison de termes, le découpage des libellés d'annonce, la
 taxonomie, le potentiel d'adaptation et le suivi. Ils **bloquent en local et jamais
@@ -289,7 +296,7 @@ le supprimant sans le remplacer.
 ## Méthode de travail
 
 Spécification écrite et validée avant toute ligne de code, décisions numérotées
-(D1 à D89 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
+(D1 à D91 à ce jour, dans `docs/`). Validation bloc par bloc. Aucune
 modification d'architecture, de données ou de logique de scoring sans accord
 explicite. `npm run build` avant chaque commit. Livraison des **fichiers
 modifiés uniquement**, pas de l'archive complète.

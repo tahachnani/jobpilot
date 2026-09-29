@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { potentielAdaptation } from "@/lib/cv/ecart";
+import { lirePotentiel, potentielAdaptation } from "@/lib/cv/ecart";
 import type { Selection } from "@/lib/cv/selection";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 
@@ -128,6 +128,55 @@ test("un terme absent de tout le parcours reste hors de portée", () => {
   assert.equal(p.niveau, "faible");
 });
 
+/**
+ * D90 — le CV composé fait foi pour « ce qui est déjà dit ».
+ *
+ * Constat du 29 septembre : « contrôleur de gestion », imprimé en majuscules
+ * en tête du CV, et « business partner », écrit dans l'accroche, étaient
+ * comptés comme absents. Trois termes fantômes suffisaient à afficher « fort »
+ * et à faire payer une génération qui ne pouvait rien produire.
+ */
+test("le titre et l'accroche du CV comptent comme déjà dits", () => {
+  const texteCV = [
+    "Taha Chnani",
+    "CONTRÔLEUR DE GESTION",
+    "PROFIL",
+    "Prêt à intervenir en véritable business partner, à produire un reporting fiable.",
+    "EXPÉRIENCES",
+    "Production du reporting mensuel",
+  ].join("\n");
+
+  const p = potentielAdaptation(
+    offre(["Contrôleur de gestion", "Business partner", "Consolidation"]),
+    CV,
+    {
+      // Ces deux termes sont partout dans le corpus : c'est justement le piège.
+      corpus: [
+        "Missions de contrôleur de gestion au sein de la direction financière",
+        "Rôle de business partner auprès des opérationnels",
+        "Travaux de consolidation des filiales",
+      ],
+      missions: [],
+      competences: [],
+      formations: [],
+    },
+    texteCV
+  );
+
+  assert.deepEqual(p.parSource?.corpus, ["Consolidation"]);
+  assert.equal(p.niveau, "moyen");
+});
+
+test("sans texte de CV, le repli sur la sélection reste en place", () => {
+  const p = potentielAdaptation(offre(["Consolidation"]), CV, {
+    corpus: ["Travaux de consolidation des filiales"],
+    missions: [],
+    competences: [],
+    formations: [],
+  });
+  assert.equal(p.parSource?.corpus.length, 1);
+});
+
 test("la couverture reste ce qu'elle était : ce que le CV dit déjà", () => {
   // « Reporting » est sur le CV, « Consolidation » non : une moitié couverte.
   const p = potentielAdaptation(offre(["Reporting", "Consolidation"]), CV, {
@@ -137,4 +186,39 @@ test("la couverture reste ce qu'elle était : ce que le CV dit déjà", () => {
     formations: [],
   });
   assert.equal(p.couverture, 50);
+});
+
+/**
+ * D90 — la péremption d'un indice figé.
+ *
+ * Un document porte la forme qu'il avait le jour de sa composition. Un
+ * potentiel de schéma 4 surestime ce qui reste à récupérer ; l'écran doit le
+ * dire plutôt que l'afficher comme s'il valait encore.
+ */
+test("un potentiel d'avant D90 est signalé comme périmé", () => {
+  const brut = {
+    niveau: "fort" as const,
+    recuperables: ["contrôleur de gestion"],
+    horsPortee: [],
+    couverture: 38,
+    parSource: {
+      corpus: ["contrôleur de gestion"],
+      mission: [],
+      competence: [],
+      formation: [],
+    },
+  };
+
+  assert.equal(lirePotentiel(brut, 4).perime, true);
+  assert.equal(lirePotentiel(brut, 5).perime, false);
+  // Schéma inconnu : on ne crie pas au périmé sans savoir.
+  assert.equal(lirePotentiel(brut).perime, false);
+});
+
+test("un potentiel d'avant D78 est signalé comme sans ventilation", () => {
+  const { sansSource } = lirePotentiel(
+    { niveau: "moyen", recuperables: ["x"], horsPortee: [], couverture: 50 },
+    3
+  );
+  assert.equal(sansSource, true);
 });
