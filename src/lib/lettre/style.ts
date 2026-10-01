@@ -90,7 +90,29 @@ const NOMS_ABSTRAITS = [
   "indicateurs",
   "conclusions",
   "recommandations",
+  // D106 — la phrase de résultat est celle qui compte, et c'est précisément
+  // celle que la prose impersonnelle vole au candidat : « Ce constat a orienté
+  // les priorités d'action ».
+  "constat",
+  "travail",
+  "diagnostic",
+  "chantier",
+  "bilan",
 ];
+
+/**
+ * Catégories d'outils, qui ne nomment rien (D105).
+ *
+ * « Excel reste mon outil principal, complété par une pratique des ERP
+ * métier » — écrit par quelqu'un qui connaît ULIS Sopra à 3/3, pour un
+ * bailleur social. Nommer le logiciel du secteur prouve l'expérience ; dire
+ * « les ERP métier » prouve qu'on ne veut pas le dire.
+ *
+ * Le motif s'applique au texte BRUT, pas au normalisé : « l'ERP SILOG » doit
+ * passer et « les ERP métier » non, ce qui se joue sur la majuscule.
+ */
+const CATEGORIES_OUTILS =
+  /\bERP\s+m[ée]tiers?\b|\bprogiciels?\b|\boutils?\s+(?:m[ée]tiers?|d[ée]cisionnels?|bureautiques?|informatiques?|comptables?|de\s+reporting)\b|\bles\s+ERP\b/i;
 
 /**
  * Adverbes d'intensité : le marqueur le plus mécanique de la prose générée.
@@ -386,7 +408,15 @@ export function verifierStyle(paragraphes: string[]): DefautStyle[] {
    * deux fois sur cinq cesse d'être lu, et il ne restait plus rien.
    */
   const maximes = phrases(texte).filter(
-    (p) => mots(p) <= 11 && !porteUnFait(p) && !parleALaPremierePersonne(p)
+    (p) =>
+      mots(p) <= 11 &&
+      !porteUnFait(p) &&
+      !parleALaPremierePersonne(p) &&
+      // Second discriminant, trouvé lui aussi en se trompant : « Certaines
+      // agences dépassaient largement ce délai » était signalée, alors que
+      // c'est la phrase la plus utile du paragraphe. Un démonstratif renvoie à
+      // ce qui précède ; une maxime, par définition, ne renvoie à rien.
+      !/\b(ce|cet|cette|ces|celui|celle|celles|ceux|y)\b/i.test(p)
   );
   if (maximes.length > 0) {
     defauts.push({
@@ -460,6 +490,50 @@ export function verifierStyle(paragraphes: string[]): DefautStyle[] {
       extrait: extrait(impersonnelles.find((p) => mots(p) > 10) ?? impersonnelles[0]),
       pourquoi:
         "Plus d'une phrase sur trois ne nomme pas le candidat : le travail s'y fait tout seul. Reprends-les avec « j'ai ».",
+    });
+  }
+
+  /**
+   * L'ouverture qui récite l'annonce (D104).
+   *
+   * « Le poste s'inscrit dans la création d'un groupe national… Ce groupe
+   * réunit près de 80 000 logements. » Deux phrases pour expliquer au
+   * recruteur l'organisation de sa propre entreprise, et le candidat qui
+   * n'apparaît qu'à la troisième.
+   *
+   * Le paragraphe « vous » doit ancrer la lettre dans l'offre, pas la résumer.
+   * Une phrase suffit à montrer qu'on a lu ; au-delà, c'est du remplissage pris
+   * dans le texte de l'annonce — le même réflexe que la maxime, appliqué à une
+   * autre contrainte.
+   */
+  const ouverture = phrases(paragraphes[0] ?? "");
+  const avantLeCandidat = ouverture.findIndex(parleALaPremierePersonne);
+  // UNE phrase sur l'entreprise est le plan, pas un défaut : le seuil est donc
+  // à deux. La première version exigeait le « je » dès la phrase d'ouverture,
+  // et signalait la lettre modèle du prompt — un contrôle qui condamne sa
+  // propre référence est faux, pas sévère.
+  if (ouverture.length >= 2 && (avantLeCandidat === -1 || avantLeCandidat >= 2)) {
+    defauts.push({
+      tournure:
+        avantLeCandidat === -1
+          ? "Ouverture sans le candidat"
+          : `Ouverture qui récite l'annonce (${avantLeCandidat} phrases avant « je »)`,
+      extrait: extrait(ouverture[0]),
+      pourquoi:
+        "Le recruteur connaît son entreprise. Une phrase suffit à montrer que tu as lu l'annonce ; la suivante doit déjà être sur toi.",
+    });
+  }
+
+  /**
+   * La catégorie au lieu de l'outil (D105).
+   */
+  const categorie = texte.match(CATEGORIES_OUTILS);
+  if (categorie) {
+    defauts.push({
+      tournure: "Catégorie au lieu d'un outil",
+      extrait: extrait(categorie[0], 50),
+      pourquoi:
+        "Nomme le logiciel : ULIS Sopra, SILOG, Sage 100, Qlik Sense. Une catégorie ne prouve rien, et devant un employeur du secteur, le nom de son propre outil vaut un paragraphe.",
     });
   }
 

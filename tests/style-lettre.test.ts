@@ -228,3 +228,58 @@ test("une clôture correcte n'est pas prise pour une maxime", () => {
     d.map((x) => `${x.tournure} : ${x.extrait}`).join(" / ")
   );
 });
+
+/**
+ * D107 — la lettre modèle du prompt doit passer son propre contrôle.
+ *
+ * C'est le test le plus important du fichier. Le prompt enseigne désormais par
+ * l'exemple : si cet exemple déclenche un défaut, il enseigne le défaut. La
+ * première version du contrôle d'ouverture exigeait le « je » dès la phrase
+ * d'ouverture et condamnait donc la référence — un contrôle qui condamne sa
+ * propre référence est faux, pas sévère.
+ *
+ * Toute modification du contrôle de style se vérifie ici en premier.
+ */
+const LETTRE_MODELE_DU_PROMPT = [
+  "Vous réunissez 80 000 logements sous une direction unique et cherchez quelqu'un pour en consolider le pilotage auprès des directions opérationnelles. J'ai fait ce travail dix-huit mois chez un bailleur de 18 000 logements, et c'est le changement d'échelle qui m'intéresse.",
+  "Chez Le Mans Métropole Habitat, je contrôlais chaque mois le quittancement du patrimoine : loyers, charges, nouvelles locations, vacance. En rapprochant les charges récupérables prévisionnelles de celles réellement quittancées, j'ai trouvé des écarts qui ne venaient pas des consommations mais du découpage : deux sous-groupes immobiliers voisins étaient régularisés sur des périmètres différents. J'ai harmonisé ce découpage et neutralisé les écarts d'exercice. Je n'ai plus eu à réexpliquer les mêmes anomalies à chaque régularisation.",
+  "Dans ce poste, je ferais le même travail à une autre échelle : consolider les indicateurs par portefeuille, et expliquer les écarts budgétaires aux directions opérationnelles plutôt que de les leur transmettre. Je travaille sous ULIS Sopra, Excel et Qlik Sense. Disponible immédiatement, je vous propose d'en parler de vive voix.",
+];
+
+test("la lettre modèle du prompt ne déclenche aucun défaut", () => {
+  const d = verifierStyle(LETTRE_MODELE_DU_PROMPT);
+  assert.deepEqual(d, [], d.map((x) => `${x.tournure} : ${x.extrait}`).join(" / "));
+});
+
+test("une phrase sur l'entreprise est le plan, deux sont un défaut", () => {
+  const une = verifierStyle([
+    "Vous ouvrez ce poste pour structurer le suivi de trois sites. J'ai fait ce travail deux ans en industrie.",
+  ]);
+  assert.ok(!une.some((x) => x.tournure.startsWith("Ouverture")));
+
+  const deux = verifierStyle([
+    "Vous ouvrez ce poste pour structurer le suivi de trois sites. Le groupe réunit quatre usines et six cents salariés. J'ai fait ce travail deux ans en industrie.",
+  ]);
+  assert.ok(
+    deux.some((x) => x.tournure.startsWith("Ouverture")),
+    deux.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("la catégorie d'outil est repérée, le logiciel nommé passe", () => {
+  assert.ok(
+    verifierStyle(["Excel reste mon outil principal, complété par une pratique des ERP métier."]).some(
+      (x) => x.tournure === "Catégorie au lieu d'un outil"
+    )
+  );
+  assert.ok(
+    !verifierStyle(["J'ai paramétré la comptabilité analytique dans l'ERP SILOG."]).some(
+      (x) => x.tournure === "Catégorie au lieu d'un outil"
+    )
+  );
+  assert.ok(
+    !verifierStyle(["Passer d'un ERP à l'autre m'a appris à m'approprier vite un environnement."]).some(
+      (x) => x.tournure === "Catégorie au lieu d'un outil"
+    )
+  );
+});
