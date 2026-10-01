@@ -11,6 +11,7 @@ import { comparerAuReference, potentielAdaptation } from "@/lib/cv/ecart";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
+import { chargerTaxonomie } from "@/lib/taxonomie";
 
 export class ErreurCV extends Error {}
 
@@ -85,6 +86,22 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     ),
     formations: donnees.formations.map((f) => f.diplome),
   };
+
+  /**
+   * Les métiers du barème (D97).
+   *
+   * Un terme de l'annonce qui est le libellé d'un code d'activité n'est pas une
+   * tâche qu'on ajoute à une ligne : c'est un métier, et le score le mesure
+   * déjà. « Comptabilité générale » proposée comme adaptation, alors que
+   * plusieurs missions portent `compta_generale`, était le symptôme exact.
+   *
+   * Toute la taxonomie est passée, y compris les codes inactifs : un code
+   * retiré du service reste un métier, et le proposer en reformulation serait
+   * aussi absurde qu'avant son retrait.
+   */
+  const taxonomie = await chargerTaxonomie();
+  const metiers = Object.values(taxonomie).map((a) => a.libelle);
+
   if (donnees.experiences.length === 0) {
     throw new ErreurCV(
       `Aucune expérience n'est visible dans le volet ${offre.volet}. ` +
@@ -169,7 +186,8 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
         analyse,
         selection,
         parcours,
-        modeleEnTexte(modele)
+        modeleEnTexte(modele),
+        metiers
       ),
       hauteurEstimee: Math.round(estimerHauteur(modele)),
       pages,

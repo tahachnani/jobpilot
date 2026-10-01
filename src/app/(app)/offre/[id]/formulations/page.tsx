@@ -260,9 +260,15 @@ export default async function Formulations({
             {!sansSource && potentiel.parSource && (
               <div className="mt-2 space-y-1.5">
                 {(
-                  ["corpus", "mission", "competence", "formation"] as const
+                  [
+                    "corpus",
+                    "activite",
+                    "mission",
+                    "competence",
+                    "formation",
+                  ] as const
                 ).map((source) =>
-                  potentiel.parSource![source].length > 0 ? (
+                  (potentiel.parSource![source] ?? []).length > 0 ? (
                     <div key={source} className="text-xs">
                       <span
                         className={`font-medium ${
@@ -280,7 +286,7 @@ export default async function Formulations({
                             : "text-ardoise-500"
                         }
                       >
-                        {potentiel.parSource![source].join(" · ")}
+                        {(potentiel.parSource![source] ?? []).join(" · ")}
                       </span>
                       <p className="mt-0.5 leading-relaxed text-ardoise-400">
                         {ACTIONS_PAR_SOURCE[source]}

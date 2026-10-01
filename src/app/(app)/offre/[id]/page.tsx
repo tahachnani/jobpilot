@@ -29,6 +29,7 @@ import {
   type Ecart,
   type Potentiel,
 } from "@/lib/cv/ecart";
+import { estimerPotentiel } from "@/lib/cv/estimation";
 import {
   supprimerOffre,
   recalculerScore,
@@ -211,17 +212,10 @@ export default async function DetailOffre({
    * lecture passe par `lirePotentiel` plutôt que de deviner la forme ici.
    */
   const {
-    potentiel,
+    potentiel: potentielDuCV,
     sansSource: potentielSansSource,
     perime: potentielPerime,
   } = lirePotentiel(dernierCV?.potentiel, dernierCV?.schema);
-
-  const termesCorpus = potentiel?.parSource?.corpus ?? [];
-
-  /** Les sources qui ne permettent aucune action, repliées derrière un détail. */
-  const autresSources = (["mission", "competence", "formation"] as const)
-    .map((source) => [source, potentiel?.parSource?.[source] ?? []] as const)
-    .filter(([, termes]) => termes.length > 0);
 
   // L'adresse de candidature écrite dans l'annonce (D94) : trouvée par motif
   // dans le texte déjà stocké, sans appel ni réanalyse.
@@ -233,6 +227,28 @@ export default async function DetailOffre({
   const score = (scoreBrut as { detail: Resultat } | null)?.detail ?? null;
   const analyse =
     (analyseBrute as { resultat: OffreExtraite } | null)?.resultat ?? null;
+
+  /**
+   * L'indice avant toute génération (D98).
+   *
+   * Il n'y avait aucune raison d'attendre le CV : la décision qu'il éclaire —
+   * payer une reformulation ou non — se prend juste après l'analyse. Tant
+   * qu'aucun CV n'existe, on l'estime, et l'écran dit que c'est une estimation.
+   */
+  const potentielEstime =
+    !potentielDuCV && analyse
+      ? await estimerPotentiel(offre.volet as CodeVolet, params.id, analyse)
+      : null;
+
+  const potentiel = potentielDuCV ?? potentielEstime;
+  const potentielProvisoire = !potentielDuCV && potentielEstime !== null;
+
+  const termesCorpus = potentiel?.parSource?.corpus ?? [];
+
+  /** Les sources qui ne permettent aucune action, repliées derrière un détail. */
+  const autresSources = (["activite", "mission", "competence", "formation"] as const)
+    .map((source) => [source, potentiel?.parSource?.[source] ?? []] as const)
+    .filter(([, termes]) => termes.length > 0);
 
   // Ce que l'offre réclame et que la base ne connaît pas : c'est une question
   // de profil, pas d'adaptation de CV. Sa place est ici, sur la fiche d'offre,
@@ -805,6 +821,15 @@ export default async function DetailOffre({
               </p>
             </div>
 
+            {potentielProvisoire && (
+              <p className="mt-1.5 text-xs leading-relaxed text-ardoise-500">
+                Estimation, mesurée sur le CV que cette offre produirait — même
+                sélection, même texte que la génération. Si le CV composé
+                déborde d&apos;une page, la version finale retirera des missions
+                et l&apos;indice montera un peu ; il ne descendra jamais.
+              </p>
+            )}
+
             {potentielSansSource || potentielPerime ? (
               <p className="mt-2 text-xs leading-relaxed text-ardoise-500">
                 {potentielSansSource
@@ -869,10 +894,9 @@ export default async function DetailOffre({
           </div>
         ) : (
           <p className="mt-4 rounded-lg bg-ardoise-50 p-3 text-xs leading-relaxed text-ardoise-500">
-            L&apos;indice d&apos;adaptation se mesure entre l&apos;annonce et le
-            CV réellement sélectionné : il n&apos;existe donc qu&apos;une fois le
-            CV composé. Génère-le — c&apos;est gratuit et sans appel IA — et il
-            te dira si payer une reformulation a un sens.
+            {analyse
+              ? "L'indice d'adaptation se mesure entre l'annonce et les missions du volet. Aucune expérience n'y est visible : vérifie les visibilités depuis Mon profil."
+              : "L'indice d'adaptation se mesure entre l'annonce et le CV que cette offre produirait. Analyse l'offre, et il apparaîtra ici — sans attendre la génération du CV."}
           </p>
         )}
 

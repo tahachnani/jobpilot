@@ -45,7 +45,24 @@ export interface Ecart {
  * C'est toute la correction de D78. Les quatre sources n'autorisent pas le
  * même geste, et les confondre promettait une action impossible.
  */
-export type SourcePotentiel = "corpus" | "mission" | "competence" | "formation";
+export type SourcePotentiel =
+  | "corpus"
+  | "mission"
+  | "competence"
+  | "formation"
+  /**
+   * Pas une source du parcours : un **métier de la taxonomie** (D97).
+   *
+   * Constat du 1er octobre : l'écran proposait d'adapter le CV pour
+   * « comptabilité générale ». Or ce n'est pas une tâche qu'on ajoute à une
+   * ligne — c'est un métier entier, et un code du barème. Le score le mesure
+   * déjà, par les codes portés par les missions ; aucune reformulation ne peut
+   * « insérer » un métier dans une phrase.
+   *
+   * Ces termes sont donc écartés de l'adaptation et rangés ici, pour qu'ils
+   * soient visibles sans être proposés.
+   */
+  | "activite";
 
 export interface SourcesParcours {
   /** Les entrées de corpus : la seule matière dont une mission puisse naître. */
@@ -90,6 +107,8 @@ export const ACTIONS_PAR_SOURCE: Record<SourcePotentiel, string> = {
     "Tu le revendiques déjà en compétence. Rien à générer : au mieux, le faire remonter dans la sélection.",
   formation:
     "C'est dans ta formation. Rien à générer, et le diplôme le dit déjà.",
+  activite:
+    "C'est un métier du barème, pas une tâche : le score le mesure déjà par les codes de tes missions. Aucune reformulation ne peut ajouter un métier à une ligne — si le mot doit apparaître, sa place est le titre du CV ou l'accroche du volet.",
 };
 
 export const LIBELLES_SOURCE: Record<SourcePotentiel, string> = {
@@ -97,6 +116,7 @@ export const LIBELLES_SOURCE: Record<SourcePotentiel, string> = {
   mission: "Dans une mission non retenue",
   competence: "Dans tes compétences",
   formation: "Dans tes formations",
+  activite: "Métier du barème, déjà mesuré par le score",
 };
 
 /**
@@ -224,7 +244,15 @@ export function potentielAdaptation(
     competences: [],
     formations: [],
   },
-  texteCV?: string
+  texteCV?: string,
+  /**
+   * Les libellés des métiers du barème — la taxonomie d'activités (D97).
+   *
+   * Un terme de l'annonce qui est l'un de ces libellés est un métier, pas une
+   * tâche : il sort de l'adaptation. Vide par défaut, pour que les documents
+   * anciens et les tests continuent de se comporter comme avant.
+   */
+  metiers: string[] = []
 ): Potentiel {
   const attendus = [
     ...analyse.mots_cles_ats,
@@ -243,6 +271,7 @@ export function potentielAdaptation(
     mission: [],
     competence: [],
     formation: [],
+    activite: [],
   };
 
   if (attendus.length === 0) {
@@ -300,6 +329,20 @@ export function potentielAdaptation(
     return !termePresent(terme, motsDuCv);
   });
 
+  /**
+   * Les métiers du barème, comparés par noyau de termes (D97).
+   *
+   * La comparaison est symétrique et volontairement stricte : « comptabilité
+   * générale » doit reconnaître le code `compta_generale` dont le libellé est
+   * « Comptabilité générale », sans que « comptabilité fournisseurs » n'attrape
+   * le même code.
+   */
+  const metiersNormalises = metiers.map((m) => normaliser(noyauDuTerme(m)));
+  const estMetier = (t: string): boolean => {
+    const n = normaliser(noyauDuTerme(t));
+    return n.length >= 4 && metiersNormalises.includes(n);
+  };
+
   const origine = (t: string): SourcePotentiel | null => {
     for (const [source, lignes] of parLigne) {
       if (lignes.some((mots) => termePresent(t, mots))) return source;
@@ -312,11 +355,21 @@ export function potentielAdaptation(
     mission: [],
     competence: [],
     formation: [],
+    activite: [],
   };
   const recuperables: string[] = [];
   const horsPortee: string[] = [];
 
   for (const t of absents) {
+    // Un métier sort avant tout examen des sources : quelle que soit la
+    // provenance du mot, il n'existe aucun geste d'adaptation qui l'ajoute.
+    // Il n'entre donc ni dans les récupérables — rien à récupérer — ni dans
+    // le hors-portée, qui signifierait à tort qu'il manque au profil.
+    if (estMetier(t)) {
+      parSource.activite.push(t);
+      continue;
+    }
+
     const source = origine(t);
     if (source) {
       parSource[source].push(t);
@@ -349,6 +402,7 @@ export function potentielAdaptation(
       mission: parSource.mission.slice(0, 12),
       competence: parSource.competence.slice(0, 12),
       formation: parSource.formation.slice(0, 12),
+      activite: parSource.activite.slice(0, 12),
     },
   };
 }
@@ -388,6 +442,12 @@ export function lirePotentiel(
       ...brut,
       recuperables: brut.recuperables ?? [],
       horsPortee: brut.horsPortee ?? [],
+      // `activite` est né en D97 : les documents antérieurs n'ont pas la clé,
+      // et la lire sans défaut donnerait `undefined` là où le type promet un
+      // tableau.
+      parSource: brut.parSource
+        ? { ...brut.parSource, activite: brut.parSource.activite ?? [] }
+        : undefined,
     },
     sansSource: brut.parSource === undefined,
     perime: schema > 0 && schema < 5,

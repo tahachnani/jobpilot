@@ -413,3 +413,224 @@ La **récupération des refus depuis la boîte mail** commence à la main, pour
 codées : domaine de l'expéditeur, date postérieure à l'envoi, intitulé du poste,
 référence d'annonce. Aucune application automatique — deux offres chez le même
 employeur se ressemblent trop.
+
+---
+
+# Sixième passe — 1er octobre
+
+Six remarques après une nouvelle session d'usage réel. Quatre corrections de
+code, une reconstruction complète du prompt de lettre, et un travail de
+dépouillement de boîte mail.
+
+## D96 — La lettre, refondue sur des sources et non sur mon intuition
+
+> « Pour la lettre j'ai toujours pas ce qu'il faut, en la lisant je sens que
+> c'est de l'IA. Essaye de chercher un mode ou des consignes de création de
+> lettres de motivation sur Google ou sur internet et on l'applique ensuite
+> pour la génération, parce que c'est complètement non adapté et ça me coûte
+> cher. »
+
+La demande était la bonne, et la critique implicite juste : jusqu'ici le prompt
+de lettre disait ce que **je** trouvais bien écrit. Trois refontes successives
+(D80, D92, D93) ont ajouté des interdits un par un, chacun tiré d'une lettre
+ratée — mais aucune n'est partie de ce que disent ceux qui lisent ces lettres
+pour de vrai. D'où un prompt cohérent avec lui-même et sourd au métier.
+
+### Les sources retenues
+
+- **France Travail** nomme la « signature ChatGPT » et en cite les formules mot
+  pour mot : « Actuellement en recherche active, je souhaite mettre mes
+  compétences en … au service de votre entreprise », « Je suis convaincu que
+  mon dynamisme et ma rigueur … », « Fort de mon expérience … ».
+- **Welcome to the Jungle** a fait juger des lettres IA par des recruteuses.
+  Verdict à retenir tel quel, parce qu'il est double : elles sont « toutes bien
+  rédigées et bien structurées » — mieux que la moyenne des lettres reçues —
+  mais « les lettres de l'IA manquent de personnalité ». Le problème n'est donc
+  pas la qualité d'écriture. C'est l'absence de singularité.
+- **L'Office québécois de la langue française**, sur la lettre
+  d'accompagnement : « Énumérer les réalisations (cela relève du CV) » et ne pas
+  « rédiger comme une circulaire avec phrases toutes faites ».
+- **Le repérage d'une lettre générée** tient aussi au rythme : « absence de
+  variations rythmiques naturelles », « adverbes et modalisateurs
+  disproportionnés », « ton uniformément élogieux, peu crédible ».
+- **EURES** et l'OQLF s'accordent sur la forme : trois ou quatre paragraphes,
+  une seule page, et s'adresser à une personne nommée quand on la connaît.
+
+### Ce que les sources ont contredit dans mon prompt
+
+L'OQLF donne la réponse exacte à la question posée le 29 septembre — « c'est
+quoi ce style d'énumération : quatre missions, deux expériences, trois
+secteurs, à quoi sert ? ». Énumérer relève du CV. Or le prompt **poussait** à
+l'énumération : son paragraphe 2 était décrit comme « le cœur, le paragraphe le
+plus dense et le plus long », avec un budget de 700 signes et la consigne
+d'« au moins deux faits précis ». Un modèle à qui l'on demande de la densité
+sur deux faits en empile quatre. Le défaut venait de l'instruction, pas du
+modèle.
+
+Deuxième contradiction : le plan. Les quatre paragraphes étaient *tous* sur le
+candidat — qui il est, ce qu'il apporte, ce qui le distingue, sa disponibilité.
+L'entreprise n'apparaissait nulle part, et une instruction explicite interdisait
+même d'ouvrir sur elle. C'est l'inverse du plan attendu en France.
+
+### Le nouveau plan — vous / moi / nous
+
+**Trois paragraphes**, 1 800 signes au total, une page.
+
+1. **Vous** (450 signes) — le poste nommé, et **un fait concret pris dans
+   l'annonce** : un problème que ce recrutement doit résoudre, un contexte
+   (création de poste, réorganisation, multi-sites), une mission qui structure
+   le reste. Une citation de fait, jamais un compliment. Si l'annonce ne dit
+   rien d'autre que des tâches, le paragraphe est court — mieux vaut bref
+   qu'inventé.
+2. **Moi** (800 signes) — **une seule situation vécue, racontée en entier** :
+   ce qui n'allait pas, ce qui a été fait, ce que ça a donné. Deux faits sont un
+   maximum absolu, et le second n'est admis que s'il découle du premier. Plus de
+   trois groupes séparés par des virgules dans une phrase est interdit. Le
+   critère de réussite est formulé pour être vérifiable à la relecture : le
+   lecteur doit pouvoir se représenter une scène.
+3. **Nous** (450 signes) — ce que le candidat ferait dans les premiers mois,
+   la disponibilité, la demande d'entretien.
+
+S'y ajoutent deux règles de forme, tirées des sources : au moins une phrase de
+moins de dix mots par paragraphe, et deux adverbes d'intensité au maximum dans
+toute la lettre.
+
+## D97 — Un métier du barème n'est pas une adaptation
+
+> « Un exemple d'une offre : ça m'affiche adaptation : comptabilité générale
+> alors que c'est complètement un métier ou un module. Mais quand j'ai lancé
+> l'adaptation elle m'a affiché 0 proposition, avec le message d'adapter. »
+
+Le diagnostic tient en une phrase : **« comptabilité générale » n'est pas une
+tâche qu'on ajoute à une ligne de CV, c'est un métier entier — et un code du
+barème.** Plusieurs missions portent déjà `compta_generale` ; le score le mesure
+donc, par les codes. Aucune reformulation ne peut « insérer » un métier dans une
+phrase, et c'est pourquoi la génération rendait zéro proposition tout en
+affichant un potentiel.
+
+D78 avait construit exactement la machinerie qu'il fallait : les termes
+récupérables sont ventilés par **source**, et chaque source porte le texte de ce
+qu'elle autorise réellement. Il manquait une cinquième source, qui n'est pas une
+source du parcours mais une nature de terme.
+
+`SourcePotentiel` gagne donc `"activite"`. Un terme de l'annonce qui est le
+libellé d'un code de la taxonomie :
+
+- sort **avant** tout examen des sources — quelle que soit sa provenance, il n'y
+  a aucun geste d'adaptation qui l'ajoute ;
+- n'entre ni dans `recuperables` (rien à récupérer) ni dans `horsPortee`, qui
+  dirait à tort qu'il manque au profil ;
+- ne compte pas dans le niveau, qui ne regarde que le corpus.
+
+Il s'affiche avec son propre message : *« C'est un métier du barème, pas une
+tâche : le score le mesure déjà par les codes de tes missions. Si le mot doit
+apparaître, sa place est le titre du CV ou l'accroche du volet. »* La dernière
+phrase est la seule action utile, et elle est gratuite.
+
+La liste des métiers est **toute** la taxonomie, codes inactifs compris : un
+code retiré du service reste un métier, et le proposer en reformulation serait
+aussi absurde qu'avant son retrait.
+
+## D98 — L'indice d'adaptation dès l'analyse
+
+> « Est-ce que pour le message d'adapter ou pas ça peut s'afficher dès
+> l'analyse de l'offre, pas suite à la génération du premier CV ? »
+
+L'indice attendait la composition du document pour une raison qui n'en est pas
+une : c'est là qu'on avait la sélection sous la main. Rien ne l'y obligeait.
+
+`estimerPotentiel` refait le premier essai de la génération — `choisirNiveau`,
+qui estime la hauteur par comptage de caractères et **ne compose aucun PDF**.
+Même sélection, même texte, donc le même indice, pas l'approximation d'un autre
+algorithme. Coût : zéro appel IA, zéro rendu.
+
+Une seule réserve, dite à l'écran : si le CV composé déborde d'une page, la
+génération descendra d'un cran et retirera des missions, donc l'indice réel sera
+un peu **plus haut** que l'estimation. Se tromper dans ce sens est le bon sens :
+l'indice sert à décider s'il faut *payer*, et une estimation prudente ne pousse
+jamais à la dépense.
+
+L'écran « aucun indice » ne dit plus « génère le CV ». Il dit d'analyser
+l'offre — ou, si l'analyse existe et qu'aucune expérience n'est visible dans le
+volet, que le problème est une visibilité à corriger dans Mon profil.
+
+## D99 — Un filtre sur le suivi des candidatures
+
+> « J'aimerais aussi un filtre comme celui du volet offres dans le volet
+> candidatures. »
+
+Même mécanique que sur Offres, et pour la même raison : les filtres vivent dans
+l'URL, donc la page reste rendue côté serveur, le retour arrière fonctionne et
+un filtre choisi tient dans un signet.
+
+Les états ne sont pas ceux d'Offres, parce que la question n'est pas la même.
+Ici tout est déjà parti : **Toutes**, **À relancer**, **Sans réponse**,
+**Entretien**, **Closes**. Quatre tris : par urgence (défaut, l'ordre de D81),
+plus récentes, plus anciennes, meilleur score.
+
+S'y ajoute une ligne que le dépouillement de la boîte mail rend enfin utile :
+un **filtre par provenance**, construit depuis les données et non depuis la
+liste fermée — proposer « Monster (0) » n'aiderait personne. Les candidatures
+sans origine connue ont leur propre puce : c'est aussi une information, et elle
+en dit long sur ce que les 33 restantes ont en commun. La ligne n'apparaît qu'à
+partir de deux origines distinctes ; avec une seule elle ne filtrerait rien.
+
+## Un piège coûteux, corrigé au passage
+
+`normaliser` remplace **toute** ponctuation par une espace : « c'est » devient
+« c est », « l'annonce » devient « l annonce ». Trois motifs du contrôle de
+style écrivaient l'apostrophe comme `['’]` et ne pouvaient donc correspondre à
+rien. Ils passaient les tests parce qu'une autre alternative de la même
+expression régulière attrapait le cas — la règle était morte, son test vert.
+
+Corrigé, et la règle est désormais écrite en tête du fichier : dans un motif qui
+s'applique à du texte normalisé, une apostrophe s'écrit `\s`.
+
+## Le dépouillement de la boîte mail
+
+> « Pour les offres que j'ai déjà envoyées et que j'ai pas mis de source, tu
+> peux voir dans ma boîte si tu trouves un site de recrutement, et revérifier
+> les refus aussi. »
+
+**Cinq refus** écrits en base, chacun avec la phrase de l'expéditeur et sa date
+dans `statuts_historique` : MEOGROUP (30/09), Mary (29/09) et Entreprise
+Beaudeux et Fils (30/09) via HelloWork ; **ADEF RESIDENCES** (29/09, Taleez) et
+**Nové Gestion** (21/09, UES Aiguillon), trouvés à la deuxième passe avec une
+recherche par formules de refus plutôt que par expéditeur.
+
+**Trente-six origines** sur soixante-dix, à partir de quatre motifs sûrs :
+`contact@emails.hellowork.com` (« Votre candidature est arrivée chez X »),
+`jobs-noreply@linkedin.com` (« Votre candidature a été envoyée à X »),
+`no-reply@apec.fr` (« Candidature sur offre d'emploi N° … - ENTREPRISE - poste »)
+et `indeedapply@indeed.com`.
+
+**Trente-trois restent vides, et c'est un arrêt volontaire.** Aucune trace dans
+la boîte : ces candidatures sont parties directement sur le site de l'entreprise
+ou son ATS — Taleez, DigitalRecruiters, SmartRecruiters, werecruit, flatchr,
+profils.org, broadbean. L'accusé de réception vient alors du recruteur, jamais
+d'une plateforme, et rien ne permet de remonter à la source. Deviner serait pire
+que laisser vide : la colonne sert à mesurer le rendement par canal, et une
+valeur inventée fausserait la seule chose qu'elle mesure.
+
+Deux refus trouvés dans la boîte ne correspondent à aucune offre en base —
+Cluxelite (23/09) et Transports PORTMANN (18/09). Vérifié par recherche dans
+`contenu_brut` avant de conclure, plutôt que par ressemblance d'intitulé.
+
+## Indeed — lecture seule
+
+> « Je pense t'as aussi accès à mon compte Indeed, donc essaye d'alimenter tout
+> ce qui manque dans les infos de la plateforme. »
+
+Le connecteur expose quatre opérations — lire le CV, chercher des offres, lire
+une offre, lire une entreprise — et **aucune écriture**. Je ne peux pas mettre le
+profil à jour.
+
+Ce que la lecture apprend, en revanche, valait le détour : le profil Indeed est
+très en retard sur la base. Trois expériences sur cinq, la plus récente affichée
+étant un stage de 2023 — **le CDD de contrôleur de gestion 2026 et l'alternance
+2024-2025 sont absents**. Un recruteur qui ouvre ce profil voit un stagiaire
+comptable, et ce profil travaille sans lui, tout le temps. Quatre des six
+compétences listées sont des adjectifs.
+
+Le contenu exact à coller est dans `docs/PROFIL_INDEED.md`, poste par poste,
+prêt à recopier sur profile.indeed.com.

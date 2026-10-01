@@ -222,3 +222,94 @@ test("un potentiel d'avant D78 est signalé comme sans ventilation", () => {
   );
   assert.equal(sansSource, true);
 });
+
+/**
+ * D97 — un métier du barème n'est pas une adaptation.
+ *
+ * Constat du 1er octobre : l'écran annonçait « adaptation : comptabilité
+ * générale » alors que c'est un métier entier, déjà mesuré par le score via
+ * les codes des missions. Aucune reformulation ne peut ajouter un métier à une
+ * ligne ; le proposer faisait payer une génération qui rendait zéro mission.
+ */
+const METIERS = [
+  "Comptabilité générale",
+  "Contrôle de gestion industriel",
+  "Consolidation",
+  "Budget et prévisions",
+];
+
+test("un métier du barème sort de l'adaptation", () => {
+  const p = potentielAdaptation(
+    offre(["Comptabilité générale"]),
+    CV,
+    { corpus: ["Saisie des écritures de comptabilité générale"], missions: [], competences: [], formations: [] },
+    undefined,
+    METIERS
+  );
+
+  assert.deepEqual(p.parSource?.activite, ["Comptabilité générale"]);
+  // Ni récupérable — rien à récupérer — ni hors portée, qui dirait à tort
+  // que le profil ne le couvre pas.
+  assert.deepEqual(p.recuperables, []);
+  assert.deepEqual(p.horsPortee, []);
+  assert.equal(p.niveau, "faible");
+});
+
+test("un métier reste hors adaptation même absent du corpus", () => {
+  const p = potentielAdaptation(
+    offre(["Consolidation"]),
+    CV,
+    { corpus: [], missions: [], competences: [], formations: [] },
+    undefined,
+    METIERS
+  );
+
+  assert.deepEqual(p.parSource?.activite, ["Consolidation"]);
+  assert.deepEqual(p.horsPortee, []);
+});
+
+test("un outil précis reste bien une adaptation possible", () => {
+  const p = potentielAdaptation(
+    offre(["Power BI", "Comptabilité générale"]),
+    CV,
+    { corpus: ["Construction de tableaux de bord sous Power BI"], missions: [], competences: [], formations: [] },
+    undefined,
+    METIERS
+  );
+
+  assert.deepEqual(p.parSource?.corpus, ["Power BI"]);
+  assert.deepEqual(p.parSource?.activite, ["Comptabilité générale"]);
+  assert.equal(p.niveau, "moyen");
+});
+
+test("sans liste de métiers, le comportement d'avant D97 est conservé", () => {
+  const p = potentielAdaptation(offre(["Comptabilité générale"]), CV, {
+    corpus: ["Saisie des écritures de comptabilité générale"],
+    missions: [],
+    competences: [],
+    formations: [],
+  });
+
+  assert.deepEqual(p.parSource?.activite, []);
+  assert.equal(p.parSource?.corpus.length, 1);
+});
+
+test("un document d'avant D97 se lit sans clé activite", () => {
+  const { potentiel } = lirePotentiel(
+    {
+      niveau: "moyen",
+      recuperables: ["Consolidation"],
+      horsPortee: [],
+      couverture: 80,
+      parSource: {
+        corpus: ["Consolidation"],
+        mission: [],
+        competence: [],
+        formation: [],
+      },
+    } as never,
+    5
+  );
+
+  assert.deepEqual(potentiel?.parSource?.activite, []);
+});

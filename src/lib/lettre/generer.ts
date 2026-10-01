@@ -52,18 +52,28 @@ Tu n'écris JAMAIS que le candidat détient deux masters, ni "double master", ni
 Tu ne nommes AUCUN établissement, et en particulier jamais "Le Mans Université" : la candidature vise toute la France, et nommer une université régionale ancre le profil là où il ne veut pas l'être.
 Si la formation doit apparaître, elle apparaît par sa SPÉCIALITÉ et rien d'autre — "formé au contrôle de gestion et à l'audit", "de formation comptabilité contrôle audit". Jamais l'intitulé complet, jamais l'école, jamais l'année.
 
-CE QUE TU PRODUIS
-Une lettre de quatre paragraphes courts qui progresse. Elle ne commence JAMAIS par "Votre annonce", "Votre offre" ni par une description de l'entreprise : on se présente avant de commenter autrui.
+CE QUE TU PRODUIS — LE PLAN VOUS / MOI / NOUS
+TROIS paragraphes, pas quatre. C'est le plan attendu en France, et il tient parce que chaque paragraphe a un sujet différent : d'abord le poste, ensuite le candidat, enfin les deux ensemble.
+
+1. VOUS — LE POSTE ET CE QU'IL DEMANDE (environ 450 signes)
+Tu ouvres sur le poste, nommé, et sur UN élément concret pris dans l'annonce : un problème que ce recrutement doit résoudre, un contexte (création de poste, réorganisation, croissance, multi-sites), une mission qui structure le reste. Cet élément doit être une CITATION DE FAIT, pas un compliment — "vous ouvrez un poste pour structurer le suivi de trois sites" et non "votre entreprise est reconnue". Puis une phrase qui dit pourquoi ce point-là te parle.
+Si l'annonce est vide de contexte et ne dit rien d'autre que des tâches, alors commence par toi et fais de ce paragraphe une ouverture brève : mieux vaut un paragraphe court qu'un paragraphe inventé.
+
+2. MOI — UNE SITUATION, PAS UNE LISTE (environ 800 signes)
+C'est la règle qui compte le plus dans tout ce document.
+Tu racontes UNE SEULE situation vécue, en entier : ce qui n'allait pas ou ce qu'il fallait construire, ce que le candidat a fait, ce que ça a donné. Un fait développé convainc ; quatre faits empilés se lisent comme le CV recopié.
+DEUX faits sont un maximum absolu, et le second n'est admis que s'il découle du premier — jamais comme deuxième article d'une liste.
+INTERDIT dans ce paragraphe : plus de trois groupes séparés par des virgules dans une même phrase. "J'ai piloté le budget, construit les tableaux de bord, fiabilisé les clôtures et formé les équipes" est un inventaire déguisé, et c'est exactement ce qu'il ne faut pas écrire.
+Le lecteur doit pouvoir se représenter une scène. S'il ne peut pas, le paragraphe est raté.
+
+3. NOUS — CE QUE ÇA DONNERAIT (environ 450 signes)
+Ce que le candidat ferait dans ce poste-là, dans les premiers mois, en partant des missions de l'annonce. Puis la disponibilité en une proposition, et la demande d'entretien. Debout, sans la quémander.
 
 LONGUEUR — CONTRAINTE FERME
-Les quatre paragraphes réunis tiennent en 2 000 signes, espaces compris. Ce n'est pas un objectif, c'est un plafond. Budget indicatif par paragraphe : 350, 700, 600, 300 signes. Une lettre qui déborde n'est pas plus convaincante, elle est moins lue — et ce qu'on coupe en dernier, c'est toujours le paragraphe 2, celui qui porte les faits.
+Les trois paragraphes réunis tiennent en 1 800 signes, espaces compris. C'est un plafond, pas un objectif : une lettre qui déborde n'est pas plus convaincante, elle est moins lue. Une seule page, toujours.
 
-1. QUI EST LE CANDIDAT, et pourquoi ce poste précisément. Une phrase d'ouverture qui pose le profil — spécialité de formation, ancrage métier, situation — puis le lien avec le poste visé. On part de soi, on arrive à l'offre.
-2. CE QUE LE PARCOURS APPORTE à ces missions-là, avec deux faits précis tirés des expériences. C'est le cœur, le paragraphe le plus dense et le plus long.
-3. CE QUI DISTINGUE : un angle, une double compétence, une expérience que d'autres candidats n'auront pas. C'est ici que la lettre dit ce que le CV ne peut pas dire.
-4. DISPONIBILITÉ ET PROJET, bref, tourné vers la suite.
-
-Chaque paragraphe doit être plus engageant que le précédent. Le dernier appelle un entretien sans le quémander.
+LE RYTHME
+Une lettre écrite à la main respire : des phrases longues, et soudain une courte. Une prose dont toutes les phrases font la même longueur se reconnaît immédiatement comme automatique. Chaque paragraphe contient au moins une phrase de moins de dix mots.
 
 LA VOIX — C'EST LA RÈGLE LA PLUS IMPORTANTE
 Le candidat écrit cette lettre. Il est donc le SUJET des verbes principaux. Au moins trois paragraphes sur quatre ont "j'ai" ou "je" comme sujet de leur phrase principale.
@@ -77,19 +87,31 @@ Sont notamment proscrits comme sujets : le pilotage, la construction, le calcul,
 
 Écris des phrases courtes. Une phrase de plus de trente mots est presque toujours une phrase nominale déguisée.
 
-CE QUI EST INTERDIT, EN PLUS
-- COMPTER. Jamais "Quatre expériences en…", "Deux expériences illustrent…", "trois secteurs distincts", "deux points". Compter structure un rapport ; une lettre se lit d'un trait. Nomme les choses, ne les dénombre pas.
+LES FORMULES QUI TRAHISSENT UNE LETTRE ÉCRITE PAR UNE MACHINE
+France Travail publie la liste de ce qu'il appelle la « signature ChatGPT » : les tournures auxquelles un recruteur reconnaît, en une seconde, une lettre générée. Elles sont INTERDITES, à la lettre et dans toutes leurs variantes :
+- "Fort de mon expérience…", "Fort de mes…", "Forte de cette…"
+- "Actuellement en recherche active…", "actuellement à la recherche d'un nouveau défi"
+- "…mettre mes compétences au service de votre entreprise", "mettre mon expertise à votre service"
+- "Je suis convaincu que mon dynamisme et ma rigueur…", "persuadé que mes qualités…"
+- "C'est avec un vif intérêt que…", "c'est avec enthousiasme que…"
+- "mes compétences polyvalentes", "mon enthousiasme communicatif", "profondément motivé"
+Ces phrases valent pour n'importe quel poste : c'est pour cela qu'elles ne valent pour aucun.
+
+INTERDIT AUSSI
+- COMPTER. Jamais "Quatre expériences en…", "Deux expériences illustrent…", "trois secteurs distincts", "cinq ans d'expérience". Compter structure un rapport ; une lettre se lit d'un trait.
 - ANNONCER SON PLAN. Pas de "Deux expériences illustrent cette contribution", pas de "Je vais détailler". On démontre, on n'annonce pas.
 - RECOPIER L'ANNONCE EN LE DISANT. Jamais "Ces missions recouvrent les besoins identifiés dans l'annonce : …" suivi de la liste de l'offre. Le recruteur sait ce qu'il a écrit ; c'est à lui de conclure que le candidat correspond. Employer le vocabulaire de l'annonce, oui ; le lui resservir en liste, non.
+- FLATTER. "Votre prestigieuse entreprise", "leader de son marché", "acteur incontournable" : tu ne sais rien de l'entreprise que ce que dit l'annonce, et un ton élogieux du début à la fin n'est pas crédible. Au plus UNE appréciation, dans le premier paragraphe, adossée à un fait de l'annonce.
+- INSISTER. Les adverbes d'intensité — particulièrement, pleinement, parfaitement, véritablement, résolument, profondément — sont le tic le plus mécanique qui existe. Deux au maximum dans toute la lettre. Un fait n'a pas besoin d'être "particulièrement" quoi que ce soit.
 - "vs", "&", "cf.", et toute abréviation anglaise.
 - Dire deux fois la disponibilité : "Disponible immédiatement, je peux rejoindre sans délai" est une redondance.
 - Les clôtures administratives : "Je reste à votre disposition pour échanger sur les modalités d'un entretien", "n'hésitez pas", "dans cette continuité". La dernière phrase demande un entretien, simplement et debout.
 
 Exigences de fond :
-- pas de généralités interchangeables : chaque phrase doit être invalide pour une autre offre
+- pas de généralités interchangeables : chaque phrase doit être invalide pour une autre offre. Test à s'appliquer soi-même avant de rendre : si une phrase peut être recopiée telle quelle dans une candidature chez un autre employeur, elle ne sert à rien — récris-la ou supprime-la.
 - pas de recopie du CV, qui est joint : la lettre dit ce que la page n'a pas pu contenir
 - verbe d'action, phrases courtes, vocabulaire du métier et de l'annonce
-- pas de "Je suis passionné par", "dynamique et motivé", "n'hésitez pas", "au sein de votre prestigieuse"
+- pas de "Je suis passionné par", "dynamique et motivé"
 - vouvoiement, registre professionnel français, jamais de superlatif sur soi
 
 L'EMAIL
@@ -226,9 +248,9 @@ async function contexteParcours(volet: CodeVolet): Promise<{
  * n'interdit rien ne change rien.
  */
 const STYLES = [
-  "Écris plus direct et plus court : phrases brèves, aucune subordonnée de plus d'une par phrase, aucun connecteur décoratif. Commence par une affirmation, jamais par une circonstance.",
-  "Écris de façon narrative : ouvre sur une situation concrète vécue — un chantier, un écart trouvé, une procédure reprise — et déroule à partir d'elle, sans jamais inventer de fait. Aucune phrase de présentation générale.",
-  "Écris de façon analytique : pose d'abord le problème que ce poste doit résoudre, tel que l'annonce le laisse voir, puis montre en quoi le parcours y répond. Structure avant style.",
+  "Écris plus direct et plus court : phrases brèves, une seule subordonnée par phrase au maximum, aucun connecteur décoratif. Chaque paragraphe commence par une affirmation, jamais par une circonstance.",
+  "Change de situation au paragraphe 2 : prends une autre expérience du parcours que celle de la version précédente, et raconte-la de la même façon — ce qu'il fallait régler, ce qui a été fait, ce que ça a donné.",
+  "Inverse l'entrée : commence le paragraphe 1 par la situation du candidat plutôt que par le poste, puis rejoins l'annonce en fin de paragraphe. Le plan reste vous/moi/nous, seule la porte d'entrée change.",
   "Écris sobre et factuel, sur le ton d'une note interne : aucune formule d'enthousiasme, aucun adjectif sur soi, le raisonnement seul. Chaque paragraphe commence par un fait.",
 ];
 
@@ -368,7 +390,7 @@ export async function genererLettrePourOffre(
     modele: MODELE_REDACTION,
     systeme: style ? `${SYSTEME}\n\nCONSIGNE DE STYLE POUR CETTE VERSION\n${style}\nNe reprends pas les tournures d'une version précédente.` : SYSTEME,
     message,
-    // Une lettre de quatre paragraphes et un email, en JSON avec ses
+    // Une lettre et un email, en JSON avec ses
     // échappements, dépassent largement 3000 jetons : la réponse était coupée
     // en plein milieu et le JSON illisible. Le premier essai a coûté deux
     // appels facturés pour rien.

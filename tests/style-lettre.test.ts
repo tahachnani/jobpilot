@@ -73,6 +73,84 @@ test("une lettre écrite à la première personne ne déclenche rien", () => {
 });
 
 /**
+ * D96 — les règles venues des sources, pas de mon intuition.
+ *
+ * France Travail publie la « signature ChatGPT » ; l'OQLF interdit d'énumérer
+ * les réalisations ; le repérage d'une lettre générée tient aussi au rythme et
+ * aux adverbes. Chaque cas ci-dessous correspond à une de ces sources.
+ */
+test("la signature ChatGPT relevée par France Travail est repérée", () => {
+  const d = verifierStyle([
+    "Fort de mon expérience en contrôle de gestion, je souhaite mettre mes compétences au service de votre entreprise.",
+  ]);
+  const noms = d.map((x) => x.tournure).join(" / ");
+  assert.ok(noms.includes("« Fort de mon…"), noms);
+  assert.ok(noms.includes("mettre mes compétences au service de"), noms);
+});
+
+test("« convaincu que ma rigueur » et « c'est avec un vif intérêt » sont repérés", () => {
+  const d = verifierStyle([
+    "C'est avec un vif intérêt que je vous adresse ma candidature.",
+    "Je suis convaincu que mon dynamisme et ma rigueur seront des atouts.",
+  ]);
+  const noms = d.map((x) => x.tournure).join(" / ");
+  assert.ok(noms.includes("vif intérêt"), noms);
+  assert.ok(noms.includes("convaincu que ma rigueur"), noms);
+});
+
+test("l'inventaire déguisé est repéré même sans compter", () => {
+  const d = verifierStyle([
+    "Chez TECHNICAPS, j'ai piloté le budget, construit les tableaux de bord, fiabilisé les clôtures et formé les équipes du site.",
+  ]);
+  const inv = d.find((x) => x.tournure.startsWith("Inventaire déguisé"));
+  assert.ok(inv, d.map((x) => x.tournure).join(" / "));
+  assert.match(inv!.tournure, /\(4 groupes\)/);
+});
+
+/**
+ * Le rythme plat : aucune phrase ne respire, toutes avancent au même pas.
+ * C'est le repère le plus fiable d'une prose automatique, et le plus invisible
+ * à la relecture.
+ */
+test("le rythme plat est repéré quand aucune phrase n'est brève", () => {
+  const d = verifierStyle([
+    "J'ai construit les budgets annuels de trois entités industrielles en lien direct avec les responsables de production.",
+    "J'ai fiabilisé les clôtures mensuelles en reprenant l'ensemble des écritures de stock sur un exercice complet.",
+    "J'ai paramétré la comptabilité analytique de l'ERP pour que chaque atelier porte enfin ses propres charges.",
+    "J'ai présenté chaque mois les écarts entre le réalisé et le budget devant le comité de direction du groupe.",
+  ]);
+  assert.ok(
+    d.some((x) => x.tournure === "Rythme plat"),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("les adverbes d'intensité ne sont signalés qu'à partir de trois", () => {
+  const deux = verifierStyle([
+    "J'ai particulièrement travaillé la fiabilité des clôtures, et pleinement repris le paramétrage analytique.",
+  ]);
+  assert.ok(!deux.some((x) => x.tournure.startsWith("Adverbes")));
+
+  const trois = verifierStyle([
+    "J'ai particulièrement travaillé la fiabilité des clôtures, pleinement repris le paramétrage et parfaitement tenu les délais.",
+  ]);
+  assert.ok(
+    trois.some((x) => x.tournure.startsWith("Adverbes d'intensité")),
+    trois.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("l'éloge de l'entreprise est repéré", () => {
+  const d = verifierStyle([
+    "Rejoindre votre prestigieuse entreprise, leader mondial de son marché, serait une chance.",
+  ]);
+  assert.ok(
+    d.some((x) => x.tournure === "Éloge de l'entreprise"),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+/**
  * D92 — la formule d'appel se calcule, elle ne se demande pas au modèle.
  *
  * L'usage français veut qu'elle ne porte pas le patronyme : « Monsieur, » et
