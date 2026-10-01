@@ -634,3 +634,126 @@ compétences listées sont des adjectifs.
 
 Le contenu exact à coller est dans `docs/PROFIL_INDEED.md`, poste par poste,
 prêt à recopier sur profile.indeed.com.
+
+---
+
+# Septième passe — 1er octobre, après-midi
+
+Une seule lettre, générée sur l'offre **in'li** (contrôleur de gestion
+opérationnel, groupe de 80 000 logements, Île-de-France), et le verdict est
+sans appel : la refonte de D96 a tenu sur la **forme** et raté le **fond**.
+
+Trois paragraphes, une seule situation racontée, aucune énumération, aucune
+signature ChatGPT, 1 500 signes. Tous les contrôles de D96 au vert. Et la
+lettre est mauvaise.
+
+## D100 — Le CV était transmis à la lettre comme une liste noire
+
+La lettre a raconté **un stage de 2023 dans une usine de lingerie à Fès**, pour
+candidater chez un bailleur social d'Île-de-France.
+
+Le moteur de sélection, lui, avait eu raison. Le CV composé pour cette offre
+classe **Le Mans Métropole Habitat en première et deuxième position** :
+quittancement d'un patrimoine de 18 000 logements, charges récupérables
+prévisionnelles et quittancées, indicateurs de gestion locative par agence.
+TECHNICAPS troisième. TRIUMPH **dernier**.
+
+La cause n'était pas dans le modèle. Elle était dans le message, et c'est une
+instruction que j'avais écrite :
+
+```
+DÉJÀ SUR LE CV, À NE PAS REDIRE MOT POUR MOT :
+  • Contrôlé mensuellement le quittancement d'un patrimoine de 18000 logements…
+  • Analysé les écarts entre charges récupérables prévisionnelles et quittancées…
+```
+
+**La sélection la plus pertinente — celle que tout le moteur travaille à
+produire — arrivait au rédacteur sous forme d'interdit.** Il l'a évitée,
+consciencieusement, et il est allé chercher la seule expérience restante qui
+portait un chiffre frappant : 5 à 10 points de marge, dans une usine.
+
+Le message nomme désormais l'expérience au lieu de l'interdire. Trois
+changements :
+
+1. **`EXPÉRIENCE À RACONTER AU PARAGRAPHE 2 — CE N'EST PAS UN CHOIX`**, calculée
+   par `choisirNiveau` — gratuit, aucun PDF composé — donc juste même quand
+   aucun CV n'a encore été généré.
+2. **Le corpus de cette expérience-là est joint**, et d'elle seule. Les puces du
+   CV sont des résultats sans contexte ; une situation se raconte avec ce qu'il
+   y avait autour, et c'est dans le corpus que ça se trouve. Aucune de ces
+   lignes n'est sur le CV, donc la lettre ne le répète pas — l'objectif initial
+   de l'interdit est atteint sans l'interdit.
+3. Le reste du CV garde son rôle de « ne pas recopier mot pour mot », mais
+   **après** l'expérience nommée, et plus à sa place.
+
+Une porte de sortie est laissée : si l'expérience imposée ne répond vraiment à
+rien dans l'annonce, le modèle prend la suivante et doit le dire en une phrase.
+
+## D101 — Ma règle de rythme a produit trois proverbes
+
+D96 exigeait « au moins une phrase de moins de dix mots par paragraphe ». La
+contrainte a été respectée, et remplie avec du vide :
+
+> « Un périmètre large exige des indicateurs fiables. »
+> « Un chiffre juste change une décision. »
+> « Je resterais attentif aux signaux faibles. »
+
+**Une contrainte de forme sans contrainte de contenu se remplit toujours par le
+chemin le plus court.** Le prompt demande désormais qu'une phrase brève porte un
+fait — un chiffre, un outil, un employeur — et donne ces trois phrases en
+contre-exemples, avec le test : si elle reste vraie en la déplaçant dans
+n'importe quelle autre lettre, elle saute. Mieux vaut un paragraphe sans phrase
+courte qu'un paragraphe avec une maxime.
+
+Le contrôle correspondant a demandé deux essais. La première version attrapait
+aussi « Disponible immédiatement, je souhaite échanger sur ces missions lors
+d'un entretien » — une clôture irréprochable. Le discriminant trouvé est la
+première personne : **une maxime est une vérité générale, elle ne parle de
+personne.** Précision plutôt que couverture, délibérément : un panneau qui se
+trompe deux fois sur cinq cesse d'être lu.
+
+## D102 — Le conditionnel en rafale, et l'annonce citée comme source
+
+Le paragraphe 3 entier : « je consoliderais les indicateurs, j'objectiverais les
+écarts, je resterais attentif ». Trois hypothèses à la suite ne décrivent rien.
+Un seul conditionnel est désormais autorisé ; le reste s'écrit au présent.
+
+Et : « en lien avec les projets data **évoqués dans l'annonce** ». Le recruteur a
+écrit cette annonce — la lui citer comme source est une maladresse. Le motif
+« Recopie de l'annonce » de D93 ne couvrait que la liste resservie ; un second
+motif vise la citation comme document.
+
+## D103 — Un faux positif silencieux, vieux de D93
+
+> « Les pistes de marge identifiées ont nourri les recommandations transmises au
+> management opérationnel. »
+
+C'est exactement le défaut que D93 avait été écrit pour attraper : le travail
+s'y fait tout seul. Il est passé pour **deux caractères manquants**.
+
+Le motif de première personne s'écrivait `\b(je|j['’]|mon|ma|mes|m['’])` —
+**sans limite de mot finale**. « ma » y correspondait donc au début de
+« management », de « marge », de « maintenant », de « mesure », de « montant ».
+La phrase était tenue pour écrite à la première personne, et le contrôle la
+sautait.
+
+Un faux positif de ce genre est silencieux : il ne produit pas d'erreur, il
+**éteint une règle**, et son test reste vert. Corrigé, avec la limite finale.
+
+S'y ajoute une mesure qui ne dépend d'aucun vocabulaire, parce que
+`NOMS_ABSTRAITS` est une liste fermée et ne le sera jamais : **la part de
+phrases sans première personne**. Au-delà d'une sur trois, dans une lettre
+écrite à la première personne, c'est une prose qui parle du travail au lieu de
+parler du candidat. Sur la lettre in'li : quatre sur dix.
+
+## Ce que les cinq contrôles disent maintenant de cette lettre
+
+```
+• Phrase sans sujet humain (1)   « Les pistes de marge identifiées… ont nourri »
+• Maxime (2)                     « Un périmètre large exige des indicateurs fiables. »
+• Conditionnel en rafale (3)     consoliderais, objectiverais, resterais
+• Renvoi à l'annonce             « évoqués dans l'annonce »
+• Phrases sans « je » (4 sur 10) « Vous ouvrez ce poste de Contrôleur de Gestion… »
+```
+
+Aucun faux positif sur la lettre de référence saine. **118 tests.**

@@ -78,6 +78,18 @@ const NOMS_ABSTRAITS = [
   "missions",
   "realisation",
   "production",
+  // Ajoutés après coup, sachant que la liste ne sera jamais complète : c'est
+  // la mesure de première personne, plus bas, qui attrape le reste.
+  "pistes",
+  "resultats",
+  "travaux",
+  "analyses",
+  "donnees",
+  "chiffres",
+  "ecarts",
+  "indicateurs",
+  "conclusions",
+  "recommandations",
 ];
 
 /**
@@ -111,9 +123,23 @@ function phrases(texte: string): string[] {
     .filter((p) => p.length > 0);
 }
 
-/** Les marques de première personne : la preuve qu'une personne parle. */
+/**
+ * Les marques de première personne : la preuve qu'une personne parle.
+ *
+ * Le motif d'origine — `\b(je|j['’]|mon|ma|mes|m['’])` — n'avait **pas de
+ * limite de mot finale**. « ma » y correspondait donc au début de
+ * « management », « marge », « maintenant », « mesure », « montant ». La
+ * phrase « Les pistes de marge identifiées ont nourri les recommandations
+ * transmises au management opérationnel » était ainsi tenue pour écrite à la
+ * première personne, et le contrôle de D93 la sautait — alors que c'est
+ * exactement le défaut qu'il avait été écrit pour attraper.
+ *
+ * Un faux positif ici est silencieux : il ne produit pas d'erreur, il éteint
+ * une règle. Trois jours de lettres sont passées à côté pour deux caractères
+ * manquants.
+ */
 function parleALaPremierePersonne(phrase: string): boolean {
-  return /\b(je|j['’]|mon|ma|mes|m['’])/i.test(phrase);
+  return /\b(?:je|mon|ma|mes|me|moi)\b|\b[jm]['’]/i.test(phrase);
 }
 
 function extrait(texte: string, taille = 90): string {
@@ -123,6 +149,20 @@ function extrait(texte: string, taille = 90): string {
 
 function mots(phrase: string): number {
   return phrase.split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Un fait vérifiable dans la phrase : un chiffre, ou un nom propre.
+ *
+ * Le nom propre se repère à une majuscule qui n'ouvre pas la phrase — TRIUMPH,
+ * SILOG, Le Mans. Grossier, et c'est voulu : il ne s'agit pas d'analyser la
+ * phrase mais de distinguer « J'ai repris le calcul chez TRIUMPH » d'« Un
+ * chiffre juste change une décision ».
+ */
+function porteUnFait(phrase: string): boolean {
+  if (/\d/.test(phrase)) return true;
+  const sansPremierMot = phrase.replace(/^\W*\w+\s*/, "");
+  return /[A-ZÀ-Þ]/.test(sansPremierMot);
 }
 
 /**
@@ -317,6 +357,110 @@ export function verifierStyle(paragraphes: string[]): DefautStyle[] {
           "Aucune phrase brève : le texte avance au même pas du début à la fin, ce qui se lit comme de la prose automatique. Coupe-en une en deux.",
       });
     }
+  }
+
+  /**
+   * La maxime (D101).
+   *
+   * D96 exigeait « au moins une phrase de moins de dix mots par paragraphe »
+   * pour casser le rythme plat. La contrainte a été respectée, et remplie avec
+   * du vide : « Un périmètre large exige des indicateurs fiables », « Un
+   * chiffre juste change une décision », « Je reste attentif aux signaux
+   * faibles » — trois proverbes dans une même lettre.
+   *
+   * La leçon vaut au-delà de ce cas : une contrainte de FORME sans contrainte
+   * de CONTENU se remplit toujours par le chemin le plus court. Une phrase
+   * brève doit donc porter un fait — un chiffre ou un nom propre —, faute de
+   * quoi elle n'est pas une respiration, c'est un remplissage.
+   */
+  /**
+   * La première personne est le discriminant, et il a été trouvé en essayant.
+   *
+   * Sans elle, la règle attrapait « Disponible immédiatement, je souhaite
+   * échanger sur ces missions lors d'un entretien » — une clôture
+   * irréprochable — et « C'est ce terrain qui m'intéresse ». Une maxime est
+   * une vérité GÉNÉRALE : elle ne parle de personne. Dès que le candidat y
+   * figure, la phrase est brève, pas creuse.
+   *
+   * Précision plutôt que couverture, délibérément : un panneau qui se trompe
+   * deux fois sur cinq cesse d'être lu, et il ne restait plus rien.
+   */
+  const maximes = phrases(texte).filter(
+    (p) => mots(p) <= 11 && !porteUnFait(p) && !parleALaPremierePersonne(p)
+  );
+  if (maximes.length > 0) {
+    defauts.push({
+      tournure: `Maxime (${maximes.length})`,
+      extrait: extrait(maximes[0]),
+      pourquoi:
+        "Phrase courte sans aucun fait : elle resterait vraie dans n'importe quelle autre lettre. Donne-lui un chiffre, un outil ou un employeur, ou supprime-la.",
+    });
+  }
+
+  /**
+   * Le conditionnel en rafale (D102).
+   *
+   * « Je consoliderais les indicateurs, j'objectiverais les écarts, je
+   * resterais attentif » : trois hypothèses à la suite ne décrivent rien. Le
+   * paragraphe de projection en mérite un, pas trois.
+   */
+  const FAUX_AMIS = new Set(["vrais", "frais", "marais", "engrais", "jamais"]);
+  const conditionnels = [
+    ...n.matchAll(/\b[a-z]{2,}r(?:ais|ait|aient|ions|iez)\b/g),
+  ]
+    .map((m) => m[0])
+    .filter((m) => !FAUX_AMIS.has(m));
+  if (conditionnels.length >= 3) {
+    defauts.push({
+      tournure: `Conditionnel en rafale (${conditionnels.length})`,
+      extrait: [...new Set(conditionnels)].join(", "),
+      pourquoi:
+        "Tout est supposé, rien n'est affirmé. Écris au présent ce qui est vrai aujourd'hui et garde le conditionnel pour la seule phrase qui projette.",
+    });
+  }
+
+  /**
+   * Le renvoi à l'annonce comme document (D102).
+   *
+   * Le motif « Recopie de l'annonce » ci-dessus visait la liste resservie. Il
+   * ne couvrait pas « les projets data évoqués dans l'annonce », qui cite
+   * l'offre comme une source — le recruteur l'a écrite.
+   */
+  const renvoi = n.match(
+    /\b(evoque|mentionne|decrit|indique|precise|cite|presente|detaille)[a-z]*\s+(?:dans|par|sur)\s+(?:l\s+annonce|votre\s+annonce|l\s+offre|votre\s+offre|le\s+descriptif)/
+  );
+  if (renvoi) {
+    defauts.push({
+      tournure: "Renvoi à l'annonce",
+      extrait: extrait(renvoi[0], 60),
+      pourquoi:
+        "Le recruteur a écrit cette annonce : la citer comme source lui renvoie son propre texte. Nomme la chose, pas l'endroit où tu l'as lue.",
+    });
+  }
+
+  /**
+   * La part de phrases sans première personne (D103).
+   *
+   * « Les pistes de marge identifiées ont nourri les recommandations
+   * transmises au management opérationnel » est le défaut que D93 visait, et
+   * il est passé : la liste `NOMS_ABSTRAITS` est fermée, et « pistes » n'y
+   * était pas. Elle n'y sera jamais toute — c'est la nature d'une liste.
+   *
+   * Cette mesure-ci ne dépend d'aucun vocabulaire. Dans une lettre écrite à la
+   * première personne, une phrase sur trois sans « je », « mon » ni « me » est
+   * une prose qui parle du travail au lieu de parler du candidat. Le seuil
+   * laisse passer l'ouverture sur l'entreprise, qui n'a légitimement pas de
+   * première personne.
+   */
+  const toutes = phrases(texte);
+  const impersonnelles = toutes.filter((p) => !parleALaPremierePersonne(p));
+  if (impersonnelles.length >= 3 && impersonnelles.length * 3 > toutes.length) {
+    defauts.push({
+      tournure: `Phrases sans « je » (${impersonnelles.length} sur ${toutes.length})`,
+      extrait: extrait(impersonnelles.find((p) => mots(p) > 10) ?? impersonnelles[0]),
+      pourquoi:
+        "Plus d'une phrase sur trois ne nomme pas le candidat : le travail s'y fait tout seul. Reprends-les avec « j'ai ».",
+    });
   }
 
   /**

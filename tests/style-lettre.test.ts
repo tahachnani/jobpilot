@@ -168,3 +168,63 @@ test("sans civilité, la formule reste neutre : on ne devine pas un genre", () =
   assert.equal(formuleAppel(""), "Madame, Monsieur,");
   assert.equal(formuleAppel(null), "Madame, Monsieur,");
 });
+
+/**
+ * D100–D103 — la lettre in'li du 1er octobre.
+ *
+ * Trois paragraphes, une seule situation, aucune énumération, aucune signature
+ * ChatGPT : D96 a tenu sur la forme. Et la lettre est mauvaise quand même.
+ * Les cas ci-dessous figent les quatre défauts que D96 ne voyait pas.
+ */
+const LETTRE_INLI = [
+  "Vous ouvrez ce poste de Contrôleur de Gestion Opérationnel dans un contexte de constitution d'un groupe national de près de 80 000 logements, rattaché au responsable du contrôle de gestion opérationnel IDF. Un périmètre large exige des indicateurs fiables. C'est ce terrain, entre patrimoine immobilier et pilotage budgétaire, qui m'intéresse.",
+  "Chez Triumph, à Fès, j'ai dû évaluer la rentabilité d'une unité de production dont les coûts de revient restaient mal connus. J'ai repris le calcul poste par poste et confronté les résultats aux indicateurs de rendement industriel suivis sur place. Les pistes de marge identifiées, de 5 à 10 points, ont nourri les recommandations transmises au management opérationnel. Un chiffre juste change une décision.",
+  "Dans ce poste, je consoliderais les indicateurs par portefeuille et objectiverais les écarts budgétaires auprès des directions opérationnelles, en lien avec les projets data évoqués dans l'annonce. Je resterais attentif aux signaux faibles. Disponible immédiatement, je souhaite échanger sur ces missions lors d'un entretien.",
+];
+
+test("les maximes de la lettre in'li sont repérées", () => {
+  const d = verifierStyle(LETTRE_INLI);
+  const m = d.find((x) => x.tournure.startsWith("Maxime"));
+  assert.ok(m, d.map((x) => x.tournure).join(" / "));
+  // « Un périmètre large exige des indicateurs fiables. » et « Un chiffre
+  // juste change une décision. »
+  assert.match(m!.tournure, /\([2-9]\)/);
+});
+
+test("le conditionnel en rafale est repéré", () => {
+  const d = verifierStyle(LETTRE_INLI);
+  assert.ok(
+    d.some((x) => x.tournure.startsWith("Conditionnel en rafale")),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("le renvoi à l'annonce comme document est repéré", () => {
+  const d = verifierStyle(LETTRE_INLI);
+  assert.ok(
+    d.some((x) => x.tournure === "Renvoi à l'annonce"),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("la phrase « les pistes ont nourri » ne passe plus", () => {
+  const d = verifierStyle(LETTRE_INLI);
+  const noms = d.map((x) => x.tournure).join(" / ");
+  // Deux filets : la liste de noms abstraits, et la mesure de première
+  // personne qui, elle, ne dépend d'aucun vocabulaire.
+  assert.ok(
+    noms.includes("Phrase sans sujet humain") || noms.includes("Phrases sans « je »"),
+    noms
+  );
+});
+
+test("une clôture correcte n'est pas prise pour une maxime", () => {
+  const d = verifierStyle([
+    "Disponible immédiatement, je souhaite échanger sur ces missions lors d'un entretien.",
+    "C'est ce terrain, entre patrimoine immobilier et pilotage budgétaire, qui m'intéresse.",
+  ]);
+  assert.ok(
+    !d.some((x) => x.tournure.startsWith("Maxime")),
+    d.map((x) => `${x.tournure} : ${x.extrait}`).join(" / ")
+  );
+});

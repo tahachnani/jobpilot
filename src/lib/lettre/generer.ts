@@ -4,6 +4,9 @@ import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV } from "@/lib/cv/generer";
+import { chargerDonneesCV } from "@/lib/cv/donnees";
+import { chargerCorpus } from "@/lib/cv/corpus";
+import { choisirNiveau } from "@/lib/cv/compacite";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
@@ -61,6 +64,7 @@ Si l'annonce est vide de contexte et ne dit rien d'autre que des tâches, alors 
 
 2. MOI — UNE SITUATION, PAS UNE LISTE (environ 800 signes)
 C'est la règle qui compte le plus dans tout ce document.
+**L'EXPÉRIENCE EST IMPOSÉE.** Le message te donne, sous l'intitulé « EXPÉRIENCE À RACONTER », celle que le moteur a classée la plus proche de cette offre. Tu racontes une situation vécue LÀ. Tu ne choisis pas une autre expérience parce qu'elle contient un chiffre plus frappant : un chiffre venu d'un autre métier ne prouve rien au recruteur qui lit, et le décalage se voit immédiatement.
 Tu racontes UNE SEULE situation vécue, en entier : ce qui n'allait pas ou ce qu'il fallait construire, ce que le candidat a fait, ce que ça a donné. Un fait développé convainc ; quatre faits empilés se lisent comme le CV recopié.
 DEUX faits sont un maximum absolu, et le second n'est admis que s'il découle du premier — jamais comme deuxième article d'une liste.
 INTERDIT dans ce paragraphe : plus de trois groupes séparés par des virgules dans une même phrase. "J'ai piloté le budget, construit les tableaux de bord, fiabilisé les clôtures et formé les équipes" est un inventaire déguisé, et c'est exactement ce qu'il ne faut pas écrire.
@@ -68,12 +72,22 @@ Le lecteur doit pouvoir se représenter une scène. S'il ne peut pas, le paragra
 
 3. NOUS — CE QUE ÇA DONNERAIT (environ 450 signes)
 Ce que le candidat ferait dans ce poste-là, dans les premiers mois, en partant des missions de l'annonce. Puis la disponibilité en une proposition, et la demande d'entretien. Debout, sans la quémander.
+UN SEUL VERBE AU CONDITIONNEL dans tout le paragraphe. « Je consoliderais les indicateurs, j'objectiverais les écarts, je resterais attentif » : trois conditionnels d'affilée ne décrivent rien, ils supposent. Écris au présent ce qui est vrai aujourd'hui — ce que le candidat sait faire, ce que l'annonce demande — et garde le conditionnel pour la seule phrase qui projette.
+Tu ne nommes JAMAIS l'annonce comme document. « Les projets data évoqués dans l'annonce », « les missions décrites dans votre offre » : le recruteur l'a écrite, lui renvoyer son texte en le citant comme source est une maladresse. Nomme la chose, pas l'endroit où tu l'as lue.
 
 LONGUEUR — CONTRAINTE FERME
 Les trois paragraphes réunis tiennent en 1 800 signes, espaces compris. C'est un plafond, pas un objectif : une lettre qui déborde n'est pas plus convaincante, elle est moins lue. Une seule page, toujours.
 
-LE RYTHME
-Une lettre écrite à la main respire : des phrases longues, et soudain une courte. Une prose dont toutes les phrases font la même longueur se reconnaît immédiatement comme automatique. Chaque paragraphe contient au moins une phrase de moins de dix mots.
+LE RYTHME — ET LE PIÈGE QUI VA AVEC
+Une lettre écrite à la main respire : des phrases longues, et soudain une courte. Une prose dont toutes les phrases font la même longueur se reconnaît immédiatement comme automatique. Chaque paragraphe contient donc au moins une phrase brève.
+
+MAIS une phrase brève doit porter un FAIT : un chiffre, un nom d'outil, un nom d'employeur, une action précise. « J'ai repris le calcul poste par poste. » « Le quittancement portait sur 18 000 logements. »
+
+INTERDIT ABSOLU : la phrase brève qui énonce une vérité générale. Ce sont des maximes, elles n'apprennent rien, et trois d'affilée transforment la lettre en recueil de proverbes. Exemples de ce qu'il ne faut JAMAIS écrire :
+- « Un périmètre large exige des indicateurs fiables. »
+- « Un chiffre juste change une décision. »
+- « Je reste attentif aux signaux faibles. »
+Test : si la phrase reste vraie en la sortant de la lettre et en la mettant dans n'importe quelle autre, supprime-la. Mieux vaut un paragraphe sans phrase courte qu'un paragraphe avec une maxime.
 
 LA VOIX — C'EST LA RÈGLE LA PLUS IMPORTANTE
 Le candidat écrit cette lettre. Il est donc le SUJET des verbes principaux. Au moins trois paragraphes sur quatre ont "j'ai" ou "je" comme sujet de leur phrase principale.
@@ -293,7 +307,53 @@ export async function genererLettrePourOffre(
   }
   const analyse = (analyseBrute as { resultat: OffreExtraite }).resultat;
 
-  // Le CV déjà généré, pour que la lettre ne le répète pas.
+  /**
+   * L'expérience que la lettre doit raconter (D100).
+   *
+   * Constat du 1er octobre, sur une offre de bailleur social de 80 000
+   * logements : la lettre est allée raconter un stage de 2023 dans une usine
+   * de lingerie à Fès. Le moteur de sélection, lui, avait eu raison — il avait
+   * classé Le Mans Métropole Habitat en première et deuxième position, avec le
+   * quittancement d'un patrimoine de 18 000 logements et les charges
+   * récupérables. TRIUMPH était dernier.
+   *
+   * La cause était dans le message, pas dans le modèle : le CV lui était
+   * transmis sous l'intitulé « DÉJÀ SUR LE CV, À NE PAS REDIRE MOT POUR MOT ».
+   * C'est-à-dire que la sélection la plus pertinente — celle que tout le
+   * moteur travaille à produire — arrivait au rédacteur sous forme de **liste
+   * noire**. Il l'a évitée, consciencieusement, et il est allé chercher la
+   * seule expérience restante qui portait un chiffre.
+   *
+   * On lui nomme donc l'expérience, au lieu de la lui interdire. Le classement
+   * est celui du CV, recalculé ici — `choisirNiveau` est gratuit et ne compose
+   * aucun PDF — pour que la lettre soit juste même quand aucun CV n'a encore
+   * été généré.
+   */
+  const donneesCV = await chargerDonneesCV(offre.volet, offreId);
+  const retenues =
+    donneesCV.experiences.length > 0
+      ? choisirNiveau(donneesCV, analyse, offre.volet).selection.experiences.filter(
+          (e) => e.missions.length > 0
+        )
+      : [];
+  const aRaconter = retenues[0] ?? null;
+
+  /**
+   * Le corpus de cette expérience-là, et d'elle seule.
+   *
+   * Les puces du CV sont des résultats sans contexte — « Contrôlé
+   * mensuellement le quittancement d'un patrimoine de 18 000 logements ». Pour
+   * raconter une situation il faut ce qu'il y avait autour, et c'est dans le
+   * corpus que ça se trouve. Cloisonné par expérience : ce qui a été fait chez
+   * un employeur n'autorise rien chez un autre.
+   */
+  const corpusDeLExperience = aRaconter
+    ? ((await chargerCorpus()).get(aRaconter.experience.id) ?? []).map(
+        (l) => l.texte
+      )
+    : [];
+
+  // Le CV déjà généré, pour que la lettre ne le répète pas mot pour mot.
   const { data: cvBrut } = await supabase
     .from("documents")
     .select("selection")
@@ -361,8 +421,39 @@ export async function genererLettrePourOffre(
     "",
     parcours.texte,
     "",
+    // D100 — l'expérience est NOMMÉE, elle n'est plus laissée au choix du
+    // rédacteur. C'est le classement du moteur face à cette offre précise, et
+    // il est meilleur qu'une intuition de rédaction.
+    aRaconter
+      ? [
+          "EXPÉRIENCE À RACONTER AU PARAGRAPHE 2 — CE N'EST PAS UN CHOIX :",
+          `${aRaconter.experience.titre ?? ""} — ${aRaconter.experience.entreprise} ` +
+            `(${aRaconter.experience.typeContrat})`,
+          "C'est l'expérience que le moteur a classée la plus proche de cette offre, " +
+            "sur les codes d'activité de l'annonce. Le paragraphe 2 raconte une situation " +
+            "vécue LÀ, et nulle part ailleurs.",
+          "",
+          "Ce que le CV en dit déjà — la lettre ne recopie pas ces phrases, elle " +
+            "raconte ce qu'il y avait autour : le problème, ce qui a été fait, ce que " +
+            "ça a donné :",
+          ...aRaconter.missions.map((m) => `  • ${m.texte}`),
+          corpusDeLExperience.length > 0
+            ? "\nLe détail de cette expérience, d'où tirer le contexte et la situation " +
+              "(aucune de ces lignes n'est sur le CV) :\n" +
+              corpusDeLExperience.map((t) => `  • ${t}`).join("\n")
+            : "",
+          "",
+          retenues[1]
+            ? `Si et seulement si cette expérience ne contient rien qui réponde à l'annonce, ` +
+              `prends ${retenues[1].experience.entreprise} — et dis-le en une phrase avant le JSON.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "",
+    "",
     modeleCV
-      ? `DÉJÀ SUR LE CV, À NE PAS REDIRE MOT POUR MOT :\n${modeleCV.experiences
+      ? `LE RESTE DU CV JOINT, À NE PAS RECOPIER MOT POUR MOT :\n${modeleCV.experiences
           .flatMap((e) => e.missions.map((m) => `  • ${m.texte}`))
           .join("\n")}`
       : "",
