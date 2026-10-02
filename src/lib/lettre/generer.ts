@@ -382,6 +382,13 @@ interface Dossier {
   style: string;
   parcours: { texte: string; corpus: string; profil: Record<string, string | null> };
   versionPrecedente: number;
+  /**
+   * La fiche entreprise telle qu'elle a servi, pour que la lettre puisse
+   * enregistrer d'où vient son §2 (D114). Elle est résolue pendant l'assemblage
+   * et consommée à l'enregistrement : sans ce passage, elle reste prisonnière
+   * de `rassemblerDossier` — ce qui a cassé le build du 2 octobre.
+   */
+  fiche: Awaited<ReturnType<typeof ficheOuRecherche>> | null;
 }
 
 
@@ -664,7 +671,14 @@ async function rassemblerDossier(
     ? STYLES[(lettrePrecedente?.version ?? 0) % STYLES.length]
     : "";
 
-  return { offre, message, style, parcours, versionPrecedente: lettrePrecedente?.version ?? 0 };
+  return {
+    offre,
+    message,
+    style,
+    parcours,
+    fiche,
+    versionPrecedente: lettrePrecedente?.version ?? 0,
+  };
 }
 
 export async function genererLettrePourOffre(
@@ -683,7 +697,7 @@ async function redigerLettre(
   changerDeStyle: boolean
 ): Promise<ResultatLettre> {
   const supabase = creerClientServeur();
-  const { offre, message, style, parcours } = await rassemblerDossier(
+  const { offre, message, style, parcours, fiche } = await rassemblerDossier(
     offreId,
     changerDeStyle
   );

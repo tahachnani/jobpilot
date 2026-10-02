@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/tests.mjs",
+    "prebuild": "node scripts/verifier-types.mjs && node scripts/tests.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node scripts/tests.mjs"
+    "test": "node scripts/tests.mjs",
+    "types": "node scripts/verifier-types.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "4.9.0",
