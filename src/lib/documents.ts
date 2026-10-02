@@ -41,9 +41,25 @@ export function schemaDe(selection: unknown): number {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+/**
+ * Les types de document, en miroir de l'énumération `type_document` en base.
+ *
+ * Le nom est exporté plutôt que recopié dans chaque signature : ajouter
+ * `message` en D112 a demandé de toucher cette union, et le build Vercel a
+ * échoué parce qu'elle n'existait qu'ici, en dur dans un paramètre. Un type
+ * nommé se cherche ; une union anonyme au milieu d'une signature, non.
+ */
+export type TypeDocument =
+  | "cv"
+  | "lettre"
+  | "email"
+  | "relance"
+  | "preparation"
+  | "message";
+
 export async function purgerAnciennesVersions(
   offreId: string,
-  type: "cv" | "lettre" | "email" | "relance" | "preparation"
+  type: TypeDocument
 ): Promise<number> {
   const supabase = creerClientServeur();
 
