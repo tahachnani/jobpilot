@@ -227,7 +227,11 @@ export async function ficheOuRecherche(
     ]
       .filter(Boolean)
       .join("\n\n"),
-    maxTokens: 3000,
+    // Large à dessein (D113) : une recherche web rapporte le contenu des
+    // pages dans le contexte, et le raisonnement qui suit est long. Un plafond
+    // juste produit « blocs : thinking », zéro fiche, et deux recherches
+    // facturées pour rien.
+    maxTokens: 8000,
     tache: "recherche_entreprise",
     offreId: offreId ?? null,
     recherchesWeb: 2,

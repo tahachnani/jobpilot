@@ -684,7 +684,23 @@ export async function genererLettrePourOffre(
     // échappements, dépassent largement 3000 jetons : la réponse était coupée
     // en plein milieu et le JSON illisible. Le premier essai a coûté deux
     // appels facturés pour rien.
-    maxTokens: 8000,
+    /**
+     * Relevé de 8 000 à 20 000 (D113).
+     *
+     * Deux appels ont échoué le 2 octobre sur « blocs : thinking — réponse
+     * coupée — 8 000 jetons produits » : le modèle a dépensé tout le budget en
+     * raisonnement, sans place pour la réponse. Les jetons ont été facturés.
+     *
+     * 8 000 suffisaient pour trois paragraphes et un email. La sortie a grossi
+     * depuis : quatre paragraphes, l'email, et DEUX messages courts. L'appel
+     * réussi de 15 h 36 a consommé 6 129 jetons — la marge était de 30 %, et
+     * le raisonnement du modèle l'a mangée.
+     *
+     * Le plafond ne se paie pas : seuls les jetons réellement produits sont
+     * facturés. Le fixer large ne coûte rien, le fixer juste coûte un appel
+     * entier à chaque fois qu'il est dépassé.
+     */
+    maxTokens: 20000,
     tache: "lettre_motivation",
     offreId,
   });
@@ -816,24 +832,6 @@ export async function genererLettrePourOffre(
       selection: { email: brut.email },
       cout_usd: 0,
     },
-    ...(messages && documentMessageId
-      ? [
-          {
-            id: documentMessageId,
-            offre_id: offreId,
-            type: "message",
-            volet: offre.volet,
-            version,
-            // Les deux longueurs dans un seul texte, séparées lisiblement :
-            // c'est ce qui s'affiche si jamais `selection` devenait illisible.
-            contenu_texte: messageEnTexte(messages),
-            selection: { messages },
-            // Le coût est porté par la lettre : les messages n'ont rien coûté
-            // de plus qu'environ 0,5 ¢ de jetons de sortie, déjà comptés là.
-            cout_usd: 0,
-          },
-        ]
-      : []),
   ]);
 
   if (error) {
@@ -842,9 +840,46 @@ export async function genererLettrePourOffre(
     );
   }
 
+  /**
+   * Les messages s'enregistrent SÉPARÉMENT de la lettre (D113).
+   *
+   * Ils étaient dans le même lot d'insertion. Or `type_document` est une
+   * énumération, et la valeur `message` n'existe qu'après la migration 0014 :
+   * sur une base où elle n'a pas été lancée, l'insertion du message faisait
+   * échouer **tout le lot**, et la lettre payée neuf centimes était perdue.
+   *
+   * L'ordre importe autant que la séparation : la lettre est l'artefact cher,
+   * elle s'enregistre d'abord et son échec reste bloquant. Les messages sont
+   * un supplément à 0,5 ¢ ; leur échec se signale dans les journaux et ne
+   * détruit rien.
+   */
+  let messagesEnregistres = messages;
+  if (messages && documentMessageId) {
+    const { error: erreurMessage } = await supabase.from("documents").insert({
+      id: documentMessageId,
+      offre_id: offreId,
+      type: "message",
+      volet: offre.volet,
+      version,
+      // Les deux longueurs dans un seul texte, séparées lisiblement : c'est ce
+      // qui s'affiche si jamais `selection` devenait illisible.
+      contenu_texte: messageEnTexte(messages),
+      selection: { messages },
+      // Le coût est porté par la lettre : les messages n'ont coûté que les
+      // 0,5 ¢ de jetons de sortie déjà comptés là.
+      cout_usd: 0,
+    });
+    if (erreurMessage) {
+      console.error(
+        `[lettre] messages courts non enregistrés (migration 0014 lancée ?) : ${erreurMessage.message}`
+      );
+      messagesEnregistres = null;
+    }
+  }
+
   await purgerAnciennesVersions(offreId, "lettre");
   await purgerAnciennesVersions(offreId, "email");
-  if (messages) await purgerAnciennesVersions(offreId, "message");
+  if (messagesEnregistres) await purgerAnciennesVersions(offreId, "message");
 
   return {
     documentLettreId,
@@ -854,8 +889,8 @@ export async function genererLettrePourOffre(
     email: brut.email,
     ancrage,
     style: defautsStyle,
-    messages: messages ?? { court: "", moyen: "" },
-    documentMessageId,
+    messages: messagesEnregistres ?? { court: "", moyen: "" },
+    documentMessageId: messagesEnregistres ? documentMessageId : null,
     coutUsd: reponse.coutUsd,
   };
 }
@@ -952,7 +987,12 @@ export async function regenererEmailPourOffre(offreId: string): Promise<void> {
       "LETTRE JOINTE :",
       lettre.contenu_texte,
     ].join("\n"),
-    maxTokens: 1200,
+    // Relevé de 1 200 (D113). Un email fait cinq à huit lignes, mais le
+    // raisonnement du modèle n'est pas plafonné séparément : sur une sortie
+    // courte, c'est lui qui consomme tout le budget, et l'appel rend « blocs :
+    // thinking » pour zéro texte utile — facturé quand même. Le plafond ne se
+    // paie pas, seuls les jetons produits le sont.
+    maxTokens: 4000,
     tache: "email_candidature",
     offreId,
   });
@@ -1075,7 +1115,10 @@ export async function genererMessagesPourOffre(
     modele: MODELE_EXTRACTION,
     systeme: SYSTEME_MESSAGES,
     message,
-    maxTokens: 1500,
+    // Même raison que pour l'email (D113) : deux messages font 1 300 signes
+    // en tout, soit environ 400 jetons, mais le raisonnement peut en demander
+    // dix fois plus avant d'écrire la première phrase.
+    maxTokens: 6000,
     tache: "messages_motivation",
     offreId,
   });

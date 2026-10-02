@@ -141,27 +141,6 @@ export async function appelIA(options: {
       .join("\n");
   }
 
-  // Une réponse sans texte doit se diagnostiquer sur l'écran, pas dans les
-  // journaux : on dit ce qui est réellement revenu.
-  if (!texte.trim()) {
-    const types = donnees.content.map((b) => b.type).join(", ") || "aucun bloc";
-    const cause =
-      donnees.stop_reason === "max_tokens"
-        ? "réponse coupée par la limite de jetons"
-        : `arrêt : ${donnees.stop_reason ?? "inconnu"}`;
-    await journaliser(
-      options,
-      null,
-      false,
-      `réponse sans texte — blocs : ${types} — ${cause} — ` +
-        `${donnees.usage.output_tokens} jetons produits`
-    );
-    throw new ErreurIA(
-      `Le modèle n'a renvoyé aucun texte (blocs reçus : ${types} ; ${cause}). ` +
-        `${donnees.usage.output_tokens} jetons produits.`
-    );
-  }
-
   const tarif = TARIFS[options.modele] ?? { entree: 1, sortie: 5 };
   // Le nombre réel de recherches facturées, et non le plafond demandé : le
   // modèle en lance souvent moins, et une recherche en erreur n'est pas
@@ -179,6 +158,44 @@ export async function appelIA(options: {
     coutUsd,
     recherchesWeb,
   };
+
+  /**
+   * Une réponse sans texte est facturée comme les autres (D113).
+   *
+   * Constat du 2 octobre : deux appels de lettre ont échoué sur
+   * « blocs : thinking — réponse coupée par la limite de jetons — 8000 jetons
+   * produits ». Ils ont donc produit 8 000 jetons de sortie chacun, qu'Anthropic
+   * a facturés — et le journal les a enregistrés à **zéro**, parce que le coût
+   * était calculé après ce contrôle et que l'échec passait `null`.
+   *
+   * Environ 22 ¢ invisibles sur deux appels. Le fichier promet pourtant en
+   * en-tête que « le compteur du tableau de bord ne peut pas diverger de la
+   * réalité » : il divergeait exactement là où ça compte le plus, sur les
+   * appels ratés, qui sont ceux qu'on refait et donc qu'on paie deux fois.
+   *
+   * Le coût est désormais calculé d'abord, et journalisé dans les deux cas.
+   */
+  if (!texte.trim()) {
+    const types = donnees.content.map((b) => b.type).join(", ") || "aucun bloc";
+    const cause =
+      donnees.stop_reason === "max_tokens"
+        ? "réponse coupée par la limite de jetons"
+        : `arrêt : ${donnees.stop_reason ?? "inconnu"}`;
+    await journaliser(
+      options,
+      resultat,
+      false,
+      `réponse sans texte — blocs : ${types} — ${cause} — ` +
+        `${donnees.usage.output_tokens} jetons produits`
+    );
+    throw new ErreurIA(
+      `Le modèle n'a renvoyé aucun texte (blocs reçus : ${types} ; ${cause}). ` +
+        `${donnees.usage.output_tokens} jetons produits, facturés. ` +
+        (donnees.stop_reason === "max_tokens"
+          ? "La limite de jetons est trop basse pour cette tâche."
+          : "")
+    );
+  }
 
   await journaliser(options, resultat, true, null);
   void debut;
