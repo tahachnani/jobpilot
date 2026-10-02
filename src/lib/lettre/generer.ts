@@ -15,6 +15,7 @@ import { choisirNiveau } from "@/lib/cv/compacite";
 import { classerSituations } from "@/lib/cv/situations";
 import { ficheEnTexte, ficheOuRecherche } from "@/lib/entreprise/fiche";
 import { referenceAnnonce } from "@/lib/offre/reference";
+import { sousVerrou } from "@/lib/verrou";
 import {
   messageEnTexte,
   normaliserMessages,
@@ -109,18 +110,19 @@ une. Rien d'autre : ni argument, ni enthousiasme, ni "a retenu mon attention".
 Exemple de ton : "Je vous adresse ma candidature au poste de Contrôleur de
 Gestion Opérationnel, publié sur HelloWork sous la référence 2026-132550."
 
-§2 — L'ENTREPRISE (environ 400 signes)
-Pourquoi celle-là. Tu t'appuies UNIQUEMENT sur ce que le message te donne :
-la fiche entreprise si elle est présente, sinon ce que l'annonce dit d'elle.
-Un élément concret et nommé — une activité, un périmètre, un fait daté, un
-projet — et ce qu'il appelle chez le candidat.
-INTERDIT : les mots-valeurs. "Acteur reconnu", "valeurs d'excellence",
-"place l'humain au cœur de sa stratégie" sont du texte de plaquette ; un
-recruteur les lit cinquante fois par semaine et ils ne distinguent rien.
-SI TU NE SAIS RIEN DE L'ENTREPRISE, dis en une phrase ce qui t'attire dans le
-métier ou le secteur tel que l'annonce le décrit, et passe. Deux lignes
-honnêtes valent mieux qu'un paragraphe inventé — et tout ce que tu inventerais
-ici est précisément ce qu'un recruteur vérifie en premier.
+§2 — L'ENTREPRISE (environ 400 signes, UNE SEULE PHRASE SI C'EST TOUT CE QU'ON SAIT)
+Pourquoi celle-là. Tu t'appuies UNIQUEMENT sur ce que le message te donne : la fiche entreprise si elle est présente, sinon les faits que l'annonce porte sur elle.
+
+CE PARAGRAPHE NE PARLE PAS DU CANDIDAT. C'est la règle entière, et elle n'a pas d'exception.
+Le §3 démontre ce qu'il sait faire, avec une situation vécue. Si le §2 l'annonce — "c'est l'exercice que j'ai mené dans mes expériences précédentes", "ce type de mission m'est familier", "mon parcours m'y a préparé" — il promet sans preuve ce que le paragraphe suivant va prouver, et il affaiblit les deux. Ces phrases sont INTERDITES.
+
+LA LONGUEUR S'ADAPTE À LA MATIÈRE, ELLE NE SE REMPLIT PAS.
+Si tu disposes d'un seul fait sur l'entreprise, tu écris UNE phrase et tu passes au §3. Un paragraphe court est honnête ; un paragraphe étiré avec une affirmation sur le candidat est du remplissage, et c'est exactement ce que le lecteur repère.
+400 signes est un plafond, jamais un objectif à atteindre.
+
+INTERDIT : les mots-valeurs. "Acteur reconnu", "valeurs d'excellence", "place l'humain au cœur de sa stratégie" sont du texte de plaquette ; un recruteur les lit cinquante fois par semaine et ils ne distinguent rien.
+
+SI LE MESSAGE DIT QU'AUCUNE INFORMATION N'EST DISPONIBLE, tu écris une phrase sur ce qui attire dans le métier ou le secteur tels que l'annonce les décrit, et tu passes. Tu n'inventes rien sur l'entreprise : c'est le premier endroit qu'un recruteur vérifie.
 
 §3 — LE CANDIDAT (environ 800 signes)
 C'est le paragraphe qui porte la lettre.
@@ -669,6 +671,17 @@ export async function genererLettrePourOffre(
   offreId: string,
   changerDeStyle = false
 ): Promise<ResultatLettre> {
+  // D115 — un second clic pendant qu'une génération tourne coûtait le prix
+  // entier une deuxième fois. Le verrou est côté serveur parce que la
+  // désactivation du bouton ne survit ni au rechargement ni à l'expiration
+  // d'une requête de soixante secondes.
+  return sousVerrou(`lettre:${offreId}`, () => redigerLettre(offreId, changerDeStyle));
+}
+
+async function redigerLettre(
+  offreId: string,
+  changerDeStyle: boolean
+): Promise<ResultatLettre> {
   const supabase = creerClientServeur();
   const { offre, message, style, parcours } = await rassemblerDossier(
     offreId,
@@ -685,7 +698,16 @@ export async function genererLettrePourOffre(
     // en plein milieu et le JSON illisible. Le premier essai a coûté deux
     // appels facturés pour rien.
     /**
-     * Relevé de 8 000 à 20 000 (D113).
+     * Redescendu de 20 000 à 12 000, et le raisonnement bridé (D114).
+     *
+     * Les 20 000 de D113 ont coûté 19,6 ¢ et 12 ¢ sur deux lettres, contre
+     * 6 ¢ avant. Un plafond haut n'est pas une sécurité, c'est un budget : le
+     * modèle l'occupe. 12 000 laisse largement la place aux 8 598 jetons de la
+     * lettre réussie du 2 octobre, et borne la facture à environ 12 ¢ dans le
+     * pire des cas.
+     *
+     * Ancien commentaire de D113, conservé parce qu'il explique l'échec que
+     * 8 000 provoquait :
      *
      * Deux appels ont échoué le 2 octobre sur « blocs : thinking — réponse
      * coupée — 8 000 jetons produits » : le modèle a dépensé tout le budget en
@@ -700,7 +722,10 @@ export async function genererLettrePourOffre(
      * facturés. Le fixer large ne coûte rien, le fixer juste coûte un appel
      * entier à chaque fois qu'il est dépassé.
      */
-    maxTokens: 20000,
+    maxTokens: 12000,
+    // Le raisonnement a de quoi travailler sans pouvoir manger le budget :
+    // la lettre réussie du 2 octobre a produit 8 598 jetons au total.
+    budgetRaisonnement: 3000,
     tache: "lettre_motivation",
     offreId,
   });
@@ -819,7 +844,39 @@ export async function genererLettrePourOffre(
       version,
       storage_path: erreurStockage ? null : chemin,
       contenu_texte: lettreEnTexte(modele),
-      selection: { schema: SCHEMA_SELECTION, modele, ancrage, style: defautsStyle },
+      selection: {
+        schema: SCHEMA_SELECTION,
+        modele,
+        ancrage,
+        style: defautsStyle,
+        /**
+         * D'où vient la matière du §2 (D114).
+         *
+         * « Je dois savoir si la lettre contient des données d'internet ou si
+         * c'est uniquement l'annonce. » La question est juste, et elle se pose
+         * surtout avant un entretien : un fait tiré du web peut avoir vieilli,
+         * un fait tiré de l'annonce est forcément à jour.
+         *
+         * Figé dans le document plutôt que recalculé : la fiche peut être
+         * rafraîchie et l'annonce modifiée, mais cette lettre-là a été écrite
+         * avec ce qu'il y avait ce jour-là.
+         */
+        sourceEntreprise: fiche?.fiche
+          ? {
+              type: "web" as const,
+              faits: fiche.fiche.faits.map((f) => f.texte),
+              sources: fiche.fiche.faits
+                .map((f) => f.source)
+                .filter((x): x is string => Boolean(x)),
+            }
+          : (fiche?.documentation.faits.length ?? 0) > 0
+            ? {
+                type: "annonce" as const,
+                faits: fiche!.documentation.faits,
+                sources: [],
+              }
+            : { type: "aucune" as const, faits: [], sources: [] },
+      },
       cout_usd: reponse.coutUsd,
     },
     {
@@ -993,6 +1050,7 @@ export async function regenererEmailPourOffre(offreId: string): Promise<void> {
     // thinking » pour zéro texte utile — facturé quand même. Le plafond ne se
     // paie pas, seuls les jetons produits le sont.
     maxTokens: 4000,
+    budgetRaisonnement: 1500,
     tache: "email_candidature",
     offreId,
   });
@@ -1108,6 +1166,10 @@ export interface ResultatMessages {
 export async function genererMessagesPourOffre(
   offreId: string
 ): Promise<ResultatMessages> {
+  return sousVerrou(`lettre:${offreId}`, () => redigerMessages(offreId));
+}
+
+async function redigerMessages(offreId: string): Promise<ResultatMessages> {
   const supabase = creerClientServeur();
   const { offre, message } = await rassemblerDossier(offreId, false);
 
@@ -1119,6 +1181,7 @@ export async function genererMessagesPourOffre(
     // en tout, soit environ 400 jetons, mais le raisonnement peut en demander
     // dix fois plus avant d'écrire la première phrase.
     maxTokens: 6000,
+    budgetRaisonnement: 2000,
     tache: "messages_motivation",
     offreId,
   });

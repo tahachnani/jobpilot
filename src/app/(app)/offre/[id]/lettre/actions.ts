@@ -2,6 +2,7 @@
 
 import { ErreurCV } from "@/lib/cv/generer";
 import { ErreurIA } from "@/lib/anthropic";
+import { VerrouOccupe } from "@/lib/verrou";
 import {
   enregistrerLettreCorrigee,
   genererLettrePourOffre,
@@ -137,7 +138,7 @@ export async function genererMessages(formData: FormData) {
         ? `${r.style.length} tournure${r.style.length > 1 ? "s" : ""} à relire.`
         : "Aucune tournure signalée.");
   } catch (e) {
-    if (e instanceof ErreurIA || e instanceof ErreurCV) {
+    if (e instanceof ErreurIA || e instanceof ErreurCV || e instanceof VerrouOccupe) {
       redirect(
         `/offre/${offreId}/lettre?etat=erreur&message=${encodeURIComponent(e.message)}`
       );

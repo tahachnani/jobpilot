@@ -191,10 +191,62 @@ test("les maximes de la lettre in'li sont repérées", () => {
   assert.match(m!.tournure, /\([2-9]\)/);
 });
 
-test("le conditionnel en rafale est repéré", () => {
-  const d = verifierStyle(LETTRE_INLI);
+/**
+ * Ce test exigeait d'abord qu'on signale les trois conditionnels de la lettre
+ * in'li. Il a été retourné en D114, parce que la règle mesurait la mauvaise
+ * chose.
+ *
+ * Comparons. in'li : « je consoliderais les indicateurs et objectiverais les
+ * écarts […] Je resterais attentif aux signaux faibles » — trois conditionnels,
+ * et le paragraphe ne dit rien. MSA : « je participerais au déploiement de la
+ * comptabilité analytique, je construirais les tableaux comparant les coûts,
+ * j'analyserais les écarts » — trois conditionnels, et chacun nomme une mission
+ * de l'annonce.
+ *
+ * Le nombre ne distingue pas les deux ; seul le contenu le fait, et un contrôle
+ * de forme ne sait pas le juger. Le seuil est donc relevé à cinq, ce qui
+ * n'attrape plus que l'accumulation manifeste. La lettre in'li reste signalée
+ * par quatre autres règles, qui, elles, visent juste.
+ */
+test("des conditionnels groupés qui portent du contenu ne sont pas signalés", () => {
+  const d = verifierStyle([
+    "Dans ce poste, je participerais au déploiement de la comptabilité analytique au sein du réseau, je construirais des tableaux de bord comparant les coûts de gestion entre organismes et j'analyserais les écarts entre eux.",
+  ]);
+  assert.ok(
+    !d.some((x) => x.tournure.startsWith("Conditionnel")),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("l'accumulation manifeste de conditionnels reste signalée", () => {
+  const d = verifierStyle([
+    "Je consoliderais les indicateurs, j'objectiverais les écarts, je resterais attentif aux signaux, je proposerais des axes et je construirais les tableaux.",
+  ]);
   assert.ok(
     d.some((x) => x.tournure.startsWith("Conditionnel en rafale")),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+/**
+ * D114 — le remplissage du §2, relevé sur la lettre MSA du 2 octobre.
+ */
+test("l'affirmation vague sur le parcours est repérée", () => {
+  const d = verifierStyle([
+    "Rapprocher des chiffres remontés par des entités différentes pour en tirer une lecture commune est l'exercice que j'ai mené dans mes expériences précédentes en contrôle de gestion.",
+  ]);
+  assert.ok(
+    d.some((x) => x.tournure === "Affirmation vague sur le parcours"),
+    d.map((x) => x.tournure).join(" / ")
+  );
+});
+
+test("une expérience nommée et datée n'est pas une affirmation vague", () => {
+  const d = verifierStyle([
+    "Chez Le Mans Métropole Habitat, j'ai contrôlé le quittancement de 18 000 logements pendant dix-huit mois.",
+  ]);
+  assert.ok(
+    !d.some((x) => x.tournure === "Affirmation vague sur le parcours"),
     d.map((x) => x.tournure).join(" / ")
   );
 });

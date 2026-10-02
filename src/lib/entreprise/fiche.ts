@@ -1,7 +1,8 @@
 import { creerClientServeur } from "@/lib/supabase/server";
-import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
+import { appelIA, ErreurIA, MODELE_EXTRACTION } from "@/lib/anthropic";
 import { extraireJson } from "@/lib/extraction-json";
 import { documentationEntreprise, type Documentation } from "@/lib/entreprise/documentee";
+import { sousVerrou } from "@/lib/verrou";
 
 /**
  * La fiche entreprise : ce qu'on sait de l'employeur, cherché une fois (D108).
@@ -171,6 +172,21 @@ export async function ficheOuRecherche(
   offreId?: string | null,
   forcer = false
 ): Promise<FicheLue> {
+  // Le verrou porte sur l'EMPLOYEUR, pas sur l'offre (D115) : deux offres du
+  // même employeur lancées en parallèle chercheraient deux fois la même chose.
+  // Le 2 octobre, deux générations concurrentes ont payé 9 ¢ puis 14 ¢ pour la
+  // fiche d'OPCO SANTE, la seconde n'ayant pas vu l'écriture de la première.
+  return sousVerrou(`entreprise:${cleEntreprise(entreprise ?? "")}`, () =>
+    resoudreFiche(entreprise, contenuAnnonce, offreId, forcer)
+  );
+}
+
+async function resoudreFiche(
+  entreprise: string | null,
+  contenuAnnonce: string | null,
+  offreId?: string | null,
+  forcer = false
+): Promise<FicheLue> {
   const documentation = documentationEntreprise(contenuAnnonce);
 
   if (!entreprise?.trim()) {
@@ -217,7 +233,20 @@ export async function ficheOuRecherche(
 
   // 3. Recherche, deux au maximum, puis stockage définitif.
   const reponse = await appelIA({
-    modele: MODELE_REDACTION,
+    /**
+     * Modèle d'extraction, et non de rédaction (D115).
+     *
+     * J'avais estimé une recherche à 3 ¢. Mesuré sur OPCO SANTE le 2 octobre :
+     * **9 ¢ et 14 ¢**. La cause est l'entrée, pas la sortie — une recherche
+     * web verse le contenu des pages dans le contexte, et deux recherches ont
+     * produit 23 666 puis 47 526 jetons d'entrée. J'avais tablé sur 3 000 à
+     * 8 000 : erreur d'un facteur cinq.
+     *
+     * Établir une fiche factuelle à partir de pages lues est une tâche
+     * d'extraction, pas d'écriture. Le modèle bon marché divise l'entrée par
+     * deux — et c'est l'entrée qui coûte ici.
+     */
+    modele: MODELE_EXTRACTION,
     systeme: SYSTEME,
     message: [
       `ENTREPRISE : ${entreprise}`,
@@ -231,10 +260,14 @@ export async function ficheOuRecherche(
     // pages dans le contexte, et le raisonnement qui suit est long. Un plafond
     // juste produit « blocs : thinking », zéro fiche, et deux recherches
     // facturées pour rien.
-    maxTokens: 8000,
+    maxTokens: 5000,
+    budgetRaisonnement: 1500,
     tache: "recherche_entreprise",
     offreId: offreId ?? null,
-    recherchesWeb: 2,
+    // Une seule recherche, et non deux (D115). La seconde doublait le contenu
+    // rapporté — donc le prix — pour un ou deux faits de plus. Six faits
+    // sourcés sortaient déjà de la première.
+    recherchesWeb: 1,
   });
 
   let brut: Omit<FicheEntreprise, "entreprise">;

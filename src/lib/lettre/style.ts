@@ -282,6 +282,13 @@ const TOURNURES: { motif: RegExp; tournure: string; pourquoi: string }[] = [
     pourquoi: "La phrase n'ajoute aucune information : elle occupe une ligne.",
   },
   {
+    motif:
+      /mes (?:precedentes |differentes |diverses )?experiences(?: (?:precedentes|passees|anterieures))?|mon parcours m[\s']|ce type de (?:mission|exercice|travail) m[\s']|des missions similaires|j ai (?:deja )?mene ce (?:type de )?travail/,
+    tournure: "Affirmation vague sur le parcours",
+    pourquoi:
+      "« Mes expériences précédentes » ne prouve rien et annonce ce que le paragraphe suivant va démontrer. Supprime la phrase, ou remplace-la par le fait lui-même.",
+  },
+  {
     motif: /votre (prestigieuse|renommee|belle) |leader (mondial|europeen|francais|du marche)|acteur (majeur|incontournable|de reference)/,
     tournure: "Éloge de l'entreprise",
     pourquoi:
@@ -440,7 +447,13 @@ export function verifierStyle(paragraphes: string[]): DefautStyle[] {
   ]
     .map((m) => m[0])
     .filter((m) => !FAUX_AMIS.has(m));
-  if (conditionnels.length >= 3) {
+  // Seuil relevé de 3 à 5 (D114) : le passage à quatre paragraphes a
+  // explicitement autorisé les conditionnels GROUPÉS dans le paragraphe de
+  // projection — « je consoliderais, je construirais, j'identifierais ». Le
+  // contrôle, lui, était resté à 3 et condamnait une lettre conforme au
+  // prompt. Deuxième fois que les deux divergent après une évolution de
+  // règle ; un contrôle qui contredit sa propre consigne est faux, pas sévère.
+  if (conditionnels.length >= 5) {
     defauts.push({
       tournure: `Conditionnel en rafale (${conditionnels.length})`,
       extrait: [...new Set(conditionnels)].join(", "),

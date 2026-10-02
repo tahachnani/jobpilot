@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calculerScore, type Bareme, type ProfilPourScoring } from "@/lib/scoring";
 import type { OffreExtraite } from "@/lib/extraction-offre";
+import { noteSecteur } from "@/config/secteurs";
 
 /**
  * Le barème version 3.
@@ -301,4 +302,43 @@ test("une offre sans aucune compétence citée écarte le critère", () => {
   );
   assert.equal(r.competences.mesurable, false);
   assert.equal(r.competences.poids, 0);
+});
+
+/**
+ * D116 — un secteur peut appartenir à plusieurs familles.
+ *
+ * Constat du 2 octobre, offre ANCOLS : « Secteur public est éloigné de ton
+ * parcours », 40 sur 100, pour un candidat qui a passé dix-huit mois dans un
+ * office **public** de l'habitat. Ni le classement de l'offre ni celui du
+ * parcours n'étaient faux — c'est la structure qui forçait chaque secteur dans
+ * une case unique.
+ */
+test("l'immobilier social rapproche du secteur public", () => {
+  const r = noteSecteur("public", ["immobilier_social", "industrie"]);
+  assert.equal(r.note, 75);
+  assert.match(r.explication, /immobilier social/i);
+  assert.match(r.explication, /public/i);
+});
+
+test("l'immobilier social reste proche de l'immobilier et du BTP", () => {
+  assert.equal(noteSecteur("btp", ["immobilier_social"]).note, 75);
+  assert.equal(noteSecteur("immobilier", ["immobilier_social"]).note, 75);
+});
+
+test("un secteur identique vaut toujours mieux qu'une famille commune", () => {
+  assert.equal(noteSecteur("immobilier_social", ["immobilier_social"]).note, 100);
+  assert.ok(noteSecteur("public", ["immobilier_social"]).note < 100);
+});
+
+test("un secteur réellement éloigné le reste", () => {
+  const r = noteSecteur("agroalimentaire", ["immobilier_social", "expertise_comptable"]);
+  assert.equal(r.note, 40);
+  assert.match(r.explication, /éloigné/);
+});
+
+test("l'explication nomme les deux bouts du rapprochement", () => {
+  const r = noteSecteur("sante", ["immobilier_social"]);
+  // Santé et immobilier social se rejoignent par la famille « public ».
+  assert.equal(r.note, 75);
+  assert.match(r.explication, /ton expérience en/i);
 });

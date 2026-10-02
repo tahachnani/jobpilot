@@ -58,6 +58,21 @@ export async function appelIA(options: {
    * libre en lance volontiers cinq.
    */
   recherchesWeb?: number;
+  /**
+   * Plafond de jetons de raisonnement, quand on veut le brider (D114).
+   *
+   * Constat du 2 octobre : relever `maxTokens` de 8 000 à 20 000 pour corriger
+   * un échec a **triplé le prix**. Deux lettres ont coûté 19,6 ¢ et 12 ¢ au
+   * lieu de 6, l'une ayant produit 16 195 jetons de sortie. J'avais écrit
+   * qu'un plafond ne se paie pas — c'est vrai des jetons non produits, et faux
+   * du comportement : à qui on donne de la place, le modèle raisonne
+   * davantage, et le raisonnement est facturé en sortie comme le reste.
+   *
+   * Un plafond haut est donc un budget, pas une sécurité. Les deux se règlent
+   * séparément : `maxTokens` borne le total facturé, celui-ci borne la part
+   * consommée avant d'écrire.
+   */
+  budgetRaisonnement?: number;
 }): Promise<Reponse> {
   const cle = process.env.ANTHROPIC_API_KEY;
   if (!cle) {
@@ -68,34 +83,72 @@ export async function appelIA(options: {
   }
 
   const debut = Date.now();
-  let reponse: Response;
 
-  try {
-    reponse = await fetch("https://api.anthropic.com/v1/messages", {
+  const corps = (avecRaisonnement: boolean) =>
+    JSON.stringify({
+      model: options.modele,
+      max_tokens: options.maxTokens ?? 4000,
+      system: options.systeme,
+      messages: [{ role: "user", content: options.message }],
+      ...(avecRaisonnement && options.budgetRaisonnement
+        ? {
+            thinking: {
+              type: "adaptive",
+              budget_tokens: options.budgetRaisonnement,
+            },
+          }
+        : {}),
+      ...(options.recherchesWeb
+        ? {
+            tools: [
+              {
+                type: "web_search_20250305",
+                name: "web_search",
+                max_uses: options.recherchesWeb,
+              },
+            ],
+          }
+        : {}),
+    });
+
+  const envoyer = (avecRaisonnement: boolean) =>
+    fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-api-key": cle,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({
-        model: options.modele,
-        max_tokens: options.maxTokens ?? 4000,
-        system: options.systeme,
-        messages: [{ role: "user", content: options.message }],
-        ...(options.recherchesWeb
-          ? {
-              tools: [
-                {
-                  type: "web_search_20250305",
-                  name: "web_search",
-                  max_uses: options.recherchesWeb,
-                },
-              ],
-            }
-          : {}),
-      }),
+      body: corps(avecRaisonnement),
     });
+
+  let reponse: Response;
+
+  try {
+    reponse = await envoyer(true);
+
+    /**
+     * Repli si le bridage est refusé (D114).
+     *
+     * La forme du paramètre `thinking` a changé selon les générations de
+     * modèle : `enabled` est déprécié puis refusé, `adaptive` n'existe qu'à
+     * partir d'une certaine version. Deviner la bonne forme pour un modèle
+     * donné, c'est risquer de casser TOUS les appels de l'application pour
+     * économiser quelques centimes.
+     *
+     * On tente donc le bridage, et un refus explicite de l'API sur ce
+     * paramètre fait rejouer l'appel sans lui. Le premier essai refusé n'est
+     * pas facturé — une requête invalide ne produit aucun jeton.
+     */
+    if (reponse.status === 400 && options.budgetRaisonnement) {
+      const refus = await reponse.clone().text();
+      if (/thinking|budget_tokens/i.test(refus)) {
+        console.warn(
+          `[ia] bridage du raisonnement refusé pour ${options.modele}, appel rejoué sans : ${refus.slice(0, 200)}`
+        );
+        reponse = await envoyer(false);
+      }
+    }
   } catch (e) {
     await journaliser(options, null, false, String(e));
     throw new ErreurIA("Impossible de joindre l'API Anthropic.");
@@ -123,6 +176,9 @@ export async function appelIA(options: {
       input_tokens: number;
       output_tokens: number;
       server_tool_use?: { web_search_requests?: number };
+      // La part des jetons de sortie passée à raisonner. C'est elle qui a
+      // triplé la facture le 2 octobre sans qu'on puisse la voir.
+      output_tokens_details?: { thinking_tokens?: number };
     };
   };
 
@@ -150,6 +206,13 @@ export async function appelIA(options: {
     (donnees.usage.input_tokens / 1_000_000) * tarif.entree +
     (donnees.usage.output_tokens / 1_000_000) * tarif.sortie +
     recherchesWeb * TARIF_RECHERCHE_WEB;
+
+  const raisonnement = donnees.usage.output_tokens_details?.thinking_tokens ?? 0;
+  if (raisonnement > 0) {
+    console.info(
+      `[ia] ${options.tache} : ${donnees.usage.output_tokens} jetons produits, dont ${raisonnement} de raisonnement`
+    );
+  }
 
   const resultat: Reponse = {
     texte,

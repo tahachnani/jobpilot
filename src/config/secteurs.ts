@@ -24,23 +24,41 @@ export const SECTEURS: Record<string, string> = {
   autre: "Autre",
 };
 
-/** Familles sectorielles : deux secteurs d'une même famille sont proches. */
+/**
+ * Familles sectorielles : deux secteurs d'une même famille sont proches.
+ *
+ * **Un secteur peut appartenir à plusieurs familles** (D116), et c'est la
+ * correction du 2 octobre. L'immobilier social relevait de la seule famille
+ * « immobilier » ; une offre de l'ANCOLS, classée « secteur public », tombait
+ * donc à 40 sur 100 avec la mention « Secteur public est éloigné de ton
+ * parcours » — pour un candidat qui a passé dix-huit mois dans un office
+ * **public** de l'habitat.
+ *
+ * L'erreur n'était pas dans le classement de l'offre ni dans celui du
+ * parcours : les deux étaient justes. Elle était dans la structure, qui forçait
+ * chaque secteur dans une case unique alors que certains en occupent deux.
+ * Un OPH est un établissement public qui fait de l'immobilier ; le ranger d'un
+ * côté revenait à nier l'autre.
+ *
+ * Les ESH, elles, sont des sociétés privées : la proximité avec le secteur
+ * public est donc réelle sans être une identité. Elle vaut 75, pas 100.
+ */
 const FAMILLES: Record<string, string[]> = {
   immobilier: ["immobilier_social", "immobilier", "btp"],
   industrie: ["industrie", "industrie_textile", "agroalimentaire", "energie"],
   finance: ["banque_assurance", "expertise_comptable"],
   services: ["services", "conseil", "tech", "distribution", "transport_logistique"],
-  public: ["public", "association", "sante"],
+  public: ["public", "association", "sante", "immobilier_social"],
 };
 
 /** Secteurs qui recrutent tous les profils, donc jamais vraiment éloignés. */
 const TRANSVERSES = ["conseil", "expertise_comptable", "services"];
 
-function famille(code: string): string | null {
-  for (const [nom, membres] of Object.entries(FAMILLES)) {
-    if (membres.includes(code)) return nom;
-  }
-  return null;
+/** Les familles d'un secteur. Plusieurs, parfois : voir FAMILLES. */
+function famillesDe(code: string): string[] {
+  return Object.entries(FAMILLES)
+    .filter(([, membres]) => membres.includes(code))
+    .map(([nom]) => nom);
 }
 
 /**
@@ -65,11 +83,21 @@ export function noteSecteur(
     return { note: 100, explication: `Secteur identique : ${libelle}.` };
   }
 
-  const fOffre = famille(secteurOffre);
-  if (fOffre && secteursProfil.some((s) => famille(s) === fOffre)) {
+  /**
+   * Le secteur du parcours qui fait le pont, et non le simple fait qu'il y en
+   * ait un. « Même famille sectorielle » n'apprenait rien et ne se vérifiait
+   * pas ; nommer les deux bouts permet de juger si le rapprochement tient.
+   */
+  const famillesOffre = famillesDe(secteurOffre);
+  const pont = secteursProfil.find((s) =>
+    famillesDe(s).some((f) => famillesOffre.includes(f))
+  );
+  if (pont) {
     return {
       note: 75,
-      explication: `Même famille sectorielle que ton parcours (${libelle}).`,
+      explication:
+        `Proche de ton parcours : ton expérience en ${SECTEURS[pont] ?? pont} ` +
+        `relève de la même famille que ${libelle}.`,
     };
   }
 

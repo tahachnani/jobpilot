@@ -6,6 +6,12 @@ import type { ModeleLettre } from "@/lib/lettre/document";
 import type { Ancrage } from "@/lib/lettre/ancrage";
 import type { DefautStyle } from "@/lib/lettre/style";
 import type { Messages } from "@/lib/lettre/messages";
+
+interface SourceEntreprise {
+  type: "web" | "annonce" | "aucune";
+  faits: string[];
+  sources: string[];
+}
 import { contactPrincipal } from "@/lib/offre/contact";
 import {
   corrigerLettre,
@@ -19,6 +25,22 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Durée maximale de la fonction, déclarée explicitement (D115).
+ *
+ * La génération du 2 octobre a duré soixante-quatre secondes — fiche
+ * entreprise puis lettre dans la même requête — et a dépassé la limite par
+ * défaut sans que rien ne le dise. Le navigateur a lâché, l'écran est resté
+ * muet, un second clic est parti, et la facture a doublé.
+ *
+ * Soixante secondes est le maximum du plan Hobby : le déclarer ne l'augmente
+ * pas, mais rend la contrainte visible dans le code plutôt que subie. La vraie
+ * correction est ailleurs — la recherche est passée au modèle d'extraction
+ * avec une seule requête, ce qui ramène l'étape de vingt secondes à moins de
+ * dix — et le verrou empêche le second appel de dépenser.
+ */
+export const maxDuration = 60;
 
 export default async function Lettre({
   params,
@@ -63,6 +85,7 @@ export default async function Lettre({
       modele?: ModeleLettre;
       ancrage?: Ancrage;
       style?: DefautStyle[];
+      sourceEntreprise?: SourceEntreprise;
     } | null;
   }[];
   const derniere = lettres[0] ?? null;
@@ -70,6 +93,9 @@ export default async function Lettre({
   const ancrage = derniere?.selection?.ancrage ?? null;
   // Les lettres d'avant D93 n'ont pas de contrôle de style : elles sont figées.
   const style = derniere?.selection?.style ?? [];
+  // Figée avec la lettre, pas recalculée : cette lettre-là a été écrite avec ce
+  // qu'on savait ce jour-là. Absente sur les lettres d'avant D114.
+  const source = derniere?.selection?.sourceEntreprise ?? null;
 
   // L'adresse de candidature écrite dans l'annonce (D94) : trouvée par motif,
   // sans appel ni réanalyse, sur toutes les offres même les plus anciennes.
@@ -381,6 +407,61 @@ export default async function Lettre({
             </p>
             <p className="mt-2 text-sm text-ardoise-500">{modele.signature}</p>
           </Carte>
+
+          {/* D114 — d'où vient le paragraphe sur l'entreprise. La question se
+              pose surtout avant un entretien : un fait venu du web peut avoir
+              vieilli, un fait venu de l'annonce est forcément à jour. */}
+          {source && (
+            <div
+              className={`mt-4 rounded-lg border p-3 ${
+                source.type === "web"
+                  ? "border-sky-200 bg-sky-50"
+                  : source.type === "annonce"
+                    ? "border-ardoise-200 bg-ardoise-50"
+                    : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              <p className="text-sm font-medium text-ardoise-900">
+                {source.type === "web"
+                  ? "Le paragraphe sur l'entreprise s'appuie sur une recherche web"
+                  : source.type === "annonce"
+                    ? "Le paragraphe sur l'entreprise s'appuie uniquement sur l'annonce"
+                    : "Aucune information sur l'entreprise n'était disponible"}
+              </p>
+
+              {source.faits.length > 0 && (
+                <p className="mt-1.5 text-xs leading-relaxed text-ardoise-600">
+                  Faits utilisables : {source.faits.join(" · ")}
+                </p>
+              )}
+
+              {source.sources.length > 0 && (
+                <p className="mt-1.5 text-xs text-ardoise-500">
+                  {source.sources.map((u, i) => (
+                    <span key={u}>
+                      {i > 0 && " · "}
+                      <a
+                        href={u}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-700 underline"
+                      >
+                        source {i + 1}
+                      </a>
+                    </span>
+                  ))}
+                </p>
+              )}
+
+              <p className="mt-1.5 text-xs leading-relaxed text-ardoise-400">
+                {source.type === "web"
+                  ? "Vérifie ces faits avant un entretien : ils datent du jour de la recherche."
+                  : source.type === "annonce"
+                    ? "Rien n'a été cherché sur internet, et rien n'a été facturé : l'annonce en disait assez."
+                    : "Le paragraphe ne doit donc rien affirmer de l'entreprise. S'il le fait, c'est inventé — supprime-le."}
+              </p>
+            </div>
+          )}
 
           {/* D112 — les deux messages courts, avec leur compteur exact.
               Le compteur n'est pas décoratif : c'est lui qui dit si le texte

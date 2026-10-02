@@ -57,6 +57,22 @@ import { preparationEnTexte, type Preparation } from "@/lib/entretien/generer";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Durée maximale de la fonction, déclarée explicitement (D115).
+ *
+ * La génération du 2 octobre a duré soixante-quatre secondes — fiche
+ * entreprise puis lettre dans la même requête — et a dépassé la limite par
+ * défaut sans que rien ne le dise. Le navigateur a lâché, l'écran est resté
+ * muet, un second clic est parti, et la facture a doublé.
+ *
+ * Soixante secondes est le maximum du plan Hobby : le déclarer ne l'augmente
+ * pas, mais rend la contrainte visible dans le code plutôt que subie. La vraie
+ * correction est ailleurs — la recherche est passée au modèle d'extraction
+ * avec une seule requête, ce qui ramène l'étape de vingt secondes à moins de
+ * dix — et le verrou empêche le second appel de dépenser.
+ */
+export const maxDuration = 60;
+
 function couleurNote(n: number) {
   if (n >= 80) return "text-emerald-700";
   if (n >= 60) return "text-amber-700";
