@@ -262,3 +262,137 @@ déjà écrits, pas encore appliqués.
   maintenant : phrase sans sujet humain, 4 phrases sur 8 sans « je », ouverture
   qui récite l'annonce sur deux phrases, catégorie au lieu d'un outil.
 - **121 tests.**
+
+---
+
+# Deuxième réécriture — 2 octobre (D108 à D111)
+
+La version du 1er octobre tenait sur la forme et la structure était la
+mienne : trois paragraphes. La structure attendue en France en compte quatre,
+et c'est elle qui est désormais appliquée.
+
+## La structure, telle que demandée
+
+| | Objectif | Signes |
+|---|---|---|
+| **§1 — L'objet** | Le poste, où l'annonce a été vue, sa référence | ~250 |
+| **§2 — L'entreprise** | Prouver qu'on s'est renseigné | ~400 |
+| **§3 — Le candidat** | Une situation racontée, pas le CV | ~800 |
+| **§4 — Nous** | Projection, disponibilités, entretien | ~400 |
+
+**Le crescendo demande un départ plat.** Le §1 est administratif et bref, et
+c'est voulu. L'ouverture « Vous recherchez un contrôleur de gestion pour… »
+est explicitement interdite : attaquer sur le besoin de l'annonce grille la
+montée et ne ressemble pas à une lettre.
+
+## D108 — La fiche entreprise, une recherche pour plusieurs usages
+
+Le §2 demandé — « prouvez que vous vous êtes renseigné » — exige une
+information que l'application n'avait pas. Sans source, un modèle y écrit
+« votre positionnement reconnu » et « vos projets de transformation » : de la
+flatterie invérifiable, exactement ce que la lettre bannit depuis le premier
+jour.
+
+La fiche est donc **indexée par employeur, jamais par offre**. Une recherche
+coûte 1 ¢ plus le contenu rapporté ; la ranger par offre la ferait repayer à
+chaque régénération, et une deuxième fois si une autre annonce du même
+employeur arrivait.
+
+Elle sert quatre choses :
+
+1. **Le §2 de la lettre** — avec l'obligation de ne citer que des faits datés
+   et sourcés, et d'écarter les mots-valeurs.
+2. **La préparation d'entretien** — en **lecture seule** : cet écran ne lance
+   jamais de recherche. La fiche a été payée à la lettre, l'entretien s'en sert
+   gratuitement. Elle sert surtout aux questions à poser au recruteur : une
+   question adossée à un fait daté montre qu'on s'est renseigné, « quelles sont
+   vos perspectives » ne montre rien.
+3. **La fiche d'offre** — affichage, avec les sources cliquables et l'âge de la
+   recherche.
+4. **Toute offre future chez le même employeur** — sans rien repayer.
+
+La clé de rapprochement réduit le nom à l'essentiel : « IN'LI SAS », « in'li »
+et « in'li (Groupe Action Logement) » tombent sur la même fiche. Un test disait
+d'abord qu'« Irisolaris » et « Irisolaris Groupe » devaient rester séparés et
+il échouait : c'était l'attente qui était fausse, pas le code. Ces deux
+graphies désignent le même employeur et deux annonces de la base les portent.
+
+Le prompt de recherche est explicite sur un point : en cas de doute
+d'homonymie, il doit laisser les champs vides et le dire dans `lacunes`. **Une
+fiche vide est utile ; une fiche fausse fait écrire une lettre fausse.**
+
+## D109 — Pas de recherche si l'annonce se suffit
+
+Point soulevé pendant l'implémentation, et il était juste : inutile d'alourdir
+le coût quand l'annonce décrit déjà l'entreprise.
+
+La décision se prend **sans IA**, par comptage dans le texte déjà stocké :
+gratuit, instantané, rétroactif sur toutes les offres, et reproductible — donc
+l'écran peut dire *pourquoi* aucune recherche n'a eu lieu, en montrant les
+faits trouvés.
+
+Ne comptent que les **nombres accompagnés de leur unité** : « 1 200
+collaborateurs » compte, « acteur majeur du secteur » ne compte pas. Seuil :
+deux faits chiffrés, ou un fait et une section de présentation.
+
+Le seuil est asymétrique à dessein. **Se tromper en cherchant coûte 3 ¢ ; se
+tromper en ne cherchant pas coûte un paragraphe inventé, que personne ne
+rattrape.**
+
+Vérifié sur les annonces réelles de la base :
+
+| Annonce | Verdict | Pourquoi |
+|---|---|---|
+| MSA | pas de recherche | 16 000 collaborateurs, 37 organismes, 750 collaborateurs |
+| in'li | pas de recherche | 1300 collaborateurs, 80 000 logements |
+| RATP Maintenance Services | recherche | des tâches, une référence, rien sur l'employeur |
+| CMG Consulting Group | recherche | page carrières bavarde, aucun fait |
+
+L'ironie est utile : **l'annonce qui a motivé tout ce travail n'aurait pas
+déclenché de recherche.**
+
+## D110 — Les situations aussi sont classées
+
+D100 avait corrigé *quelle expérience* la lettre raconte. La même erreur se
+rejouait un cran plus bas : l'expérience imposée arrivait avec **tout** son
+corpus, dans l'ordre de saisie. Le modèle a donc raconté un délai de
+relocation et une remise en commercialisation — de la gestion locative — là où
+les faits les plus solides pour un poste de contrôle de gestion étaient le
+quittancement de 18 000 logements et les écarts de charges récupérables.
+
+Les lignes sont désormais classées par les codes d'activité de l'annonce,
+pondérés par leur importance — exactement la logique de `noterMission`. Il
+serait absurde que la lettre et le score ne soient pas d'accord sur ce qui
+compte dans une offre.
+
+## D111 — La référence de l'annonce
+
+Le §1 demandé nomme la référence quand l'annonce en porte une. Elle est dans
+`contenu_brut` depuis le premier jour ; un motif suffit, comme pour l'adresse
+de candidature de D94 — gratuit, rétroactif, incapable d'inventer.
+
+Les garde-fous comptent autant que les motifs : un salaire (« 40 k€ »), un code
+postal (« 93100 »), une année (« 01/01/2025 ») et une durée d'expérience
+(« 2 à 5 ans ») sont écartés, chacun tiré d'une annonce réelle. Sans eux, une
+lettre s'ouvrirait sur « sous la référence 93100 ».
+
+Quand rien n'est trouvé, le message le dit au modèle au lieu de se taire : un
+champ absent se comble, un champ déclaré absent ne se comble pas.
+
+## Le coût, mesuré
+
+| | |
+|---|---|
+| Génération de lettre, moyenne constatée sur 117 appels | 5,6 ¢ |
+| Total lettres, 60 offres | 6,58 $, soit 55 % de la dépense |
+| Recherche web | 1 ¢ par recherche, plafond de 2, plus le contenu en jetons d'entrée |
+| Surcoût d'une recherche | ~3 ¢, **une seule fois par employeur** |
+| Lettre livrée aujourd'hui (2 générations) | 11 ¢ |
+| Lettre livrée avec recherche | ~14 ¢ |
+
+Le forfait par recherche est ajouté au compteur à la main : le contenu rapporté
+passe par les tarifs de jetons ordinaires, mais les 10 $ / 1 000 recherches
+n'apparaîtraient nulle part si on les oubliait, et le tableau de bord
+divergerait de la facture.
+
+**131 tests.**

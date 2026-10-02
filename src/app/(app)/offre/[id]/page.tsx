@@ -30,6 +30,9 @@ import {
   type Potentiel,
 } from "@/lib/cv/ecart";
 import { estimerPotentiel } from "@/lib/cv/estimation";
+import { lireFiche } from "@/lib/entreprise/fiche";
+import { documentationEntreprise } from "@/lib/entreprise/documentee";
+import { referenceAnnonce } from "@/lib/offre/reference";
 import {
   supprimerOffre,
   recalculerScore,
@@ -220,6 +223,20 @@ export default async function DetailOffre({
   // L'adresse de candidature écrite dans l'annonce (D94) : trouvée par motif
   // dans le texte déjà stocké, sans appel ni réanalyse.
   const contactAnnonce = contactPrincipal(offre.contenu_brut as string | null);
+
+  /**
+   * Ce que l'on sait de l'employeur, et par quel chemin (D108, D109).
+   *
+   * Lecture seule : ouvrir une fiche d'offre ne doit jamais déclencher une
+   * recherche facturée. La fiche apparaît si la lettre en a fait établir une ;
+   * sinon l'écran dit honnêtement pourquoi il n'y en a pas — soit l'annonce
+   * suffisait, soit personne n'a encore rédigé de lettre.
+   */
+  const { fiche: ficheEntreprise, ageJours: ficheAge } = await lireFiche(
+    offre.entreprise as string | null
+  );
+  const docEntreprise = documentationEntreprise(offre.contenu_brut as string | null);
+  const reference = referenceAnnonce(offre.contenu_brut as string | null);
 
   const lettres = tousDocuments.filter((d) => d.type === "lettre");
   const derniereLettre = lettres[0] ?? null;
@@ -1133,6 +1150,92 @@ export default async function DetailOffre({
         {/* D94 — cette offre se candidate par mail, et l'annonce le disait.
             L'adresse était dans le texte brut depuis le premier jour : il
             fallait rouvrir l'annonce pour la retrouver. */}
+        {(ficheEntreprise || docEntreprise.faits.length > 0 || reference) && (
+          <div className="mt-3 rounded-lg border border-ardoise-200 bg-white p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-medium text-ardoise-900">
+                Ce que l&apos;on sait de l&apos;employeur
+              </p>
+              {reference && (
+                <p className="text-xs text-ardoise-500">
+                  Référence de l&apos;annonce :{" "}
+                  <span className="font-medium text-ardoise-700">{reference}</span>
+                </p>
+              )}
+            </div>
+
+            {ficheEntreprise ? (
+              <div className="mt-2 space-y-1 text-xs leading-relaxed text-ardoise-600">
+                {ficheEntreprise.activite && <p>{ficheEntreprise.activite}</p>}
+                {(ficheEntreprise.taille || ficheEntreprise.implantation) && (
+                  <p className="text-ardoise-500">
+                    {[ficheEntreprise.taille, ficheEntreprise.implantation]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+                {ficheEntreprise.faits.length > 0 && (
+                  <ul className="mt-1.5 space-y-1">
+                    {ficheEntreprise.faits.map((f, i) => (
+                      <li key={i}>
+                        {f.texte}
+                        {f.date && (
+                          <span className="text-ardoise-400"> ({f.date})</span>
+                        )}
+                        {f.source && (
+                          <>
+                            {" "}
+                            <a
+                              href={f.source}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sky-700 underline"
+                            >
+                              source
+                            </a>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {ficheEntreprise.lacunes.length > 0 && (
+                  <p className="text-ardoise-400">
+                    Non établi par la recherche :{" "}
+                    {ficheEntreprise.lacunes.join(" · ")}
+                  </p>
+                )}
+                <p className="pt-1 text-ardoise-400">
+                  Recherche web sourcée, faite une fois pour cet employeur
+                  {ficheAge !== null &&
+                    ` il y a ${ficheAge} jour${ficheAge > 1 ? "s" : ""}`}
+                  . Elle sert aussi la préparation d&apos;entretien, et toute
+                  offre future chez eux, sans être repayée.
+                </p>
+              </div>
+            ) : docEntreprise.suffisante ? (
+              <div className="mt-2 text-xs leading-relaxed text-ardoise-600">
+                <p>
+                  <strong>Aucune recherche lancée</strong> : l&apos;annonce
+                  décrit déjà l&apos;entreprise, c&apos;est donc elle qui sert
+                  de source et ça ne coûte rien.
+                </p>
+                <p className="mt-1 text-ardoise-500">
+                  {docEntreprise.faits.join(" · ")}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs leading-relaxed text-ardoise-500">
+                L&apos;annonce ne dit presque rien de l&apos;entreprise
+                {docEntreprise.faits.length > 0 &&
+                  ` — seulement « ${docEntreprise.faits.join(" », « ")} »`}
+                . Une recherche web sera lancée à la rédaction de la lettre, une
+                seule fois pour cet employeur, pour environ 3 ¢.
+              </p>
+            )}
+          </div>
+        )}
+
         {contactAnnonce && (
           <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3">
             <p className="text-sm font-medium text-sky-900">

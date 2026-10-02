@@ -7,6 +7,10 @@ import { ErreurCV } from "@/lib/cv/generer";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import { choisirNiveau } from "@/lib/cv/compacite";
+import { classerSituations } from "@/lib/cv/situations";
+import { ficheEnTexte, ficheOuRecherche } from "@/lib/entreprise/fiche";
+import { referenceAnnonce } from "@/lib/offre/reference";
+import { libelleOrigine } from "@/config/origines";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
@@ -78,44 +82,89 @@ L'EXPÉRIENCE DU PARAGRAPHE 2 T'EST IMPOSÉE. Le message la nomme : c'est celle 
 À vérité égale, retiens la formulation qui sert la candidature. Taire un détail sans intérêt n'est pas mentir ; l'inventer, si.
 
 ════════════════════════════════════════
-2. LA LETTRE
+2. LA LETTRE — QUATRE PARAGRAPHES
 ════════════════════════════════════════
 
-Trois paragraphes, 1 500 à 1 800 signes en tout, une page.
+Quatre paragraphes, 1 700 à 2 000 signes en tout, une page. C'est la structure
+attendue en France : l'objet, l'entreprise, le candidat, la projection.
 
-§1 — L'OFFRE, PUIS LE CANDIDAT, VITE.
-Une phrase : le poste, et le fait de l'annonce qui le rend nécessaire — une création de poste, une réorganisation, un périmètre, un problème à régler. Ce fait est une citation, pas un compliment.
-Puis tu passes au candidat. LA DEUXIÈME PHRASE DU PARAGRAPHE DIT DÉJÀ "J'AI". Le recruteur connaît son entreprise : lui résumer son organigramme et ses effectifs ne lui apprend rien et lui fait perdre les premières secondes de lecture, les seules dont tu sois sûr.
-Si l'annonce ne dit rien d'autre que des tâches, commence directement par le candidat : mieux vaut un paragraphe court qu'un paragraphe recopié.
+ELLE MONTE EN PUISSANCE. Un crescendo demande un départ plat : le premier
+paragraphe est administratif et bref, et c'est voulu. N'ouvre JAMAIS sur
+"Vous recherchez un contrôleur de gestion pour…" — attaquer sur le besoin de
+l'annonce grille la montée et ne ressemble pas à une lettre.
 
-§2 — UNE SITUATION, RACONTÉE.
-Dans l'expérience imposée, tu prends une situation et tu la racontes en entier : ce qu'il y avait à régler, ce que le candidat a fait, ce que ça a donné. UNE SEULE. Un fait développé convainc ; quatre faits empilés sont le CV recopié, et le CV est joint.
-Le message te donne le corpus de cette expérience : c'est là qu'est le contexte. Les puces du CV sont des résultats sans contexte, elles ne suffisent pas à raconter.
-La phrase de résultat a le candidat pour sujet. "Ce constat a orienté les priorités" efface celui qui a fait le constat.
+§1 — L'OBJET (environ 250 signes, deux phrases au plus)
+Le poste nommé, où l'annonce a été vue, et sa référence si le message en donne
+une. Rien d'autre : ni argument, ni enthousiasme, ni "a retenu mon attention".
+Exemple de ton : "Je vous adresse ma candidature au poste de Contrôleur de
+Gestion Opérationnel, publié sur HelloWork sous la référence 2026-132550."
+
+§2 — L'ENTREPRISE (environ 400 signes)
+Pourquoi celle-là. Tu t'appuies UNIQUEMENT sur ce que le message te donne :
+la fiche entreprise si elle est présente, sinon ce que l'annonce dit d'elle.
+Un élément concret et nommé — une activité, un périmètre, un fait daté, un
+projet — et ce qu'il appelle chez le candidat.
+INTERDIT : les mots-valeurs. "Acteur reconnu", "valeurs d'excellence",
+"place l'humain au cœur de sa stratégie" sont du texte de plaquette ; un
+recruteur les lit cinquante fois par semaine et ils ne distinguent rien.
+SI TU NE SAIS RIEN DE L'ENTREPRISE, dis en une phrase ce qui t'attire dans le
+métier ou le secteur tel que l'annonce le décrit, et passe. Deux lignes
+honnêtes valent mieux qu'un paragraphe inventé — et tout ce que tu inventerais
+ici est précisément ce qu'un recruteur vérifie en premier.
+
+§3 — LE CANDIDAT (environ 800 signes)
+C'est le paragraphe qui porte la lettre.
+L'EXPÉRIENCE T'EST IMPOSÉE : le message la nomme, c'est celle que le moteur a
+classée la plus proche de cette offre.
+LES SITUATIONS AUSSI SONT CLASSÉES : le message te donne les lignes de cette
+expérience dans l'ordre de leur pertinence face à cette annonce. Tu prends la
+PREMIÈRE, ou la deuxième si elle raconte mieux. Tu ne descends pas chercher au
+bas de la liste une anecdote plus plaisante : si l'annonce porte sur du
+contrôle de gestion, une histoire de gestion locative ne pèse rien, même bien
+racontée.
+Tu racontes UNE SEULE situation, en entier : ce qu'il y avait à régler, ce que
+le candidat a fait, ce que ça a donné. Un fait développé convainc ; quatre
+faits empilés sont le CV recopié, et le CV est joint.
+La phrase de résultat a le candidat pour sujet. "Ce constat a orienté les
+priorités" efface celui qui a fait le constat.
 Si la matière fournie porte un chiffre, la lettre le porte.
-Le lecteur doit pouvoir se représenter une scène. S'il ne peut pas, le paragraphe est raté.
+Le lecteur doit pouvoir se représenter une scène. S'il ne peut pas, le
+paragraphe est raté.
 
-§3 — CE QUE ÇA DONNE ICI.
-Ce que le candidat ferait dans ce poste, à partir des missions de l'annonce.
-Un seul verbe au conditionnel dans tout le paragraphe : le reste au présent, parce que ce qu'il sait faire est vrai aujourd'hui.
-Si tu nommes un outil, c'est l'un de ceux que le message liste, jamais une catégorie. "Une pratique des ERP métier" ne prouve rien ; devant un employeur du secteur, le nom de son propre logiciel vaut un paragraphe d'arguments.
+§4 — LA PROJECTION ET L'ENTRETIEN (environ 400 signes)
+Ce que le candidat ferait dans ce poste, à partir des missions de l'annonce, et
+en quoi son parcours y répond.
+Les verbes de projection vont au conditionnel, et ils peuvent être plusieurs :
+"je consoliderais, je construirais, j'identifierais" est correct. Ce qui est
+interdit, c'est de mélanger les deux dans une même phrase coordonnée —
+"je consoliderais les résultats et je construis les tableaux" est une faute.
+Ce que le candidat sait faire aujourd'hui se dit au présent, dans une phrase
+séparée.
+Si tu nommes un outil, c'est l'un de ceux que le message liste, jamais une
+catégorie. "Une pratique des ERP métier" ne prouve rien ; devant un employeur
+du secteur, le nom de son propre logiciel vaut un paragraphe d'arguments. Tu ne
+cites pas un outil que le message signale comme acquis en formation seulement.
 Puis la disponibilité, et la demande d'entretien. Debout, sans la quémander.
+L'intérêt pour le poste se montre par la précision de ce qui précède, jamais
+par une déclaration d'enthousiasme.
 
 ════════════════════════════════════════
 3. LA LETTRE QU'ON VISE
 ════════════════════════════════════════
 
-Voici ce que tout ce qui précède doit donner. L'offre : contrôleur de gestion opérationnel, groupe de bailleurs sociaux en constitution, 80 000 logements, Île-de-France.
+Voici ce que tout ce qui précède doit donner. L'offre : contrôleur de gestion opérationnel, groupe de bailleurs sociaux en constitution, 80 000 logements répartis sur 35 organismes, Île-de-France.
 
-« Vous réunissez 80 000 logements sous une direction unique et cherchez quelqu'un pour en consolider le pilotage auprès des directions opérationnelles. J'ai fait ce travail dix-huit mois chez un bailleur de 18 000 logements, et c'est le changement d'échelle qui m'intéresse.
+« Je vous adresse ma candidature au poste de Contrôleur de Gestion Opérationnel, publié sur HelloWork sous la référence 179510151W.
 
-Chez Le Mans Métropole Habitat, je contrôlais chaque mois le quittancement du patrimoine : loyers, charges, nouvelles locations, vacance. En rapprochant les charges récupérables prévisionnelles de celles réellement quittancées, j'ai trouvé des écarts qui ne venaient pas des consommations mais du découpage : deux sous-groupes immobiliers voisins étaient régularisés sur des périmètres différents. J'ai harmonisé ce découpage et neutralisé les écarts d'exercice. Je n'ai plus eu à réexpliquer les mêmes anomalies à chaque régularisation.
+Vous réunissez 35 organismes et 80 000 logements sous une direction unique, et ce poste existe pour que cette échelle devienne comparable d'un organisme à l'autre. C'est le travail que je préfère : rendre des chiffres venus de sources différentes effectivement comparables.
 
-Dans ce poste, je ferais le même travail à une autre échelle : consolider les indicateurs par portefeuille, et expliquer les écarts budgétaires aux directions opérationnelles plutôt que de les leur transmettre. Je travaille sous ULIS Sopra, Excel et Qlik Sense. Disponible immédiatement, je vous propose d'en parler de vive voix. »
+Chez Le Mans Métropole Habitat, je contrôlais chaque mois le quittancement d'un patrimoine de 18 000 logements : loyers, charges, nouvelles locations, vacance. En rapprochant les charges récupérables prévisionnelles de celles réellement quittancées, j'ai trouvé des écarts qui ne venaient pas des consommations mais du découpage : deux sous-groupes immobiliers voisins étaient régularisés sur des périmètres différents. J'ai harmonisé ce découpage et neutralisé les écarts d'exercice. Je n'ai plus eu à réexpliquer les mêmes anomalies à chaque régularisation.
 
-Observe ce que cette lettre fait, et refais-le : une seule phrase sur l'entreprise, et le candidat dès la deuxième ; un chiffre dans chaque paragraphe ; le candidat sujet de chaque phrase de résultat ; un seul conditionnel ; des logiciels nommés ; une phrase brève qui porte un fait. Aucune qualité revendiquée, aucune formule d'enthousiasme, et pourtant on sait ce que ce candidat sait faire.
+Dans ce poste, je consoliderais les remontées des 35 organismes et je construirais les tableaux qui comparent leurs coûts de gestion. Décomposer un écart jusqu'à sa cause est ce que j'ai fait chaque mois pendant dix-huit mois, et c'est exactement ce que demande une comparaison entre entités. Je travaille sous ULIS Sopra, Excel et Qlik Sense. Disponible immédiatement, je vous propose d'en parler de vive voix. »
 
-Cet exemple est construit sur un parcours de bailleur social. Le parcours que le message te donne peut être tout autre : tu en reprends la FORME, jamais les faits.
+Observe ce que cette lettre fait, et refais-le : un premier paragraphe plat et bref ; une seule phrase sur l'entreprise, adossée à un fait, puis le candidat ; un chiffre dans chaque paragraphe qui en porte un ; le candidat sujet de chaque phrase de résultat ; les conditionnels groupés dans le dernier paragraphe, sans mélange avec le présent ; des logiciels nommés. Aucune qualité revendiquée, aucune formule d'enthousiasme, et pourtant on sait ce que ce candidat sait faire.
+
+Cet exemple est construit sur un parcours de bailleur social. Le parcours que le message te donne peut être tout autre : tu en reprends la FORME et le DEGRÉ DE PRÉCISION, jamais les faits ni les tournures. En particulier, ne recopie aucune de ses phrases — « c'est le travail que je préfère », « jusqu'à sa cause » sont des formulations de cet exemple, pas des formules à réemployer.
 
 ════════════════════════════════════════
 4. CE QUI FAIT QU'UNE LETTRE SONNE FABRIQUÉE
@@ -144,7 +193,7 @@ Un objet JSON, sans préambule ni balises de code :
   "lettre": {
     "objet": "Objet : ...",
     "formuleAppel": "Madame, Monsieur,",
-    "paragraphes": ["...", "...", "..."],
+    "paragraphes": ["...", "...", "...", "..."],
     "formulePolitesse": "..."
   },
   "email": { "objet": "...", "corps": "..." }
@@ -285,7 +334,7 @@ export async function genererLettrePourOffre(
   const { data: offreBrute } = await supabase
     .from("offres")
     .select(
-      "id, volet, intitule, entreprise, localisation, contenu_brut, contact_nom, contact_adresse"
+      "id, volet, intitule, entreprise, localisation, contenu_brut, contact_nom, contact_adresse, origine"
     )
     .eq("id", offreId)
     .maybeSingle();
@@ -299,6 +348,7 @@ export async function genererLettrePourOffre(
     contenu_brut: string | null;
     contact_nom: string | null;
     contact_adresse: string | null;
+    origine: string | null;
   };
 
   const { data: analyseBrute } = await supabase
@@ -355,11 +405,37 @@ export async function genererLettrePourOffre(
    * corpus que ça se trouve. Cloisonné par expérience : ce qui a été fait chez
    * un employeur n'autorise rien chez un autre.
    */
+  // Classées face à l'annonce (D110) et non dans l'ordre de saisie : corriger
+  // le choix de l'expérience sans classer ce qu'elle contient ne faisait que
+  // déplacer le problème d'un cran.
   const corpusDeLExperience = aRaconter
-    ? ((await chargerCorpus()).get(aRaconter.experience.id) ?? []).map(
-        (l) => l.texte
-      )
+    ? classerSituations(
+        (await chargerCorpus()).get(aRaconter.experience.id) ?? [],
+        analyse
+      ).map((l) => l.texte)
     : [];
+
+  /**
+   * La fiche entreprise, pour le §2 (D108).
+   *
+   * Trois issues, et deux d'entre elles ne coûtent rien : une fiche déjà en
+   * base est réutilisée, une annonce qui se suffit dispense de chercher. La
+   * recherche n'a lieu que dans le troisième cas.
+   *
+   * L'échec n'interrompt pas la rédaction : une lettre sans §2 documenté est
+   * une lettre plus courte, pas une erreur. Le prompt prévoit explicitement ce
+   * cas et demande deux lignes honnêtes plutôt qu'un paragraphe inventé.
+   */
+  let fiche: Awaited<ReturnType<typeof ficheOuRecherche>> | null = null;
+  try {
+    fiche = await ficheOuRecherche(
+      offre.entreprise,
+      offre.contenu_brut,
+      offreId
+    );
+  } catch (e) {
+    console.error(`[lettre] fiche entreprise indisponible : ${String(e)}`);
+  }
 
   /**
    * Les logiciels que le candidat peut nommer (D105).
@@ -435,6 +511,17 @@ export async function genererLettrePourOffre(
     `ANNONCE INTÉGRALE :\n${(offre.contenu_brut ?? "").slice(0, 8000)}`,
     "",
     `POSTE VISÉ : ${offre.intitule ?? ""} chez ${offre.entreprise ?? ""}`,
+    // Ce qu'il faut pour écrire le §1 sans rien inventer (D111). Chaque
+    // élément absent est dit absent : sans cela le modèle comble, et une
+    // référence inventée en tête de lettre est pire que pas de référence.
+    `OÙ L'ANNONCE A ÉTÉ VUE : ${
+      libelleOrigine(offre.origine) ??
+      "inconnu — n'écris alors ni plateforme ni site, dis seulement le poste"
+    }`,
+    `RÉFÉRENCE DE L'ANNONCE : ${
+      referenceAnnonce(offre.contenu_brut) ??
+      "aucune trouvée — n'en invente pas, le §1 se passe de référence"
+    }`,
     // Le destinataire n'était pas transmis (D92) : le modèle rendait donc
     // toujours « Madame, Monsieur », et le code lui faisait confiance.
     offre.contact_nom
@@ -447,6 +534,17 @@ export async function genererLettrePourOffre(
     outilsNommables.length > 0
       ? `LOGICIELS QUE TU PEUX NOMMER — ceux-là et aucun autre, jamais une catégorie :\n${outilsNommables.join(", ")}`
       : "",
+    "",
+    // D108 — la matière du §2. Soit la fiche cherchée, soit les faits que
+    // l'annonce porte déjà, soit l'aveu qu'il n'y a rien : dans les trois cas
+    // le modèle sait sur quoi il peut s'appuyer, et sur quoi il ne peut pas.
+    fiche?.fiche
+      ? ficheEnTexte(fiche.fiche)
+      : fiche?.documentation.faits.length
+        ? `CE QUE L'ANNONCE DIT DE L'ENTREPRISE — ta seule source pour le §2, aucune recherche n'a été faite :\n${fiche.documentation.faits
+            .map((f) => `  • ${f}`)
+            .join("\n")}`
+        : "AUCUNE INFORMATION SUR L'ENTREPRISE. Le §2 ne doit donc rien affirmer d'elle : deux lignes sur ce qui attire dans le métier ou le secteur tel que l'annonce le décrit, et tu passes au §3.",
     "",
     parcours.texte,
     "",

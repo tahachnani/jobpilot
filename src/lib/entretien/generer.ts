@@ -6,6 +6,7 @@ import { LIBELLES_SENIORITE, niveauDuPoste } from "@/lib/seniorite";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import type { Ecart, Potentiel } from "@/lib/cv/ecart";
 import type { Resultat } from "@/lib/scoring";
+import { ficheEnTexte, lireFiche } from "@/lib/entreprise/fiche";
 
 /**
  * La fiche de préparation d'entretien (D70).
@@ -137,6 +138,21 @@ export async function genererPreparationPourOffre(
       .map((l) => l.libelle),
   ];
 
+  /**
+   * La fiche entreprise, si la lettre en a déjà fait établir une (D108).
+   *
+   * `lireFiche` et non `ficheOuRecherche` : cet écran **ne lance jamais de
+   * recherche**. La fiche a été payée au moment de la lettre, et la préparation
+   * d'entretien s'en sert gratuitement. L'inverse — chercher ici — ferait
+   * payer deux fois la même chose pour le même employeur.
+   *
+   * Sans fiche, la préparation est ce qu'elle était avant : le prompt ne
+   * promet rien sur l'entreprise, donc rien ne manque.
+   */
+  const { fiche: ficheEntreprise } = await lireFiche(
+    analyse.entreprise ?? offre.entreprise
+  );
+
   const message = `ENTRETIEN À PRÉPARER
 
 Poste : ${analyse.intitule ?? offre.intitule ?? "—"}
@@ -145,6 +161,12 @@ Niveau du poste : ${
     niveau.niveau ? LIBELLES_SENIORITE[niveau.niveau] : "non déterminé"
   } (${niveau.explication})
 Périmètre annoncé : ${analyse.perimetre ?? "non précisé"}
+
+${
+  ficheEntreprise
+    ? `${ficheEnTexte(ficheEntreprise)}\n\nCes faits sur l'entreprise viennent d'une recherche web sourcée. Sers-t'en pour les questions à poser au recruteur : une question qui s'appuie sur un fait daté montre qu'on s'est renseigné, là où « quelles sont vos perspectives » ne montre rien.`
+    : "Aucune recherche sur l'entreprise n'est disponible. Ne suppose donc rien d'elle : les questions à poser porteront sur le poste et son périmètre, tels que l'annonce les décrit."
+}
 
 MISSIONS DEMANDÉES PAR L'ANNONCE :
 ${analyse.missions.map((m) => `- [importance ${m.importance}/3] ${m.texte}`).join("\n")}

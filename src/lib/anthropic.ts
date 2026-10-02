@@ -10,6 +10,18 @@ const TARIFS: Record<string, { entree: number; sortie: number }> = {
 export const MODELE_EXTRACTION = "claude-haiku-4-5-20251001";
 export const MODELE_REDACTION = "claude-sonnet-5";
 
+/**
+ * Tarif de la recherche web côté serveur : 10 $ pour 1 000 recherches, soit
+ * 1 ¢ l'unité (documentation Anthropic, vérifiée le 2 octobre 2026).
+ *
+ * Le contenu rapporté par la recherche est facturé **en plus**, comme jetons
+ * d'entrée ordinaires — il entre donc dans le calcul par les tarifs
+ * ci-dessus, sans traitement particulier. Seul le forfait par recherche doit
+ * être ajouté à la main, et c'est précisément ce qui manquerait au compteur
+ * du tableau de bord si on l'oubliait.
+ */
+const TARIF_RECHERCHE_WEB = 10 / 1000;
+
 export class ErreurIA extends Error {}
 
 interface Reponse {
@@ -17,6 +29,8 @@ interface Reponse {
   tokensEntree: number;
   tokensSortie: number;
   coutUsd: number;
+  /** Nombre de recherches web facturées par ce seul appel. */
+  recherchesWeb: number;
 }
 
 /**
@@ -31,6 +45,19 @@ export async function appelIA(options: {
   maxTokens?: number;
   tache: string;
   offreId?: string | null;
+  /**
+   * Nombre maximal de recherches web autorisées pour cet appel (D108).
+   *
+   * Absent ou nul : aucun outil n'est transmis, l'appel se comporte
+   * exactement comme avant. C'est volontaire — tous les appels existants
+   * passent par ici, et aucun ne doit changer de prix parce qu'on a ajouté
+   * une capacité ailleurs.
+   *
+   * Le plafond est transmis à l'API (`max_uses`) et non simplement espéré :
+   * une recherche coûte 1 ¢ plus le contenu rapporté, et un modèle laissé
+   * libre en lance volontiers cinq.
+   */
+  recherchesWeb?: number;
 }): Promise<Reponse> {
   const cle = process.env.ANTHROPIC_API_KEY;
   if (!cle) {
@@ -56,6 +83,17 @@ export async function appelIA(options: {
         max_tokens: options.maxTokens ?? 4000,
         system: options.systeme,
         messages: [{ role: "user", content: options.message }],
+        ...(options.recherchesWeb
+          ? {
+              tools: [
+                {
+                  type: "web_search_20250305",
+                  name: "web_search",
+                  max_uses: options.recherchesWeb,
+                },
+              ],
+            }
+          : {}),
       }),
     });
   } catch (e) {
@@ -81,7 +119,11 @@ export async function appelIA(options: {
   const donnees = (await reponse.json()) as {
     content: { type: string; text?: string }[];
     stop_reason?: string;
-    usage: { input_tokens: number; output_tokens: number };
+    usage: {
+      input_tokens: number;
+      output_tokens: number;
+      server_tool_use?: { web_search_requests?: number };
+    };
   };
 
   let texte = donnees.content
@@ -121,15 +163,21 @@ export async function appelIA(options: {
   }
 
   const tarif = TARIFS[options.modele] ?? { entree: 1, sortie: 5 };
+  // Le nombre réel de recherches facturées, et non le plafond demandé : le
+  // modèle en lance souvent moins, et une recherche en erreur n'est pas
+  // facturée. Compter le plafond gonflerait le compteur sans raison.
+  const recherchesWeb = donnees.usage.server_tool_use?.web_search_requests ?? 0;
   const coutUsd =
     (donnees.usage.input_tokens / 1_000_000) * tarif.entree +
-    (donnees.usage.output_tokens / 1_000_000) * tarif.sortie;
+    (donnees.usage.output_tokens / 1_000_000) * tarif.sortie +
+    recherchesWeb * TARIF_RECHERCHE_WEB;
 
   const resultat: Reponse = {
     texte,
     tokensEntree: donnees.usage.input_tokens,
     tokensSortie: donnees.usage.output_tokens,
     coutUsd,
+    recherchesWeb,
   };
 
   await journaliser(options, resultat, true, null);
