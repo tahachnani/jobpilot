@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 import { creerClientServeur } from "@/lib/supabase/server";
-import { appelIA, ErreurIA, MODELE_REDACTION } from "@/lib/anthropic";
+import {
+  appelIA,
+  ErreurIA,
+  MODELE_EXTRACTION,
+  MODELE_REDACTION,
+} from "@/lib/anthropic";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { ErreurCV } from "@/lib/cv/generer";
@@ -10,6 +15,11 @@ import { choisirNiveau } from "@/lib/cv/compacite";
 import { classerSituations } from "@/lib/cv/situations";
 import { ficheEnTexte, ficheOuRecherche } from "@/lib/entreprise/fiche";
 import { referenceAnnonce } from "@/lib/offre/reference";
+import {
+  messageEnTexte,
+  normaliserMessages,
+  type Messages,
+} from "@/lib/lettre/messages";
 import { libelleOrigine } from "@/config/origines";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
@@ -186,7 +196,22 @@ Le reste — le rythme des phrases, les adverbes d'intensité, les listes dégui
 Cinq à huit lignes, sobre. Il annonce la candidature et les pièces jointes, donne une raison de lire la lettre, sans la répéter ni la résumer.
 
 ════════════════════════════════════════
-6. LA RÉPONSE
+6. LES DEUX MESSAGES COURTS
+════════════════════════════════════════
+Beaucoup de plateformes ne demandent pas de lettre mais un champ de texte plafonné en caractères. Tu produis donc deux messages, au même titre que la lettre.
+
+UN MESSAGE N'EST PAS UNE LETTRE RACCOURCIE. Aucune formule d'appel, aucune formule de politesse, aucune signature, aucun objet : ces éléments n'ont pas de sens dans un champ de formulaire, et collés là ils signalent un texte recyclé. Le message commence directement par la première phrase utile et s'arrête à la dernière.
+
+Il garde en revanche tout le reste des règles : aucun fait inventé, l'expérience imposée, la situation la mieux classée, le candidat sujet des verbes, un chiffre s'il y en a un, et aucune des formules de la section 4.
+
+"court" — 380 à 450 signes. Trois phrases, au plus quatre. Il ne contient qu'une chose : le poste, UN fait du parcours qui y répond, la disponibilité. Rien sur l'entreprise : il n'y a pas la place, et une demi-phrase de contexte y serait du remplissage.
+
+"moyen" — 800 à 900 signes, deux ou trois paragraphes. Le poste et ce qu'il demande, la situation racontée brièvement — problème, action, résultat — puis les outils et la disponibilité.
+
+Les deux doivent pouvoir être collés tels quels. Compte les signes : un message qui dépasse sa cible oblige à couper à la main dans un formulaire, c'est-à-dire au pire moment.
+
+════════════════════════════════════════
+7. LA RÉPONSE
 ════════════════════════════════════════
 Un objet JSON, sans préambule ni balises de code :
 {
@@ -196,7 +221,8 @@ Un objet JSON, sans préambule ni balises de code :
     "paragraphes": ["...", "...", "...", "..."],
     "formulePolitesse": "..."
   },
-  "email": { "objet": "...", "corps": "..." }
+  "email": { "objet": "...", "corps": "..." },
+  "messages": { "court": "...", "moyen": "..." }
 }`;
 
 export interface ResultatLettre {
@@ -208,6 +234,9 @@ export interface ResultatLettre {
   ancrage: Ancrage;
   /** Les tournures repérées par le contrôle de style (D93). */
   style: DefautStyle[];
+  /** Les deux messages courts, produits dans le même appel (D112). */
+  messages: Messages;
+  documentMessageId: string | null;
   coutUsd: number;
 }
 
@@ -325,10 +354,39 @@ const STYLES = [
   "Écris sobre et factuel, sur le ton d'une note interne : aucune formule d'enthousiasme, aucun adjectif sur soi, le raisonnement seul. Chaque paragraphe commence par un fait.",
 ];
 
-export async function genererLettrePourOffre(
+/**
+ * Tout ce qu'il faut pour rédiger, rassemblé une fois (D112).
+ *
+ * La lettre et les messages courts partent du même dossier : la même annonce,
+ * le même parcours, la même expérience imposée, la même fiche entreprise, les
+ * mêmes situations classées. Seul le prompt et la longueur attendue changent.
+ *
+ * L'assemblage est donc extrait ici plutôt que recopié. Deux copies d'une
+ * centaine de lignes auraient divergé au premier correctif — et l'historique
+ * de ce fichier montre qu'il y a un correctif par jour.
+ */
+interface Dossier {
+  offre: {
+    volet: CodeVolet;
+    intitule: string | null;
+    entreprise: string | null;
+    localisation: string | null;
+    contenu_brut: string | null;
+    contact_nom: string | null;
+    contact_adresse: string | null;
+    origine: string | null;
+  };
+  message: string;
+  style: string;
+  parcours: { texte: string; corpus: string; profil: Record<string, string | null> };
+  versionPrecedente: number;
+}
+
+
+async function rassemblerDossier(
   offreId: string,
   changerDeStyle = false
-): Promise<ResultatLettre> {
+): Promise<Dossier> {
   const supabase = creerClientServeur();
 
   const { data: offreBrute } = await supabase
@@ -604,6 +662,20 @@ export async function genererLettrePourOffre(
     ? STYLES[(lettrePrecedente?.version ?? 0) % STYLES.length]
     : "";
 
+  return { offre, message, style, parcours, versionPrecedente: lettrePrecedente?.version ?? 0 };
+}
+
+export async function genererLettrePourOffre(
+  offreId: string,
+  changerDeStyle = false
+): Promise<ResultatLettre> {
+  const supabase = creerClientServeur();
+  const { offre, message, style, parcours } = await rassemblerDossier(
+    offreId,
+    changerDeStyle
+  );
+
+
   const reponse = await appelIA({
     modele: MODELE_REDACTION,
     systeme: style ? `${SYSTEME}\n\nCONSIGNE DE STYLE POUR CETTE VERSION\n${style}\nNe reprends pas les tournures d'une version précédente.` : SYSTEME,
@@ -625,6 +697,7 @@ export async function genererLettrePourOffre(
       formulePolitesse: string;
     };
     email: { objet: string; corps: string };
+    messages?: Messages;
   };
   try {
     brut = JSON.parse(extraireJson(reponse.texte));
@@ -705,6 +778,15 @@ export async function genererLettrePourOffre(
 
   const documentLettreId = randomUUID();
   const documentEmailId = randomUUID();
+  /**
+   * Les messages n'existent que si le modèle les a rendus (D112).
+   *
+   * Une lettre générée avant cette version n'en a pas, et une réponse qui les
+   * omettrait ne doit pas faire échouer la lettre : l'absence se voit à
+   * l'écran, elle ne se paie pas deux fois.
+   */
+  const messages = normaliserMessages(brut.messages);
+  const documentMessageId = messages ? randomUUID() : null;
   const chemin = `lettre/${offreId}/${documentLettreId}.pdf`;
 
   const pdf = await rendreLettre(modele);
@@ -734,6 +816,24 @@ export async function genererLettrePourOffre(
       selection: { email: brut.email },
       cout_usd: 0,
     },
+    ...(messages && documentMessageId
+      ? [
+          {
+            id: documentMessageId,
+            offre_id: offreId,
+            type: "message",
+            volet: offre.volet,
+            version,
+            // Les deux longueurs dans un seul texte, séparées lisiblement :
+            // c'est ce qui s'affiche si jamais `selection` devenait illisible.
+            contenu_texte: messageEnTexte(messages),
+            selection: { messages },
+            // Le coût est porté par la lettre : les messages n'ont rien coûté
+            // de plus qu'environ 0,5 ¢ de jetons de sortie, déjà comptés là.
+            cout_usd: 0,
+          },
+        ]
+      : []),
   ]);
 
   if (error) {
@@ -744,6 +844,7 @@ export async function genererLettrePourOffre(
 
   await purgerAnciennesVersions(offreId, "lettre");
   await purgerAnciennesVersions(offreId, "email");
+  if (messages) await purgerAnciennesVersions(offreId, "message");
 
   return {
     documentLettreId,
@@ -753,6 +854,8 @@ export async function genererLettrePourOffre(
     email: brut.email,
     ancrage,
     style: defautsStyle,
+    messages: messages ?? { court: "", moyen: "" },
+    documentMessageId,
     coutUsd: reponse.coutUsd,
   };
 }
@@ -885,4 +988,149 @@ export async function regenererEmailPourOffre(offreId: string): Promise<void> {
   });
 
   await purgerAnciennesVersions(offreId, "email");
+}
+
+const SYSTEME_MESSAGES = `Tu rédiges deux messages de motivation courts pour un professionnel du contrôle de gestion et de la comptabilité qui candidate à une offre précise, par le formulaire d'une plateforme d'emploi.
+
+UN MESSAGE N'EST PAS UNE LETTRE RACCOURCIE. Aucune formule d'appel, aucune formule de politesse, aucune signature, aucun objet : ces éléments n'ont pas de sens dans un champ de formulaire, et collés là ils signalent un texte recyclé. Le message commence par la première phrase utile et s'arrête à la dernière.
+
+════════════════════════════════════════
+LES FAITS — RIEN ICI NE SE NÉGOCIE
+════════════════════════════════════════
+Tu n'ajoutes rien qui ne soit dans le dossier fourni : aucun chiffre, aucune durée, aucun employeur, aucun logiciel, aucun diplôme.
+
+Tu ne sais de l'entreprise que ce que le dossier en dit. Elle n'est ni "leader", ni "reconnue", si rien ne l'écrit.
+
+Tu ne décris aucune qualité de caractère : "rigoureux", "dynamique" sont invérifiables. Tu décris ce qui a été fait.
+
+LA FORMATION. Jamais "deux masters", jamais "double master", aucun nom d'établissement, et en particulier jamais "Le Mans Université". Si la formation apparaît, c'est par sa spécialité seule.
+
+LA DISPONIBILITÉ. Si le dernier contrat est terminé : "disponible immédiatement", et rien d'autre sur le sujet — ni date de fin, ni employeur.
+
+L'EXPÉRIENCE T'EST IMPOSÉE : le dossier la nomme, c'est celle que le moteur a classée la plus proche de cette offre. LES SITUATIONS AUSSI SONT CLASSÉES : tu prends la première, ou la deuxième si elle raconte mieux.
+
+════════════════════════════════════════
+LES DEUX LONGUEURS
+════════════════════════════════════════
+"court" — 380 à 450 signes. Trois phrases, au plus quatre. Le poste, UN fait du parcours qui y répond, la disponibilité. Rien sur l'entreprise : il n'y a pas la place, et une demi-phrase de contexte y serait du remplissage.
+
+"moyen" — 800 à 900 signes, deux ou trois paragraphes. Le poste et ce qu'il demande ; la situation racontée brièvement — ce qu'il y avait à régler, ce que le candidat a fait, ce que ça a donné ; puis les outils nommés et la disponibilité.
+
+Dans les deux, le candidat est le sujet des verbes. Si la matière porte un chiffre, le message le porte.
+
+Si tu nommes un outil, c'est l'un de ceux que le dossier liste, jamais une catégorie — pas de "les ERP métier", pas de "les outils décisionnels".
+
+════════════════════════════════════════
+CE QUI FAIT QU'UN MESSAGE SONNE FABRIQUÉ
+════════════════════════════════════════
+Interdites, y compris leurs variantes : "Fort de mon expérience…", "Actuellement en recherche active…", "mettre mes compétences au service de votre entreprise", "Je suis convaincu que mon dynamisme et ma rigueur…", "C'est avec un vif intérêt que…", "votre prestigieuse entreprise".
+
+Interdits aussi : compter ("quatre expériences", "trois secteurs"), la maxime — une phrase générale qui resterait vraie dans n'importe quel autre message — et la liste de tâches séparées par des virgules, qui est le CV recopié.
+
+Un message de 420 signes est plus difficile à écrire qu'une page, pas plus facile : chaque mot doit porter. Préfère un fait précis à deux faits vagues.
+
+Tu réponds UNIQUEMENT par un objet JSON, sans préambule ni balises de code :
+{ "court": "...", "moyen": "..." }`;
+
+export interface ResultatMessages {
+  documentId: string;
+  version: number;
+  messages: Messages;
+  /** Les tournures repérées, pour que le modèle bon marché reste surveillé. */
+  style: DefautStyle[];
+  coutUsd: number;
+}
+
+/**
+ * Les deux messages, sans rédiger la lettre (D112).
+ *
+ * Beaucoup de candidatures passent par un formulaire et n'auront jamais besoin
+ * de lettre. Payer une lettre de quatre paragraphes pour en extraire 420 signes
+ * serait absurde : l'entrée est la même, mais la sortie d'une lettre coûte huit
+ * fois celle de deux messages.
+ *
+ * Deux choix de coût, assumés :
+ *
+ * - **Le modèle d'extraction**, deux fois moins cher que celui de rédaction.
+ *   Un texte court n'est pas un texte facile — c'est même l'inverse — mais ici
+ *   toutes les décisions sont déjà prises avant l'appel : l'expérience est
+ *   imposée, les situations classées, les outils nommés, les faits de
+ *   l'entreprise fournis. Il ne reste qu'à formuler.
+ * - **Le contrôle de style est appliqué aux messages**, ce qui ne coûte rien et
+ *   détecte précisément ce qu'un modèle plus faible risque d'introduire. Si le
+ *   panneau s'allume régulièrement, la décision se renverse en changeant une
+ *   constante.
+ *
+ * Attention à l'enchaînement : prendre le message seul puis la lettre coûte
+ * plus cher que la lettre seule, qui produit déjà les deux messages. L'écran le
+ * dit.
+ */
+export async function genererMessagesPourOffre(
+  offreId: string
+): Promise<ResultatMessages> {
+  const supabase = creerClientServeur();
+  const { offre, message } = await rassemblerDossier(offreId, false);
+
+  const reponse = await appelIA({
+    modele: MODELE_EXTRACTION,
+    systeme: SYSTEME_MESSAGES,
+    message,
+    maxTokens: 1500,
+    tache: "messages_motivation",
+    offreId,
+  });
+
+  let brut: Messages;
+  try {
+    brut = JSON.parse(extraireJson(reponse.texte));
+  } catch {
+    throw new ErreurIA(
+      "La réponse du modèle n'était pas exploitable. Début reçu : " +
+        reponse.texte.trim().slice(0, 200)
+    );
+  }
+
+  const messages = normaliserMessages(brut);
+  if (!messages) {
+    throw new ErreurIA(
+      "Le modèle n'a pas rendu les deux longueurs. Reçu : " +
+        reponse.texte.trim().slice(0, 200)
+    );
+  }
+
+  // Les deux messages sont contrôlés ensemble : un défaut dans l'un ou l'autre
+  // se corrige à la main, et c'est le seul garde-fou sur le modèle bon marché.
+  const style = verifierStyle([messages.court, messages.moyen]);
+
+  const { data: derniere } = await supabase
+    .from("documents")
+    .select("version")
+    .eq("offre_id", offreId)
+    .eq("type", "message")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const version = ((derniere as { version: number } | null)?.version ?? 0) + 1;
+
+  const documentId = randomUUID();
+  const { error } = await supabase.from("documents").insert({
+    id: documentId,
+    offre_id: offreId,
+    type: "message",
+    volet: offre.volet,
+    version,
+    contenu_texte: messageEnTexte(messages),
+    selection: { messages, style },
+    cout_usd: reponse.coutUsd,
+  });
+
+  if (error) {
+    throw new ErreurCV(
+      `Les messages ont été rédigés mais n'ont pas pu être enregistrés : ${error.message}`
+    );
+  }
+
+  await purgerAnciennesVersions(offreId, "message");
+
+  return { documentId, version, messages, style, coutUsd: reponse.coutUsd };
 }

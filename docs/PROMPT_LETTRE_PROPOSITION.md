@@ -396,3 +396,103 @@ n'apparaîtraient nulle part si on les oubliait, et le tableau de bord
 divergerait de la facture.
 
 **131 tests.**
+
+---
+
+# D112 — Les messages de motivation courts
+
+> « Parfois j'ai besoin que d'une petite lettre ou juste un message de
+> motivation, pas toute une lettre — pas mal de sites me limitent le nombre de
+> caractères. »
+
+## Un message n'est pas une lettre raccourcie
+
+C'est le point de conception qui compte. Ni formule d'appel, ni formule de
+politesse, ni signature, ni objet : ces éléments n'ont aucun sens dans un champ
+de formulaire, et collés là ils signalent un texte recyclé. Raccourcir la
+lettre aurait produit un « Je vous prie d'agréer » orphelin au fond d'une boîte
+de texte.
+
+Le prompt le dit, et `normaliserMessages` le vérifie — parce qu'une
+interdiction de prompt n'est jamais une garantie, et que les trois motifs morts
+de D96 l'ont prouvé. Le nettoyage retire l'appareil de lettre et coupe un
+dépassement **à la phrase entière**, jamais au caractère : un texte tronqué au
+milieu d'un mot est collé sans relecture dans un formulaire.
+
+Le motif de formule d'appel a dû être repris : écrit sans répétition, il
+retirait « Madame, » et laissait « Monsieur, » en tête du message. L'usage
+français en met deux.
+
+## Deux longueurs, pour ne jamais régénérer
+
+| | Cible | Pour quoi |
+|---|---|---|
+| **court** | 380 à 450 signes, trois phrases | les champs serrés |
+| **moyen** | 800 à 900 signes, deux ou trois paragraphes | les formulaires normaux |
+
+Le surcoût de la seconde longueur est de **0,1 ¢** en jetons de sortie. Une
+régénération pour faire rentrer le texte en coûterait trois cents fois plus.
+L'écran affiche le **compteur de signes exact** à côté de chaque version : il
+n'est pas décoratif, c'est lui qui dit si le texte passe la limite du site.
+
+## Deux portes, et le piège de l'enchaînement
+
+| Action | Ce qu'on obtient | Coût |
+|---|---|---|
+| Rédiger la lettre | lettre + email + les deux messages | ~6 ¢ |
+| Messages courts seuls | les deux messages | **~1,4 ¢** |
+| Copier une version | rien de neuf | **0** |
+
+L'entrée est identique dans les deux cas — l'annonce, le parcours, la fiche
+entreprise, environ 12 400 jetons. Ce qui change est la sortie : 3 339 jetons
+pour une lettre contre 400 pour deux messages.
+
+**Enchaîner les deux coûte plus cher que la lettre seule** (1,4 + 6 contre 6).
+L'écran le dit sous les boutons : le bouton « messages seuls » vaut le coup
+quand on sait que cette candidature passe par un formulaire et n'aura jamais
+besoin de lettre.
+
+## Le modèle bon marché, et son garde-fou
+
+Le chemin « messages seuls » utilise le **modèle d'extraction**, deux fois
+moins cher (1 $ / 5 $ le million contre 2 $ / 10 $). D'où 1,4 ¢ au lieu de
+2,9 ¢.
+
+Un texte de 420 signes n'est pas plus facile qu'une page — c'est l'inverse,
+chaque mot doit porter, et c'est exactement là qu'un modèle plus faible écrit
+« Fort de mon expérience ». Ce qui rend le choix tenable ici, c'est que **toutes
+les décisions sont prises avant l'appel** : l'expérience est imposée, les
+situations classées par codes d'activité, les outils nommés, les faits de
+l'entreprise fournis. Il ne reste qu'à formuler.
+
+Et le pari est surveillé : **`verifierStyle` est appliqué aux deux messages**.
+C'est gratuit, et ça détecte précisément ce qu'un modèle plus faible risque
+d'introduire — maximes, signature ChatGPT, catégories d'outils, phrases sans
+sujet humain. Si le panneau s'allume régulièrement, la décision se renverse en
+changeant une constante.
+
+## Refactorisation
+
+`genererLettrePourOffre` contenait cent lignes d'assemblage du dossier —
+annonce, parcours, expérience imposée, situations classées, fiche entreprise,
+outils nommables, référence. Les messages partent du même dossier : seuls le
+prompt et la longueur attendue changent.
+
+L'assemblage est donc extrait dans `rassemblerDossier` plutôt que recopié. Deux
+copies auraient divergé au premier correctif, et l'historique de ce fichier
+montre qu'il y en a un par jour.
+
+`normaliserMessages` et `messageEnTexte` vivent dans `lettre/messages.ts`, pour
+la raison déjà rencontrée en D92 : `generer.ts` importe `document.tsx`, que le
+dépouilleur de types de Node ne sait pas charger, donc rien de ce qui y vit
+n'est testable. Et c'est précisément le nettoyage qu'il fallait pouvoir tester.
+
+## Migrations
+
+`0013_recherche_entreprise.sql` — la table de fiches entreprise.
+`0014_document_message.sql` — une valeur ajoutée à l'énumération
+`type_document`. Elle est seule dans sa migration : `alter type … add value`
+ne s'exécute pas dans une transaction avec d'autres instructions sur certaines
+versions de PostgreSQL.
+
+**138 tests.**

@@ -5,11 +5,13 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import type { ModeleLettre } from "@/lib/lettre/document";
 import type { Ancrage } from "@/lib/lettre/ancrage";
 import type { DefautStyle } from "@/lib/lettre/style";
+import type { Messages } from "@/lib/lettre/messages";
 import { contactPrincipal } from "@/lib/offre/contact";
 import {
   corrigerLettre,
   enregistrerContact,
   genererLettre,
+  genererMessages,
   regenererEmail,
 } from "./actions";
 import BoutonCopier from "@/components/BoutonCopier";
@@ -85,6 +87,30 @@ export default async function Lettre({
     selection: { email?: { objet: string; corps: string } } | null;
   } | null)?.selection?.email;
 
+  /**
+   * Les deux messages courts (D112).
+   *
+   * Ils arrivent par deux chemins — avec la lettre, ou seuls — et vivent dans
+   * le même document quel que soit le chemin : un seul endroit à lire, et
+   * aucune ambiguïté sur lequel est le plus récent.
+   */
+  const { data: messagesBrut } = await supabase
+    .from("documents")
+    .select("selection, created_at")
+    .eq("offre_id", params.id)
+    .eq("type", "message")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const messages = (
+    messagesBrut as {
+      selection: { messages?: Messages; style?: DefautStyle[] } | null;
+    } | null
+  )?.selection?.messages;
+  const styleMessages =
+    (messagesBrut as { selection: { style?: DefautStyle[] } | null } | null)
+      ?.selection?.style ?? [];
+
   const orphelins = ancrage
     ? [...ancrage.nombresOrphelins, ...ancrage.nomsOrphelins]
     : [];
@@ -108,11 +134,12 @@ export default async function Lettre({
           <p className="text-sm text-rose-900">{searchParams.message}</p>
         </Carte>
       )}
-      {searchParams.etat === "ok" && searchParams.message && (
-        <Carte className="mb-4 border-emerald-200 bg-emerald-50">
-          <p className="text-sm text-emerald-900">{searchParams.message}</p>
-        </Carte>
-      )}
+      {(searchParams.etat === "ok" || searchParams.etat === "messages") &&
+        searchParams.message && (
+          <Carte className="mb-4 border-emerald-200 bg-emerald-50">
+            <p className="text-sm text-emerald-900">{searchParams.message}</p>
+          </Carte>
+        )}
       {searchParams.etat === "contact" && (
         <Carte className="mb-4 border-emerald-200 bg-emerald-50">
           <p className="text-sm text-emerald-900">
@@ -219,7 +246,26 @@ export default async function Lettre({
               />
             </form>
           )}
+
+          {/* D112 — l'autre porte. Rédiger la lettre produit déjà les deux
+              messages ; ce bouton sert quand on sait que la candidature passe
+              par un formulaire et n'aura jamais besoin de lettre. */}
+          <form action={genererMessages}>
+            <input type="hidden" name="offreId" value={params.id} />
+            <BoutonSoumettre
+              libelle={messages ? "Réécrire les messages courts" : "Messages courts seuls"}
+              libelleEnCours="Rédaction…"
+              className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+            />
+          </form>
         </div>
+
+        <p className="mt-2 text-xs leading-relaxed text-ardoise-400">
+          Rédiger la lettre produit aussi les deux messages courts, pour environ
+          6 ¢. Les messages seuls coûtent environ 1,4 ¢ — même dossier en entrée,
+          mais une sortie huit fois plus courte et le modèle d&apos;extraction.
+          Enchaîner les deux coûte donc plus que la lettre seule.
+        </p>
       </Carte>
 
       {!derniere || !modele ? (
@@ -335,6 +381,60 @@ export default async function Lettre({
             </p>
             <p className="mt-2 text-sm text-ardoise-500">{modele.signature}</p>
           </Carte>
+
+          {/* D112 — les deux messages courts, avec leur compteur exact.
+              Le compteur n'est pas décoratif : c'est lui qui dit si le texte
+              rentre dans le champ du site, et il évite une régénération pour
+              le découvrir. */}
+          {messages && (
+            <div className="mt-4 rounded-lg border border-ardoise-200 bg-white p-4">
+              <p className="text-sm font-medium text-ardoise-800">
+                Messages courts, pour les formulaires
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ardoise-500">
+                Ni formule d&apos;appel, ni politesse, ni signature : collables
+                tels quels dans un champ de texte. Copier ne coûte rien.
+              </p>
+
+              {([
+                ["Version courte", messages.court, "le message court"],
+                ["Version moyenne", messages.moyen, "le message moyen"],
+              ] as const).map(([titre, texte, quoi]) => (
+                <div key={titre} className="mt-3 border-t border-ardoise-100 pt-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-xs font-medium text-ardoise-700">{titre}</p>
+                    <p className="text-xs tabular-nums text-ardoise-400">
+                      {texte.length} signes
+                    </p>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ardoise-700">
+                    {texte}
+                  </p>
+                  <div className="mt-2">
+                    <BoutonCopier texte={texte} quoi={quoi} />
+                  </div>
+                </div>
+              ))}
+
+              {styleMessages.length > 0 && (
+                <div className="mt-3 border-t border-ardoise-100 pt-3">
+                  <p className="text-xs font-medium text-amber-900">
+                    À relire avant d&apos;envoyer
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {styleMessages.map((d, i) => (
+                      <li key={i} className="text-xs leading-relaxed text-ardoise-500">
+                        <span className="font-medium text-ardoise-700">
+                          {d.tournure}
+                        </span>{" "}
+                        — « {d.extrait} » · {d.pourquoi}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {email && (
             <Carte>

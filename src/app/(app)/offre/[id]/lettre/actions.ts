@@ -5,6 +5,7 @@ import { ErreurIA } from "@/lib/anthropic";
 import {
   enregistrerLettreCorrigee,
   genererLettrePourOffre,
+  genererMessagesPourOffre,
   regenererEmailPourOffre,
 } from "@/lib/lettre/generer";
 import { creerClientServeur } from "@/lib/supabase/server";
@@ -113,4 +114,39 @@ export async function regenererEmail(formData: FormData) {
 
   revalidatePath(`/offre/${offreId}/lettre`);
   redirect(`/offre/${offreId}/lettre?etat=email`);
+}
+
+/**
+ * Rédige les deux messages courts, sans la lettre (D112).
+ *
+ * Beaucoup de candidatures passent par un formulaire plafonné en caractères et
+ * n'auront jamais besoin de lettre. Cette action coûte environ 1,4 ¢ contre 6 ¢
+ * pour la lettre : même entrée, mais une sortie huit fois plus courte et le
+ * modèle d'extraction au lieu de celui de rédaction.
+ */
+export async function genererMessages(formData: FormData) {
+  const offreId = String(formData.get("offreId") ?? "");
+  if (!offreId) return;
+
+  let resume = "";
+  try {
+    const r = await genererMessagesPourOffre(offreId);
+    resume =
+      `Messages rédigés : ${r.messages.court.length} et ${r.messages.moyen.length} signes. ` +
+      (r.style.length > 0
+        ? `${r.style.length} tournure${r.style.length > 1 ? "s" : ""} à relire.`
+        : "Aucune tournure signalée.");
+  } catch (e) {
+    if (e instanceof ErreurIA || e instanceof ErreurCV) {
+      redirect(
+        `/offre/${offreId}/lettre?etat=erreur&message=${encodeURIComponent(e.message)}`
+      );
+    }
+    throw e;
+  }
+
+  revalidatePath(`/offre/${offreId}/lettre`);
+  redirect(
+    `/offre/${offreId}/lettre?etat=messages&message=${encodeURIComponent(resume)}`
+  );
 }
