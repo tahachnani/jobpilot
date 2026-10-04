@@ -3,6 +3,7 @@
 import { creerClientServeur } from "@/lib/supabase/server";
 import { VOLETS, type CodeVolet } from "@/config/volets";
 import { enregistrerScore } from "@/lib/analyse";
+import { ficheOuRecherche } from "@/lib/entreprise/fiche";
 import {
   extraireOffre,
   extractionSuffisante,
@@ -181,6 +182,25 @@ export async function reanalyserOffre(formData: FormData) {
   // exception, et le `catch` la transformerait en message d'erreur.
   try {
     const r = await extraireOffre(o.contenu_brut, id);
+
+    /**
+     * La fiche entreprise se cherche ICI, à l'analyse (D118).
+     *
+     * Elle vivait dans la rédaction de la lettre, où elle consommait dix des
+     * soixante secondes d'une requête qui a fini par être tuée par Vercel.
+     * Or on analyse une offre une fois et on rédige parfois trois versions :
+     * la recherche n'a rien à faire dans le chemin qu'on répète.
+     *
+     * Échec sans conséquence : la lettre sait écrire un §2 sans fiche, et le
+     * dira à l'écran. L'analyse, elle, ne doit jamais échouer pour ça.
+     */
+    try {
+      // Le nom fraîchement extrait, et non celui stocké : l'analyse vient de
+      // le relire dans l'annonce, c'est la version la plus sûre.
+      await ficheOuRecherche(r.donnees.entreprise, o.contenu_brut, id);
+    } catch (e) {
+      console.error(`[analyse] fiche entreprise indisponible : ${String(e)}`);
+    }
     donnees = r.donnees;
     modele = r.modele;
   } catch (e) {

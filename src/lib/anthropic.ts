@@ -59,7 +59,7 @@ export async function appelIA(options: {
    */
   recherchesWeb?: number;
   /**
-   * Plafond de jetons de raisonnement, quand on veut le brider (D114).
+   * Niveau d'effort de raisonnement (D118).
    *
    * Constat du 2 octobre : relever `maxTokens` de 8 000 à 20 000 pour corriger
    * un échec a **triplé le prix**. Deux lettres ont coûté 19,6 ¢ et 12 ¢ au
@@ -71,8 +71,20 @@ export async function appelIA(options: {
    * Un plafond haut est donc un budget, pas une sécurité. Les deux se règlent
    * séparément : `maxTokens` borne le total facturé, celui-ci borne la part
    * consommée avant d'écrire.
+   *
+   * D118 — la première version envoyait `thinking.budget_tokens`, et l'API la
+   * refusait : « thinking.adaptive.budget_tokens: Extra inputs are not
+   * permitted ». Le repli jouait, donc rien ne cassait et rien ne se voyait —
+   * mais le raisonnement est resté libre deux jours, avec les lenteurs et le
+   * prix qui vont avec. Une sécurité qui échoue en silence est pire que pas de
+   * sécurité : elle rassure.
+   *
+   * La bonne forme est `output_config.effort`, hors de l'objet `thinking` :
+   * « low » réduit le raisonnement, « high » est le défaut de la plupart des
+   * modèles. Le budget en jetons, lui, n'existe que dans le mode manuel
+   * hérité, incompatible avec le mode adaptatif des modèles récents.
    */
-  budgetRaisonnement?: number;
+  effort?: "low" | "medium" | "high";
 }): Promise<Reponse> {
   const cle = process.env.ANTHROPIC_API_KEY;
   if (!cle) {
@@ -90,13 +102,8 @@ export async function appelIA(options: {
       max_tokens: options.maxTokens ?? 4000,
       system: options.systeme,
       messages: [{ role: "user", content: options.message }],
-      ...(avecRaisonnement && options.budgetRaisonnement
-        ? {
-            thinking: {
-              type: "adaptive",
-              budget_tokens: options.budgetRaisonnement,
-            },
-          }
+      ...(avecRaisonnement && options.effort
+        ? { output_config: { effort: options.effort } }
         : {}),
       ...(options.recherchesWeb
         ? {
@@ -140,11 +147,14 @@ export async function appelIA(options: {
      * paramètre fait rejouer l'appel sans lui. Le premier essai refusé n'est
      * pas facturé — une requête invalide ne produit aucun jeton.
      */
-    if (reponse.status === 400 && options.budgetRaisonnement) {
+    if (reponse.status === 400 && options.effort) {
       const refus = await reponse.clone().text();
-      if (/thinking|budget_tokens/i.test(refus)) {
-        console.warn(
-          `[ia] bridage du raisonnement refusé pour ${options.modele}, appel rejoué sans : ${refus.slice(0, 200)}`
+      if (/thinking|budget_tokens|output_config|effort/i.test(refus)) {
+        // Visible ET bruyant : le refus silencieux de D114 a coûté deux jours
+        // de raisonnement non bridé parce que seul un `console.warn` discret
+        // en portait la trace.
+        console.error(
+          `[ia] EFFORT REFUSÉ pour ${options.modele} — le raisonnement n'est PAS bridé sur cet appel. ${refus.slice(0, 300)}`
         );
         reponse = await envoyer(false);
       }

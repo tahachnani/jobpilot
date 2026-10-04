@@ -261,7 +261,7 @@ async function resoudreFiche(
     // juste produit « blocs : thinking », zéro fiche, et deux recherches
     // facturées pour rien.
     maxTokens: 5000,
-    budgetRaisonnement: 1500,
+    effort: "low" as const,
     tache: "recherche_entreprise",
     offreId: offreId ?? null,
     // Une seule recherche, et non deux (D115). La seconde doublait le contenu

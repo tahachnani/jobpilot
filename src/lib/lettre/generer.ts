@@ -13,7 +13,8 @@ import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { classerSituations } from "@/lib/cv/situations";
-import { ficheEnTexte, ficheOuRecherche } from "@/lib/entreprise/fiche";
+import { ficheEnTexte, lireFiche, type FicheLue } from "@/lib/entreprise/fiche";
+import { documentationEntreprise } from "@/lib/entreprise/documentee";
 import { referenceAnnonce } from "@/lib/offre/reference";
 import { sousVerrou } from "@/lib/verrou";
 import {
@@ -388,7 +389,7 @@ interface Dossier {
    * et consommée à l'enregistrement : sans ce passage, elle reste prisonnière
    * de `rassemblerDossier` — ce qui a cassé le build du 2 octobre.
    */
-  fiche: Awaited<ReturnType<typeof ficheOuRecherche>> | null;
+  fiche: FicheLue | null;
 }
 
 
@@ -493,15 +494,33 @@ async function rassemblerDossier(
    * une lettre plus courte, pas une erreur. Le prompt prévoit explicitement ce
    * cas et demande deux lignes honnêtes plutôt qu'un paragraphe inventé.
    */
-  let fiche: Awaited<ReturnType<typeof ficheOuRecherche>> | null = null;
+  /**
+   * La fiche est LUE, jamais cherchée ici (D118).
+   *
+   * Le 4 octobre, la requête de rédaction a été tuée par Vercel après soixante
+   * secondes : `504 Task timed out`. La recherche entreprise en consommait dix
+   * à elle seule, avant même que la rédaction ne commence — et dix secondes
+   * sur soixante, c'est le sixième d'un budget déjà trop court.
+   *
+   * La recherche appartient à l'analyse de l'offre, pas à la rédaction : on
+   * analyse une fois, on rédige parfois plusieurs fois, et la fiche ne change
+   * pas entre deux versions. La déplacer là où elle est faite une seule fois
+   * rend chaque rédaction plus courte, et le prix ne bouge pas puisque la
+   * fiche était déjà mise en cache par employeur.
+   */
+  let fiche: FicheLue | null = null;
   try {
-    fiche = await ficheOuRecherche(
-      offre.entreprise,
-      offre.contenu_brut,
-      offreId
-    );
+    const { fiche: enBase, origine, ageJours } = await lireFiche(offre.entreprise);
+    fiche = {
+      fiche: enBase,
+      origine: origine === "annonce" ? "annonce" : enBase ? "web" : "absente",
+      reutilisee: true,
+      documentation: documentationEntreprise(offre.contenu_brut),
+      coutUsd: 0,
+      ageJours,
+    };
   } catch (e) {
-    console.error(`[lettre] fiche entreprise indisponible : ${String(e)}`);
+    console.error(`[lettre] fiche entreprise illisible : ${String(e)}`);
   }
 
   /**
@@ -736,10 +755,22 @@ async function redigerLettre(
      * facturés. Le fixer large ne coûte rien, le fixer juste coûte un appel
      * entier à chaque fois qu'il est dépassé.
      */
-    maxTokens: 12000,
+    /**
+     * Redescendu à 8 000 (D118), maintenant que l'effort est réellement bridé.
+     *
+     * Les 12 000 de D114 supposaient un raisonnement limité — il ne l'était
+     * pas, l'API refusait le paramètre en silence. Avec `effort: low`, la part
+     * de raisonnement s'effondre et 8 000 laissent largement la place aux
+     * quatre paragraphes, à l'email et aux deux messages.
+     *
+     * Ce plafond borne aussi la DURÉE, qui est le vrai sujet : la requête est
+     * tuée à soixante secondes, et chaque millier de jetons produits coûte
+     * quelques secondes.
+     */
+    maxTokens: 8000,
     // Le raisonnement a de quoi travailler sans pouvoir manger le budget :
     // la lettre réussie du 2 octobre a produit 8 598 jetons au total.
-    budgetRaisonnement: 3000,
+    effort: "low" as const,
     tache: "lettre_motivation",
     offreId,
   });
@@ -1064,7 +1095,7 @@ export async function regenererEmailPourOffre(offreId: string): Promise<void> {
     // thinking » pour zéro texte utile — facturé quand même. Le plafond ne se
     // paie pas, seuls les jetons produits le sont.
     maxTokens: 4000,
-    budgetRaisonnement: 1500,
+    effort: "low" as const,
     tache: "email_candidature",
     offreId,
   });
@@ -1195,7 +1226,7 @@ async function redigerMessages(offreId: string): Promise<ResultatMessages> {
     // en tout, soit environ 400 jetons, mais le raisonnement peut en demander
     // dix fois plus avant d'écrire la première phrase.
     maxTokens: 6000,
-    budgetRaisonnement: 2000,
+    effort: "low" as const,
     tache: "messages_motivation",
     offreId,
   });
