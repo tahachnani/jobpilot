@@ -294,6 +294,69 @@ export default async function Lettre({
         </p>
       </Carte>
 
+      {/* D123 — les messages courts vivent hors de la branche « il existe
+          une lettre ».
+
+          Ils y étaient enfermés, alors qu'un bouton entier — « Messages
+          courts seuls » — sert précisément à les produire sans lettre. Le
+          5 octobre, sur l'offre d'auditeur junior : bandeau « Messages
+          rédigés : 433 et 859 signes », 1,4 ¢ facturés, et en dessous
+          « Aucune lettre rédigée » avec les deux messages nulle part. Payés,
+          stockés, invisibles.
+
+          D112 — le compteur de signes n'est pas décoratif : c'est lui qui dit
+          si le texte rentre dans le champ du site, et il évite une
+          régénération pour le découvrir. */}
+      {messages && (
+        <Carte>
+          <p className="text-sm font-medium text-ardoise-800">
+            Messages courts, pour les formulaires
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ardoise-500">
+            Ni formule d&apos;appel, ni politesse, ni signature : collables
+            tels quels dans un champ de texte. Copier ne coûte rien.
+          </p>
+
+          {([
+            ["Version courte", messages.court, "le message court"],
+            ["Version moyenne", messages.moyen, "le message moyen"],
+          ] as const).map(([titre, texte, quoi]) => (
+            <div key={titre} className="mt-3 border-t border-ardoise-100 pt-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xs font-medium text-ardoise-700">{titre}</p>
+                <p className="text-xs tabular-nums text-ardoise-400">
+                  {texte.length} signes
+                </p>
+              </div>
+              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ardoise-700">
+                {texte}
+              </p>
+              <div className="mt-2">
+                <BoutonCopier texte={texte} quoi={quoi} />
+              </div>
+            </div>
+          ))}
+
+          {styleMessages.length > 0 && (
+            <div className="mt-3 border-t border-ardoise-100 pt-3">
+              <p className="text-xs font-medium text-amber-900">
+                À relire avant d&apos;envoyer
+              </p>
+              <ul className="mt-1 space-y-1">
+                {styleMessages.map((d, i) => (
+                  <li key={i} className="text-xs leading-relaxed text-ardoise-500">
+                    <span className="font-medium text-ardoise-700">
+                      {d.tournure}
+                    </span>{" "}
+                    — « {d.extrait} » · {d.pourquoi}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Carte>
+      )}
+
       {!derniere || !modele ? (
         <EtatVide
           titre="Aucune lettre rédigée"
@@ -463,59 +526,6 @@ export default async function Lettre({
             </div>
           )}
 
-          {/* D112 — les deux messages courts, avec leur compteur exact.
-              Le compteur n'est pas décoratif : c'est lui qui dit si le texte
-              rentre dans le champ du site, et il évite une régénération pour
-              le découvrir. */}
-          {messages && (
-            <div className="mt-4 rounded-lg border border-ardoise-200 bg-white p-4">
-              <p className="text-sm font-medium text-ardoise-800">
-                Messages courts, pour les formulaires
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-ardoise-500">
-                Ni formule d&apos;appel, ni politesse, ni signature : collables
-                tels quels dans un champ de texte. Copier ne coûte rien.
-              </p>
-
-              {([
-                ["Version courte", messages.court, "le message court"],
-                ["Version moyenne", messages.moyen, "le message moyen"],
-              ] as const).map(([titre, texte, quoi]) => (
-                <div key={titre} className="mt-3 border-t border-ardoise-100 pt-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-xs font-medium text-ardoise-700">{titre}</p>
-                    <p className="text-xs tabular-nums text-ardoise-400">
-                      {texte.length} signes
-                    </p>
-                  </div>
-                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ardoise-700">
-                    {texte}
-                  </p>
-                  <div className="mt-2">
-                    <BoutonCopier texte={texte} quoi={quoi} />
-                  </div>
-                </div>
-              ))}
-
-              {styleMessages.length > 0 && (
-                <div className="mt-3 border-t border-ardoise-100 pt-3">
-                  <p className="text-xs font-medium text-amber-900">
-                    À relire avant d&apos;envoyer
-                  </p>
-                  <ul className="mt-1 space-y-1">
-                    {styleMessages.map((d, i) => (
-                      <li key={i} className="text-xs leading-relaxed text-ardoise-500">
-                        <span className="font-medium text-ardoise-700">
-                          {d.tournure}
-                        </span>{" "}
-                        — « {d.extrait} » · {d.pourquoi}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
 
           {email && (
             <Carte>

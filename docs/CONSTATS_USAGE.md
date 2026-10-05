@@ -1012,3 +1012,27 @@ qu'elle est en Seine-et-Marne — donnerait « mobile Lille ». L'explication no
 la ville retenue, donc l'erreur se voit au lieu de se cacher dans une note.
 
 **185 tests.**
+
+---
+
+# 5 octobre — D123, les messages courts payés et invisibles
+
+Offre d'auditeur junior, bouton « Messages courts seuls ». Le bandeau annonce
+« Messages rédigés : 433 et 859 signes. 2 tournures à relire. » — donc le
+modèle a répondu, le document est en base, **1,1 ¢ facturés**. En dessous :
+« Aucune lettre rédigée », et les deux messages nulle part.
+
+La cause tient en une accolade. Le bloc qui affiche les messages vivait à
+l'intérieur de la branche `{!derniere || !modele ? <EtatVide/> : (…)}` — la
+branche « il existe une lettre ». Or un bouton entier, « Messages courts
+seuls », sert précisément à les produire **sans** lettre. Le seul chemin où ce
+bouton a un intérêt est aussi le seul où son résultat ne s'affiche pas.
+
+Rien n'était perdu : le document `type = "message"` était bien écrit, avec ses
+deux textes et son coût. Le bloc est sorti de la branche et devient une carte
+à part, juste sous le bouton qui le produit. Les messages déjà payés
+réapparaissent sans repasser par le modèle.
+
+Ce défaut appartient à la même famille que D119 : un travail fait, stocké et
+facturé, qu'aucun écran ne montrait. Le symptôme n'est pas une erreur, c'est
+un silence.
