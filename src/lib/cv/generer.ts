@@ -18,6 +18,8 @@ import { chargerCorpus } from "@/lib/cv/corpus";
 import { compterPages, rendreModele } from "@/lib/cv/rendu";
 import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
 import { chargerTaxonomie } from "@/lib/taxonomie";
+import { titreCV } from "@/lib/cv/titre";
+import { ligneLieu } from "@/lib/cv/lieu";
 
 export class ErreurCV extends Error {}
 
@@ -49,7 +51,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
 
   const { data: offreBrute } = await supabase
     .from("offres")
-    .select("id, volet, intitule, entreprise")
+    .select("id, volet, intitule, entreprise, intitule_cv, mention_lieu")
     .eq("id", offreId)
     .maybeSingle();
 
@@ -59,6 +61,8 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     volet: CodeVolet;
     intitule: string | null;
     entreprise: string | null;
+    intitule_cv: string | null;
+    mention_lieu: string | null;
   };
 
   const { data: analyseBrute } = await supabase
@@ -123,7 +127,25 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     );
   }
 
-  let { selection, modele } = choisirNiveau(donnees, analyse, offre.volet);
+  /**
+   * L'en-tête adapté à l'offre : le titre (D121) et la localisation (D122).
+   *
+   * Calculé une fois et passé à chaque recomposition — sinon la descente de
+   * cran et le garnissage changeraient d'en-tête en cours de route, et la
+   * hauteur estimée ne porterait pas sur le document livré.
+   */
+  const saisie = { titre: offre.intitule_cv, lieu: offre.mention_lieu };
+  const entete = {
+    titre: titreCV(offre.volet, analyse, offre.intitule_cv),
+    lieu: ligneLieu(donnees.profil?.localisation, analyse, offre.mention_lieu),
+  };
+
+  let { selection, modele } = choisirNiveau(
+    donnees,
+    analyse,
+    offre.volet,
+    saisie
+  );
   let pdf = await rendreModele(modele);
   let pages = compterPages(pdf);
 
@@ -135,7 +157,7 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
   while (pages > 1 && index < NIVEAUX.length - 1) {
     index += 1;
     selection = selectionner(donnees, analyse, NIVEAUX[index]);
-    modele = construireModele(donnees, selection, offre.volet);
+    modele = construireModele(donnees, selection, offre.volet, entete);
     pdf = await rendreModele(modele);
     pages = compterPages(pdf);
   }
@@ -187,7 +209,12 @@ export async function genererCVPourOffre(offreId: string): Promise<CVGenere> {
     // la boucle redemanderait indéfiniment la même expérience.
     if (nombreDeMissions(essai) <= nombreDeMissions(selection)) break;
 
-    const modeleEssai = construireModele(donnees, essai, offre.volet);
+    const modeleEssai = construireModele(
+      donnees,
+      essai,
+      offre.volet,
+      entete
+    );
     const pdfEssai = await rendreModele(modeleEssai);
     if (compterPages(pdfEssai) > 1) {
       supplements[cible] -= 1;

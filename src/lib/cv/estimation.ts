@@ -33,7 +33,14 @@ import { chargerTaxonomie } from "@/lib/taxonomie";
 export async function estimerPotentiel(
   volet: CodeVolet,
   offreId: string,
-  analyse: OffreExtraite
+  analyse: OffreExtraite,
+  /**
+   * Ce qui est saisi à la main pour cette offre : le titre (D121) et la
+   * mention de lieu (D122). Le titre compte — l'indice mesure le vocabulaire
+   * de l'annonce déjà présent sur le CV, et c'est la ligne la plus proche de
+   * l'intitulé du poste.
+   */
+  saisie: { titre?: string | null; lieu?: string | null } = {}
 ): Promise<Potentiel | null> {
   const donnees = await chargerDonneesCV(volet, offreId);
   if (donnees.experiences.length === 0) return null;
@@ -53,7 +60,7 @@ export async function estimerPotentiel(
   const taxonomie = await chargerTaxonomie();
   const metiers = Object.values(taxonomie).map((a) => a.libelle);
 
-  const { selection, modele } = choisirNiveau(donnees, analyse, volet);
+  const { selection, modele } = choisirNiveau(donnees, analyse, volet, saisie);
 
   return potentielAdaptation(
     analyse,

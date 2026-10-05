@@ -123,17 +123,31 @@ function libelleAvecGarnissage(selection: Selection): string {
 export function construireModele(
   donnees: DonneesCV,
   selection: Selection,
-  volet: CodeVolet
+  volet: CodeVolet,
+  /**
+   * Ce que l'offre personnalise dans l'en-tête.
+   *
+   * `titre` (D121) : absent, on retombe sur l'intitulé cible du volet — le
+   * comportement d'avant, qui reste le bon quand aucune offre n'est en jeu.
+   * `lieu` (D122) : absent, la localisation du profil telle quelle.
+   */
+  entete: { titre?: string | null; lieu?: string | null } = {}
 ): ModeleCV {
   const p = donnees.profil;
 
   return {
     nomComplet: nettoyer([p?.prenom, p?.nom], " ").toUpperCase(),
-    // Le titre reste propre au volet : c'est le poste visé, pas l'intitulé
-    // recopié de l'offre.
-    titre: VOLETS[volet].intitulesCibles[0].toUpperCase(),
+    titre: (
+      entete.titre?.trim() || VOLETS[volet].intitulesCibles[0]
+    ).toUpperCase(),
     contact: nettoyer(
-      [p?.email, p?.telephone, p?.localisation, p?.linkedin, p?.permis],
+      [
+        p?.email,
+        p?.telephone,
+        entete.lieu?.trim() || p?.localisation,
+        p?.linkedin,
+        p?.permis,
+      ],
       "  |  "
     ),
     accroche: donnees.accroche,

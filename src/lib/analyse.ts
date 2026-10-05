@@ -23,20 +23,21 @@ export async function chargerBareme(volet: CodeVolet): Promise<Bareme> {
   const b = lignes.find((l) => l.cle === "bareme")?.valeur ?? {};
   const c = lignes.find((l) => l.cle === "coefficients_anciennete")?.valeur ?? {};
 
-  const poidsVolet = (b[volet] as Record<string, number>) ?? {
-    missions: 35,
-    competences: 30,
-    experience: 20,
-    secteur: 15,
-  };
+  const poidsVolet = (b[volet] as Record<string, number>) ?? {};
 
   return {
     version: String(b.version ?? "1"),
+    /**
+     * Les replis comptent le lieu (D122). Ils servent quand la ligne
+     * `parametres` a disparu : un score doit toujours pouvoir être calculé, et
+     * un repli sans lieu rendrait le critère muet sans que rien ne le dise.
+     */
     poids: {
-      missions: poidsVolet.missions ?? 35,
-      competences: poidsVolet.competences ?? 30,
-      experience: poidsVolet.experience ?? 20,
-      secteur: poidsVolet.secteur ?? 15,
+      missions: poidsVolet.missions ?? 27,
+      competences: poidsVolet.competences ?? 27,
+      experience: poidsVolet.experience ?? 27,
+      secteur: poidsVolet.secteur ?? 9,
+      lieu: poidsVolet.lieu ?? 10,
     },
     plafondEcartBloquant: Number(b.plafond_ecart_bloquant ?? 79),
     coefficients: (c as Record<string, number>) ?? {},

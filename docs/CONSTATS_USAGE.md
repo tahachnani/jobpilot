@@ -860,3 +860,155 @@ Sur le CV du cabinet, à l'estimation seule — donc au pire : **3/3/3/3/3**, le
 trois puces récupérées. Le PDF composé a davantage de marge encore.
 
 **155 tests.**
+
+---
+
+# 5 octobre — D121, le titre du CV suit l'offre
+
+Des offres d'audit apparaissent dans la veille, et la question posée était :
+faut-il un troisième volet pour « auditeur junior » ?
+
+## Ce qu'un volet coûte, mesuré
+
+- **15 branches** de la forme `volet === "cdg" ? "visible_cdg" : "visible_compta"`.
+  Ajouter `"audit"` au type `CodeVolet` ne les fait pas broncher : elles
+  compilent et retombent silencieusement sur « compta ». Même famille de défaut
+  que le `\b` manquant de `parleALaPremierePersonne` ou que la visibilité de
+  D119 — pas d'erreur, un résultat faux.
+- Trois colonnes de plus sur trois tables, une valeur d'enum.
+- **36 missions actives**, dont 23 portent une formulation cdg et 23 une
+  formulation compta. Un volet audit partirait à zéro. Or une mission sans
+  formulation dans le volet devient *empruntable*, et le plafond d'emprunts est
+  de **deux par CV** : le premier CV audit sortirait avec **deux puces**, et le
+  resterait jusqu'à ce que les formulations soient écrites à la main.
+
+## Ce que l'audit demandait vraiment
+
+Rien de tout cela. La taxonomie porte déjà `audit_interne`, `controle_interne`
+et `revision`, et trois missions les portent. Le CV n'est pas composé par
+volet : il l'est **par offre**, à partir des codes d'activité de l'annonce. Sur
+une offre d'audit, ces missions remontent déjà seules.
+
+Un seul élément était figé par volet : le **titre**, `intitulesCibles[0]`.
+D'où « COMPTABLE » en première ligne d'une candidature d'auditeur — le premier
+mot que lit un recruteur, et il contredit l'objet de la lettre.
+
+**Décision.** Le titre suit l'offre. Trois sources, dans l'ordre : ta saisie
+pour cette offre, l'intitulé de l'annonce nettoyé, l'intitulé cible du volet en
+dernier recours. Champ `offres.intitule_cv`, modifiable depuis la fiche.
+
+## Le nettoyage est timide, et c'est voulu
+
+Les titres d'annonce mêlent deux choses après le même tiret : du bruit
+administratif et de la spécialisation qui vaut de l'or. Sur les 99 intitulés de
+la base :
+
+```
+Contrôleur de Gestion - Business Partner Logistique H/F   → … - Business Partner Logistique
+Consultant junior – Audit et gestion des immobilisations  → inchangé
+Contrôleur de Gestion - Pôle Bœuf                         → inchangé
+```
+
+La règle « on coupe après le séparateur » aurait détruit les trois. On ne
+retire donc que ce qu'on sait nommer : marqueurs de mixité (`H/F`, `(F/H)`,
+`H/F/X`), formes inclusives aux trois notations (`Assistant(e)`,
+`Contrôleur.euse`, `Contrôleur-euse`), doublons féminins, mentions de contrat,
+localisation telle que l'analyse l'a lue, référence d'annonce. Un intitulé que
+le nettoyage viderait ressort **intact** : mieux vaut un titre bruité qu'un CV
+sans titre.
+
+Trois pièges relevés en passant la fonction sur les 99 intitulés réels, chacun
+une règle juste en théorie :
+
+1. « Contrôleur de Gestion / **Gestionnaire** de contrats » devenait
+   « Contrôleur de Gestion de contrats » : sept lettres de racine commune et un
+   « e » final suffisaient à faire passer *gestionnaire* pour le féminin de
+   *gestion*. Un féminin n'allonge jamais le masculin de plus de trois lettres.
+2. « Assistant(e) de direction - Gestion administrative et contrôle de
+   gestion » devenait « Assistant de direction » : vingt-deux caractères là où
+   la limite en autorise soixante. On ne sacrifie un segment que si ce qui
+   reste dit encore le poste.
+3. Un titre coupé finissait sur « … administrative **et** ».
+
+**45 intitulés sur 99 nettoyés, 0 dégradé. 173 tests.**
+
+## Et les deux volets existants ?
+
+La question « n'en garder qu'un » se pose d'autant moins que le titre n'en
+dépend plus. Ce que les volets portent encore, mesuré :
+
+- **10 missions sur 15** ont une formulation cdg et une formulation compta
+  **réellement différentes** (5 sont identiques) ;
+- **4 expériences sur 5** ont un intitulé de poste différent selon le volet ;
+- 1 expérience sur 5 n'est visible que dans un volet ;
+- deux accroches.
+
+Fusionner reviendrait à trancher une fois pour toutes une formulation unique
+pour dix missions et un intitulé unique pour quatre expériences, en perdant
+l'autre. C'est la part du volet qui fonctionne. On garde les deux.
+
+---
+
+# 5 octobre — D122, le lieu
+
+L'idée de départ était d'écrire sur le CV la ville de l'annonce : « un candidat
+dans la même ville a plus de chances qu'un autre ailleurs ». La prémisse est
+juste. La conclusion ne l'est pas, pour trois raisons dont aucune n'est morale.
+
+**Le tri géographique se joue en amont.** Il tourne sur la fiche candidat de la
+plateforme et sur le formulaire de candidature, pas sur le PDF. Quand le
+recruteur ouvre le document, le filtre est déjà passé : la ville écrite dessus
+ne fait franchir aucune barrière.
+
+**Dans le 93, la vérité est déjà la meilleure réponse.** Pour une offre
+francilienne, la seule question est « peut-il venir tous les jours », et
+« Saint-Denis (93) » y répond. Écrire la commune de l'offre n'ajoute rien.
+
+**Hors Île-de-France, le CV se contredirait tout seul.** Le CV compta porte
+sept lignes au Mans et à Fès, plus `linkedin.com/in/tahachnani` sur la ligne de
+contact même — profil francilien, à un clic.
+
+## Ce qui a été fait
+
+**La localisation du profil passe de la région à la commune.**
+« Île-de-France, France » → **« Saint-Denis (93) »**. Les analyseurs de CV
+cherchent une commune et un département ; une région est floue. Sur les
+quarante offres franciliennes, c'était un handicap gratuit.
+
+**La mobilité est nommée, par offre.** `Saint-Denis (93) — mobile Lyon` quand
+l'offre tombe dans une ville du périmètre, rien en Île-de-France (il y est
+déjà), rien hors périmètre (on ne promet pas une installation non décidée). Un
+champ par offre permet de forcer la formule : « installation prévue à Lyon en
+janvier » dit plus qu'un « mobile Lyon ».
+
+**Le périmètre devient le cinquième critère du barème.** Quarante-quatre offres
+sur quatre-vingt-dix-neuf étaient hors Île-de-France, et une offre à Alençon
+sortait avec la même note qu'une offre à La Défense si le contenu se
+ressemblait — on payait l'analyse des deux pour s'en apercevoir après. Poids 10,
+pris proportionnellement sur les quatre autres. Barème version 17.
+
+Le classement des quatre-vingt-dix-neuf localisations réelles :
+
+```
+domicile   40    Île-de-France
+mobilité   18    Lyon, Lille, Rennes, Nantes, Marseille, Aix, Nice, Le Mans
+hors       27    Alençon, Brive, Annecy, La Rochelle, Le Lamentin, Troyes…
+inconnue   14    « Siège social », « Halluin », et 11 offres sans localisation
+```
+
+## Les deux pièges
+
+**`"".padStart(2, "0")` rend `"00"`.** Un code de département qui n'existe pas
+mais qui est une chaîne non vide, donc truthy. « Siège social » et les onze
+offres sans localisation tombaient « hors périmètre » et se voyaient coller 40
+sur un critère qu'on n'avait pas mesuré. Elles sont maintenant écartées du
+calcul, ce que le barème sait faire depuis D66.
+
+**Le département rattache à l'agglomération, pas à la commune.** Tourcoing et
+Capinghem relèvent de Lille, Vénissieux et Limonest de Lyon, Châteaugiron de
+Rennes. C'est un signal, pas un calcul d'itinéraire : une extraction fautive —
+« La Madeleine-sur-Loing » rangée en Seine-Maritime dans l'annonce, alors
+qu'elle est en Seine-et-Marne — donnerait « mobile Lille ». L'explication nomme
+la ville retenue, donc l'erreur se voit au lieu de se cacher dans une note.
+
+**185 tests.**

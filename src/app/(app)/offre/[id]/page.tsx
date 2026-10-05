@@ -30,6 +30,13 @@ import {
   type Potentiel,
 } from "@/lib/cv/ecart";
 import { estimerPotentiel } from "@/lib/cv/estimation";
+import { titreCV } from "@/lib/cv/titre";
+import { ligneLieu } from "@/lib/cv/lieu";
+import {
+  LARGEUR_UTILE,
+  MESURES,
+  nombreDeLignes,
+} from "@/lib/cv/mise-en-page";
 import { lireFiche } from "@/lib/entreprise/fiche";
 import { documentationEntreprise } from "@/lib/entreprise/documentee";
 import { referenceAnnonce } from "@/lib/offre/reference";
@@ -46,6 +53,8 @@ import {
   genererRelance,
   revenirEnArriere,
   genererPreparation,
+  modifierIntituleCV,
+  modifierMentionLieu,
 } from "./actions";
 import { jour, joursDepuis, relanceDue } from "@/lib/suivi";
 import { schemaDe } from "@/lib/documents";
@@ -153,6 +162,7 @@ export default async function DetailOffre({
     analyse?: string;
     avant?: string;
     apres?: string;
+    titre?: string;
   };
 }) {
   const supabase = creerClientServeur();
@@ -270,8 +280,54 @@ export default async function DetailOffre({
    */
   const potentielEstime =
     !potentielDuCV && analyse
-      ? await estimerPotentiel(offre.volet as CodeVolet, params.id, analyse)
+      ? await estimerPotentiel(
+          offre.volet as CodeVolet,
+          params.id,
+          analyse,
+          {
+            titre: offre.intitule_cv as string | null,
+            lieu: offre.mention_lieu as string | null,
+          }
+        )
       : null;
+
+  /**
+   * La localisation du profil, pour montrer la ligne telle qu'elle sera
+   * imprimée (D122). Un aperçu vaut mieux qu'une explication : la mention
+   * s'accole à la localisation, et c'est l'ensemble qu'un recruteur lit.
+   */
+  const { data: profilBrut } = await supabase
+    .from("profil")
+    .select("localisation")
+    .maybeSingle();
+  const localisationProfil =
+    (profilBrut as { localisation: string | null } | null)?.localisation ?? null;
+
+  /**
+   * La ligne de contact telle qu'elle sera composée, et si elle tient.
+   *
+   * Les mentions déduites tiennent toutes sur une ligne, « Aix-en-Provence »
+   * compris — mesuré. Une saisie longue, elle, peut faire passer la ligne sur
+   * deux : ce n'est pas un défaut, l'estimateur le voit et le garnissage le
+   * compense, mais autant que ce soit dit avant plutôt que découvert sur le
+   * PDF.
+   */
+  const lieuImprime = ligneLieu(
+    localisationProfil,
+    analyse,
+    offre.mention_lieu as string | null
+  );
+  const contactImprime = [
+    "tahachnani@gmail.com",
+    "+33 7 53 83 72 50",
+    lieuImprime,
+    "linkedin.com/in/tahachnani",
+    "Permis B",
+  ]
+    .filter(Boolean)
+    .join("  |  ");
+  const contactSurDeuxLignes =
+    nombreDeLignes(contactImprime, MESURES.tailleContact, LARGEUR_UTILE) > 1;
 
   const potentiel = potentielDuCV ?? potentielEstime;
   const potentielProvisoire = !potentielDuCV && potentielEstime !== null;
@@ -471,6 +527,9 @@ export default async function DetailOffre({
             <BlocSousScore titre="Compétences" s={score.competences} />
             <BlocSousScore titre="Expérience" s={score.experience} />
             <BlocSousScore titre="Secteur" s={score.secteur} />
+            {/* D122 — le lieu n'existe pas sur les scores calculés avant le
+                5 octobre. Un recalcul, qui est gratuit, le fait apparaître. */}
+            {score.lieu ? <BlocSousScore titre="Lieu" s={score.lieu} /> : null}
           </div>
         </>
       )}
@@ -828,6 +887,88 @@ export default async function DetailOffre({
             </form>
           </div>
         </div>
+
+        {/* D121 — le titre imprimé en tête du CV.
+            Il était figé par volet, donc « COMPTABLE » sur une candidature
+            d'auditeur. Le changer ici évite d'ouvrir un volet entier pour une
+            ligne de texte : le reste du CV s'adapte déjà offre par offre. */}
+        <form
+          action={modifierIntituleCV}
+          className="mt-4 border-t border-ardoise-100 pt-4"
+        >
+          <input type="hidden" name="id" value={params.id} />
+          <label
+            htmlFor="intituleCV"
+            className="block text-xs font-medium uppercase tracking-wide text-ardoise-500"
+          >
+            Titre imprimé en haut du CV
+          </label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <input
+              id="intituleCV"
+              name="intituleCV"
+              type="text"
+              maxLength={120}
+              defaultValue={(offre.intitule_cv as string | null) ?? ""}
+              placeholder={titreCV(offre.volet as CodeVolet, analyse)}
+              className="min-w-0 flex-1 rounded-lg border border-ardoise-300 px-3 py-2 text-sm text-ardoise-900 placeholder:text-ardoise-400"
+            />
+            <BoutonSoumettre
+              libelle="Enregistrer"
+              libelleEnCours="Enregistrement…"
+              className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+            />
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-ardoise-500">
+            {offre.intitule_cv
+              ? "Ta saisie l'emporte sur l'annonce. Vide ce champ pour revenir à l'intitulé de l'annonce."
+              : `Déduit de l'annonce : « ${titreCV(offre.volet as CodeVolet, analyse)} ». Écris ici pour l'imposer — « Auditeur junior », par exemple.`}{" "}
+            Le titre vaut pour la prochaine génération, qui ne coûte rien.
+          </p>
+        </form>
+
+        {/* D122 — la mention de mobilité, à côté de la localisation.
+            Le tri géographique se joue sur la fiche candidat de la plateforme,
+            pas sur le PDF : nommer la mobilité répond à la question du
+            recruteur, inventer une ville ne franchit aucun filtre. */}
+        <form
+          action={modifierMentionLieu}
+          className="mt-4 border-t border-ardoise-100 pt-4"
+        >
+          <input type="hidden" name="id" value={params.id} />
+          <label
+            htmlFor="mentionLieu"
+            className="block text-xs font-medium uppercase tracking-wide text-ardoise-500"
+          >
+            Mention de mobilité
+          </label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <input
+              id="mentionLieu"
+              name="mentionLieu"
+              type="text"
+              maxLength={80}
+              defaultValue={(offre.mention_lieu as string | null) ?? ""}
+              placeholder="déduite du périmètre"
+              className="min-w-0 flex-1 rounded-lg border border-ardoise-300 px-3 py-2 text-sm text-ardoise-900 placeholder:text-ardoise-400"
+            />
+            <BoutonSoumettre
+              libelle="Enregistrer"
+              libelleEnCours="Enregistrement…"
+              className="rounded-lg border border-ardoise-300 px-4 py-2 text-sm font-medium text-ardoise-700 transition hover:bg-ardoise-50"
+            />
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-ardoise-500">
+            Ligne imprimée :{" "}
+            <span className="font-medium text-ardoise-700">
+              {lieuImprime || "—"}
+            </span>
+            . Rien n&apos;est ajouté en Île-de-France : tu y es déjà.
+            {contactSurDeuxLignes
+              ? " Attention : cette ligne de contact passera sur deux lignes."
+              : ""}
+          </p>
+        </form>
 
         {/* D89 — l'indice à l'endroit où se prend la décision.
             Il vivait sur l'écran Formulations, c'est-à-dire derrière le clic

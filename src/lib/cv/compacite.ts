@@ -9,6 +9,8 @@ import {
   type Selection,
 } from "@/lib/cv/selection";
 import { construireModele, type ModeleCV } from "@/lib/cv/modele";
+import { titreCV } from "@/lib/cv/titre";
+import { ligneLieu } from "@/lib/cv/lieu";
 import { tientSurUnePage } from "@/lib/cv/encombrement";
 
 /**
@@ -28,18 +30,31 @@ const MAX_AJOUTS = 6;
 export function choisirNiveau(
   donnees: DonneesCV,
   offre: OffreExtraite,
-  volet: CodeVolet
+  volet: CodeVolet,
+  /**
+   * Ce que tu as saisi à la main pour cette offre : le titre (D121) et la
+   * mention de lieu (D122). Les deux comptent ici et pas seulement à la
+   * génération : ils occupent des lignes de la page, et ils entrent dans le
+   * texte sur lequel l'indice d'adaptation est mesuré.
+   */
+  saisie: { titre?: string | null; lieu?: string | null } = {}
 ): { selection: Selection; modele: ModeleCV } {
+  const entete = {
+    titre: titreCV(volet, offre, saisie.titre),
+    lieu: ligneLieu(donnees.profil?.localisation, offre, saisie.lieu),
+  };
   let dernier: { selection: Selection; modele: ModeleCV } | null = null;
 
   for (const niveau of NIVEAUX) {
     const selection = selectionner(donnees, offre, niveau);
-    const modele = construireModele(donnees, selection, volet);
+    const modele = construireModele(donnees, selection, volet, entete);
     dernier = { selection, modele };
-    if (tientSurUnePage(modele)) return garnir(donnees, offre, dernier, volet);
+    if (tientSurUnePage(modele)) {
+      return garnir(donnees, offre, dernier, volet, entete);
+    }
   }
 
-  return garnir(donnees, offre, dernier!, volet);
+  return garnir(donnees, offre, dernier!, volet, entete);
 }
 
 /**
@@ -61,7 +76,8 @@ function garnir(
   donnees: DonneesCV,
   offre: OffreExtraite,
   depart: { selection: Selection; modele: ModeleCV },
-  volet: CodeVolet
+  volet: CodeVolet,
+  entete: { titre: string; lieu: string }
 ): { selection: Selection; modele: ModeleCV } {
   // Un CV qui déborde déjà n'a pas de place à rendre.
   if (!tientSurUnePage(depart.modele)) return depart;
@@ -85,7 +101,7 @@ function garnir(
     // la boucle redemanderait indéfiniment la même expérience.
     if (nombreDeMissions(selection) <= nombreDeMissions(courant.selection)) break;
 
-    const modele = construireModele(donnees, selection, volet);
+    const modele = construireModele(donnees, selection, volet, entete);
     if (!tientSurUnePage(modele)) {
       supplements[cible] -= 1;
       break;

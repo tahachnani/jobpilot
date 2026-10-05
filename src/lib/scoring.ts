@@ -1,4 +1,5 @@
 import { noteSecteur } from "@/config/secteurs";
+import { noteLieu, zoneDeLOffre } from "@/config/mobilite";
 import { SOCLE, libelleDe, type Taxonomie } from "@/lib/taxonomie";
 import type { CodeVolet } from "@/config/volets";
 import type { OffreExtraite } from "@/lib/extraction-offre";
@@ -56,16 +57,21 @@ export interface Resultat {
   plafonne: boolean;
   raisonPlafond: string | null;
   /**
-   * Combien des quatre critères l'annonce n'a pas permis de mesurer (D66).
+   * Combien des cinq critères l'annonce n'a pas permis de mesurer (D66).
    *
    * Un score calculé sur deux critères vaut moins qu'un score calculé sur
-   * quatre : l'écran le dit au lieu de laisser croire à la même solidité.
+   * cinq : l'écran le dit au lieu de laisser croire à la même solidité.
    */
   criteresEcartes: number;
   missions: SousScore;
   competences: SousScore;
   experience: SousScore;
   secteur: SousScore;
+  /**
+   * Le lieu (D122). Absent des scores calculés avant le 5 octobre : les écrans
+   * doivent le tester avant de l'afficher.
+   */
+  lieu: SousScore;
   versionBareme: string;
 }
 
@@ -88,7 +94,13 @@ export interface ProfilPourScoring {
 
 export interface Bareme {
   version: string;
-  poids: { missions: number; competences: number; experience: number; secteur: number };
+  poids: {
+    missions: number;
+    competences: number;
+    experience: number;
+    secteur: number;
+    lieu: number;
+  };
   plafondEcartBloquant: number;
   coefficients: Record<string, number>;
 }
@@ -549,6 +561,28 @@ export function calculerScore(
     resume: s.explication,
   };
 
+  /**
+   * Le lieu (D122).
+   *
+   * Quarante-quatre offres sur quatre-vingt-dix-neuf étaient hors
+   * Île-de-France, et le barème n'en disait rien : une offre à Alençon et une
+   * offre à La Défense sortaient avec la même note si le contenu se
+   * ressemblait. On payait l'analyse des deux pour s'en apercevoir après.
+   *
+   * Hors périmètre vaut 40 et non zéro : une bonne offre à Caen mérite d'être
+   * vue, elle ne doit simplement pas passer pour l'équivalent de la même offre
+   * à vingt minutes.
+   */
+  const z = zoneDeLOffre(offre.localisation, offre.departement);
+  const l = noteLieu(z);
+  const lieu: SousScore = {
+    note: l.note,
+    poids: 0,
+    mesurable: l.mesurable,
+    lignes: [{ libelle: "Lieu", note: l.note, explication: l.explication }],
+    resume: l.explication,
+  };
+
   const p = bareme.poids;
 
   /**
@@ -564,6 +598,7 @@ export function calculerScore(
     { sous: competences, poids: p.competences },
     { sous: experience, poids: p.experience },
     { sous: secteur, poids: p.secteur },
+    { sous: lieu, poids: p.lieu },
   ];
 
   const mesurables = parts.filter((x) => x.sous.mesurable);
@@ -612,6 +647,7 @@ export function calculerScore(
     competences,
     experience,
     secteur,
+    lieu,
     versionBareme: bareme.version,
   };
 }

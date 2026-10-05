@@ -1,0 +1,12 @@
+-- D121 : le titre du CV suit l'offre, plus le volet.
+--
+-- `intitulesCibles[0]` du volet imprimait « COMPTABLE » en tête d'une
+-- candidature à un poste d'auditeur junior. Plutôt qu'un troisième volet —
+-- trois colonnes par table, quinze branches de code qui retombent
+-- silencieusement sur « compta », trente-six formulations à réécrire — le
+-- titre devient une propriété de l'offre.
+--
+-- Vide par défaut, et vide veut dire « déduis-le de l'annonce » : le volet ne
+-- sert plus que de dernier recours, quand l'annonce n'a pas d'intitulé
+-- exploitable.
+alter table offres add column if not exists intitule_cv text;

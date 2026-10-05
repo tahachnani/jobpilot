@@ -313,6 +313,69 @@ export async function genererCV(formData: FormData) {
 }
 
 /**
+ * Fixe le titre imprimé en tête du CV pour cette offre (D121).
+ *
+ * Le titre était figé par volet : « CONTRÔLEUR DE GESTION » ou « COMPTABLE »,
+ * quelle que soit l'annonce. Une candidature à un poste d'auditeur junior
+ * partait donc avec le mauvais mot en première ligne, et la seule issue
+ * paraissait être d'ouvrir un troisième volet — une structure entière pour une
+ * ligne de texte, alors que le reste du CV s'adapte déjà offre par offre.
+ *
+ * Vider le champ ne remet pas le titre du volet : il rend la main à l'intitulé
+ * de l'annonce, nettoyé. Le volet ne reste que le dernier recours, quand
+ * l'annonce n'a pas d'intitulé exploitable.
+ *
+ * Aucun CV n'est recomposé ici. Le titre vaudra pour la prochaine génération,
+ * et celle-ci est gratuite.
+ */
+export async function modifierIntituleCV(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const saisi = String(formData.get("intituleCV") ?? "").trim();
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({ intitule_cv: saisi.slice(0, 120) || null })
+    .eq("id", id);
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?titre=ok`);
+}
+
+/**
+ * Fixe la mention de mobilité imprimée à côté de la localisation (D122).
+ *
+ * Vide, elle est déduite du périmètre : rien en Île-de-France, « mobile Lyon »
+ * pour une ville de mobilité déclarée, rien ailleurs. Remplie, elle remplace
+ * la déduction — « installation prévue à Lyon en janvier » dit plus qu'un
+ * « mobile Lyon », et c'est le genre de phrase qu'on n'écrit qu'une fois,
+ * quand c'est vrai.
+ *
+ * Ce champ ne sert pas à écrire la ville de l'annonce comme domicile. Le tri
+ * géographique se joue en amont, sur la fiche candidat de la plateforme : le
+ * PDF ne franchit aucun filtre, et un parcours entièrement au Mans et à Fès,
+ * sous un lien LinkedIn francilien, contredit la ville inventée sur la même
+ * ligne.
+ */
+export async function modifierMentionLieu(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const saisi = String(formData.get("mentionLieu") ?? "").trim();
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("offres")
+    .update({ mention_lieu: saisi.slice(0, 80) || null })
+    .eq("id", id);
+
+  revalidatePath(`/offre/${id}`);
+  redirect(`/offre/${id}?titre=ok`);
+}
+
+/**
  * Déclare la candidature envoyée (D44).
  *
  * C'est le seul chemin vers `envoyee` : l'application n'envoie rien et ne
