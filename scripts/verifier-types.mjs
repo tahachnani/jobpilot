@@ -45,7 +45,7 @@ const BRUIT = new Set([
   "TS2882",
   "TS2345", // argument non assignable — souvent du bruit, mais pas toujours
   "TS7031", // élément de déstructuration implicitement any
-  "TS2353", // propriété inconnue sur un type devenu unknown
+  "TS2353", // propriété inconnue — gardé quand le type est déclaré sur place
 ]);
 
 const fichiers = globSync("src/**/*.{ts,tsx}");
@@ -84,6 +84,38 @@ function estImporte(fichier, nom) {
   return new RegExp(`\\b${nom}\\b`).test(clauses);
 }
 
+/**
+ * Le type est-il DÉCLARÉ dans ce fichier ? Alors TS2353 n'est pas du bruit.
+ *
+ * TS2353 — « Object literal may only specify known properties » — était
+ * écarté en bloc, parce qu'un type venu d'un module non résolu devient `any`
+ * et déclenche l'erreur à tort. Mais quand l'interface est déclarée dans le
+ * fichier même, TypeScript la connaît parfaitement et l'erreur est vraie.
+ *
+ * Deux builds Vercel sont tombés sur exactement ce cas, à quatre jours
+ * d'intervalle : `fiche` le 2 octobre, `verification` le 6, toutes deux
+ * ajoutées à l'objet rendu par `rassemblerDossier` sans être ajoutées à
+ * l'interface `Dossier` déclarée vingt lignes plus haut. Le filtre les a
+ * laissées passer les deux fois.
+ *
+ * Une exception, trouvée dès le premier passage de cette règle : une
+ * interface locale qui **hérite** d'un type importé reste inconnue de bout en
+ * bout. `CompetenceRetenue extends CompetenceCV` ne connaît ni `libelle` ni
+ * `niveau` tant que `@/lib/cv/donnees` n'est pas résolu, et l'erreur est alors
+ * du bruit. On ne garde donc que les déclarations sans `extends`.
+ */
+function estDeclareIci(fichier, type) {
+  if (!cache.has(fichier)) {
+    cache.set(fichier, existsSync(fichier) ? readFileSync(fichier, "utf8") : "");
+  }
+  const declaration = cache
+    .get(fichier)
+    .match(
+      new RegExp(`^\\s*(?:export\\s+)?(?:interface|type)\\s+${type}\\b[^{=]*`, "m")
+    );
+  return Boolean(declaration) && !/\bextends\b/.test(declaration[0]);
+}
+
 const reels = [];
 for (const ligne of lignes) {
   const m = ligne.match(/^(.+?)\((\d+),\d+\): error (TS\d+): (.*)$/);
@@ -97,6 +129,12 @@ for (const ligne of lignes) {
     if (nom && !ambiants.includes(nom) && !estImporte(fichier, nom)) {
       reels.push(ligne);
     }
+    continue;
+  }
+
+  if (code === "TS2353") {
+    const type = texte.match(/does not exist in type '([A-Za-z_$][\w$]*)'/)?.[1];
+    if (type && estDeclareIci(fichier, type)) reels.push(ligne);
     continue;
   }
 

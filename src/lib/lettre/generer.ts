@@ -425,6 +425,16 @@ interface Dossier {
    * de `rassemblerDossier` — ce qui a cassé le build du 2 octobre.
    */
   fiche: FicheLue | null;
+  /**
+   * Ce que les contrôles de fond doivent savoir du dossier (D127) : les
+   * employeurs nommés au rédacteur, celui qui partage le secteur de
+   * l'entreprise visée, et l'existence d'une fiche.
+   *
+   * Même leçon que la fiche juste au-dessus, et même build cassé : une valeur
+   * calculée dans l'assemblage et consommée à l'enregistrement doit traverser
+   * cette interface, sinon elle n'existe pas.
+   */
+  verification: ContexteVerification;
 }
 
 

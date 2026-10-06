@@ -1228,3 +1228,35 @@ contrôles s'y ajoutent :
 - **Message déséquilibré** — le même plafond, appliqué aux deux messages.
 
 **200 tests.**
+
+## Post-scriptum — le vérificateur écartait précisément cette erreur
+
+Le build de la passe 23 est tombé à 23 h 30 :
+
+```
+./src/lib/lettre/generer.ts:799:5
+Type error: Object literal may only specify known properties,
+and 'verification' does not exist in type 'Dossier'.
+```
+
+`verification` avait été ajoutée à l'objet rendu par `rassemblerDossier` sans
+être ajoutée à l'interface `Dossier`, déclarée vingt lignes plus haut dans le
+même fichier. **C'est le même défaut, au même endroit, que celui du 2 octobre
+avec `fiche`** — et le commentaire de l'interface le raconte déjà.
+
+Le vérificateur hors ligne l'a laissé passer les deux fois : `TS2353` figurait
+dans la liste du bruit, parce qu'un type venu d'un module non résolu devient
+`any` et déclenche l'erreur à tort.
+
+Même traitement que `TS2304` en D117 : le code n'est plus écarté en bloc, il
+est **qualifié**. On le garde quand le type en cause est déclaré dans le
+fichier même — TypeScript le connaît alors parfaitement, et l'erreur est vraie.
+
+Une exception est apparue dès le premier passage de la règle, sur
+`CompetenceRetenue extends CompetenceCV` : une interface locale qui hérite d'un
+type importé reste inconnue de bout en bout, et l'erreur redevient du bruit. On
+n'en garde donc que les déclarations sans `extends`.
+
+Vérifié en réintroduisant le défaut : le détecteur le nomme. Un outil qui rate
+la panne qui l'a motivé ne vaut rien — la leçon est la même qu'en D117, où le
+premier détecteur cherchait le nom dans le chemin du module.
