@@ -1307,7 +1307,7 @@ export default async function DetailOffre({
         {/* D94 — cette offre se candidate par mail, et l'annonce le disait.
             L'adresse était dans le texte brut depuis le premier jour : il
             fallait rouvrir l'annonce pour la retrouver. */}
-        {(ficheEntreprise || docEntreprise.faits.length > 0 || reference) && (
+        {analyse && (
           <div className="mt-3 rounded-lg border border-ardoise-200 bg-white p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-ardoise-900">
@@ -1382,12 +1382,19 @@ export default async function DetailOffre({
                 </p>
               </div>
             ) : (
+              /* D126 — ce message annonçait une recherche « à la rédaction de
+                 la lettre » qui n'avait plus lieu nulle part depuis D118, et le
+                 panneau entier disparaissait quand il n'y avait rien à montrer.
+                 L'absence de fiche se découvrait donc dans la lettre. */
               <p className="mt-2 text-xs leading-relaxed text-ardoise-500">
                 L&apos;annonce ne dit presque rien de l&apos;entreprise
                 {docEntreprise.faits.length > 0 &&
                   ` — seulement « ${docEntreprise.faits.join(" », « ")} »`}
-                . Une recherche web sera lancée à la rédaction de la lettre, une
-                seule fois pour cet employeur, pour environ 3 ¢.
+                , et <strong>aucune fiche n&apos;a été trouvée</strong>. La
+                recherche est lancée à l&apos;analyse ; si elle a échoué, le
+                bouton « Réanalyser » la relance. Sans fiche, le paragraphe sur
+                l&apos;entreprise sera court — et c&apos;est voulu : il
+                n&apos;inventera rien.
               </p>
             )}
           </div>

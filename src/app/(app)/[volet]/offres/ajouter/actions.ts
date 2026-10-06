@@ -5,6 +5,7 @@ import { creerClientServeur } from "@/lib/supabase/server";
 import { voletDepuisSlug } from "@/config/volets";
 import { extraireOffre, extractionSuffisante } from "@/lib/extraction-offre";
 import { enregistrerScore } from "@/lib/analyse";
+import { ficheOuRecherche } from "@/lib/entreprise/fiche";
 import { ErreurIA } from "@/lib/anthropic";
 import { redirect } from "next/navigation";
 
@@ -217,6 +218,29 @@ export async function ajouterEtAnalyser(formData: FormData) {
       volet,
       donnees,
     });
+
+    /**
+     * La fiche entreprise se cherche ICI aussi (D126).
+     *
+     * D118 l'a sortie de la rédaction pour la mettre « à l'analyse » — mais
+     * ne l'a rebranchée que sur le bouton « Réanalyser ». Le chemin normal,
+     * celui que toute offre emprunte, ne l'appelait nulle part.
+     *
+     * Constat du 6 octobre : `recherches_entreprise` contenait **deux lignes**,
+     * du 2 et du 4 octobre, et rien depuis. Les dix-sept lettres écrites
+     * entre-temps avaient toutes un §2 sans matière, d'où les paragraphes de
+     * deux lignes. Ce n'était pas un réglage trop prudent : c'était un fil
+     * coupé.
+     *
+     * Échec sans conséquence, comme à la réanalyse : la lettre sait écrire un
+     * §2 sans fiche et le dit à l'écran. L'ajout d'une offre, lui, ne doit
+     * jamais échouer pour ça.
+     */
+    try {
+      await ficheOuRecherche(donnees.entreprise, contenu, offreId);
+    } catch (e) {
+      console.error(`[ajout] fiche entreprise indisponible : ${String(e)}`);
+    }
   } catch (e) {
     if (e instanceof ErreurIA) {
       await supabase

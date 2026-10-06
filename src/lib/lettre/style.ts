@@ -300,7 +300,70 @@ const TOURNURES: { motif: RegExp; tournure: string; pourquoi: string }[] = [
  * @param paragraphes Le corps de la lettre, formules d'appel et de politesse
  * exclues : elles ont leurs propres conventions.
  */
-export function verifierStyle(paragraphes: string[]): DefautStyle[] {
+/**
+ * Ce que le contrôle doit savoir du dossier pour juger le fond (D127).
+ *
+ * Les quatorze contrôles précédents ne regardaient que le texte : ils
+ * attrapaient des tournures. Les défauts du 6 octobre sont d'une autre nature
+ * — une lettre qui ne parle que d'un employeur, qui tait un secteur partagé,
+ * qui consacre un paragraphe entier à une mission. On ne les voit qu'en
+ * comparant le texte produit à ce qui avait été fourni pour l'écrire.
+ */
+export interface ContexteVerification {
+  /** Les employeurs nommés au rédacteur, le mieux classé en tête. */
+  employeurs?: string[];
+  /** L'employeur qui partage le secteur de l'entreprise visée, s'il existe. */
+  employeurDuSecteur?: string | null;
+  /** Ce secteur, en toutes lettres. */
+  secteurPartage?: string | null;
+  /** Vrai si une fiche entreprise existait au moment d'écrire. */
+  ficheDisponible?: boolean;
+  /** Quatre paragraphes, ou deux messages indépendants. */
+  format?: "lettre" | "messages";
+}
+
+/** Le nom d'un employeur figure-t-il dans ce texte ? */
+function nomme(texte: string, employeur: string): boolean {
+  const n = normaliser(texte);
+  const cible = normaliser(employeur);
+  if (cible.length < 3) return false;
+  if (` ${n} `.includes(` ${cible} `)) return true;
+
+  // Les noms composés sont parfois abrégés — « Le Mans Métropole Habitat »
+  // devient « Métropole Habitat ». Le mot le plus distinctif suffit alors.
+  const motLePlusLong = cible
+    .split(" ")
+    .filter((m) => m.length >= 5)
+    .sort((a, b) => b.length - a.length)[0];
+  return motLePlusLong ? ` ${n} `.includes(` ${motLePlusLong} `) : false;
+}
+
+/**
+ * La part du texte écoulée avant que le second employeur n'apparaisse.
+ *
+ * C'est la mesure du déséquilibre : si le second n'arrive qu'à la toute fin,
+ * ou jamais, le texte raconte une expérience et en mentionne une autre pour
+ * la forme. Rend `null` quand il n'y a pas deux employeurs à comparer.
+ */
+function partDuPremier(texte: string, employeurs: string[]): number | null {
+  if (employeurs.length < 2) return null;
+  const n = normaliser(texte);
+  const position = (e: string) => {
+    const cible = normaliser(e);
+    const i = n.indexOf(cible);
+    if (i >= 0) return i;
+    const mot = cible.split(" ").filter((m) => m.length >= 5).sort((a, b) => b.length - a.length)[0];
+    return mot ? n.indexOf(mot) : -1;
+  };
+  const second = position(employeurs[1]);
+  if (second < 0) return 1;
+  return n.length > 0 ? second / n.length : null;
+}
+
+export function verifierStyle(
+  paragraphes: string[],
+  contexte: ContexteVerification = {}
+): DefautStyle[] {
   const defauts: DefautStyle[] = [];
   const texte = paragraphes.join("\n");
   const n = normaliser(texte);
@@ -566,6 +629,95 @@ export function verifierStyle(paragraphes: string[]): DefautStyle[] {
         "Insister n'est pas convaincre. Un fait n'a pas besoin d'être « particulièrement » quoi que ce soit ; supprime-les, la phrase tient debout.",
     });
   }
+
+
+  /**
+   * ── Les contrôles de fond (D127) ──
+   *
+   * Ils ne jugent pas une tournure mais ce que la lettre a choisi de dire. Ils
+   * ont tous la même origine : le 6 octobre, une lettre pour un fabricant de
+   * lingerie racontait la valorisation de résidences HLM, sur six lignes, sans
+   * nommer le stage de contrôle de gestion fait dans une usine de lingerie.
+   */
+  const employeurs = contexte.employeurs ?? [];
+  const estLettre = contexte.format !== "messages";
+
+  // Le §3 pour une lettre ; chaque message pris séparément sinon.
+  const aExaminer = estLettre
+    ? paragraphes.length >= 3
+      ? [paragraphes[2]]
+      : []
+    : paragraphes;
+
+  for (const [rang, bloc] of aExaminer.entries()) {
+    if (!bloc || employeurs.length === 0) continue;
+    const quoi = estLettre ? "Le paragraphe parcours" : `Le message ${rang + 1}`;
+    const cites = employeurs.filter((e) => nomme(bloc, e));
+
+    if (cites.length <= 1 && employeurs.length >= 2) {
+      defauts.push({
+        tournure: estLettre ? "Parcours étroit" : `Message ${rang + 1} — parcours étroit`,
+        extrait: extrait(bloc),
+        pourquoi:
+          `${quoi} ne nomme qu'un employeur alors que deux te sont fournis. ` +
+          `Un parcours se montre par son étendue : nomme aussi ${employeurs[1]}, ` +
+          "ne serait-ce qu'en une proposition.",
+      });
+      continue;
+    }
+
+    const part = partDuPremier(bloc, employeurs);
+    if (part !== null && part > 0.75) {
+      defauts.push({
+        tournure: estLettre
+          ? "Parcours déséquilibré"
+          : `Message ${rang + 1} — déséquilibré`,
+        extrait: extrait(bloc),
+        pourquoi:
+          `${quoi} consacre ${Math.round(part * 100)} % de sa longueur à une seule ` +
+          "expérience avant de nommer la seconde. Le reste du parcours paraît vide.",
+      });
+    }
+  }
+
+  /**
+   * Le secteur partagé, tu, est le défaut le plus coûteux de tous : c'est
+   * l'argument le moins cher de la lettre et le plus difficile à contester.
+   */
+  if (contexte.employeurDuSecteur) {
+    const tout = paragraphes.join("\n");
+    if (!nomme(tout, contexte.employeurDuSecteur)) {
+      defauts.push({
+        tournure: "Secteur partagé ignoré",
+        extrait: contexte.secteurPartage ?? contexte.employeurDuSecteur,
+        pourquoi:
+          `${contexte.employeurDuSecteur} relève du même secteur que ` +
+          `l'entreprise visée${
+            contexte.secteurPartage ? ` (${contexte.secteurPartage})` : ""
+          }, et la lettre ne le nomme nulle part. C'est l'argument le plus ` +
+          "fort du dossier, et il est gratuit.",
+      });
+    }
+  }
+
+  /**
+   * Le §2 court n'est pas toujours une faute du rédacteur : le plus souvent,
+   * c'est qu'il n'avait rien. Le dire évite de corriger le mauvais endroit.
+   */
+  if (estLettre && paragraphes.length >= 2) {
+    const entreprise = paragraphes[1] ?? "";
+    if (entreprise.length < 120 && contexte.ficheDisponible === false) {
+      defauts.push({
+        tournure: "Entreprise muette, faute de matière",
+        extrait: extrait(entreprise),
+        pourquoi:
+          "Ce paragraphe est court parce qu'aucune fiche entreprise n'existait : " +
+          "le rédacteur a eu raison de ne rien inventer. Relance l'analyse de " +
+          "l'offre pour déclencher la recherche, puis réécris la lettre.",
+      });
+    }
+  }
+
 
   return defauts;
 }

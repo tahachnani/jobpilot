@@ -1124,3 +1124,107 @@ Et la comparaison ne se produit pas sur un CV — les outils partent sur leur
 ligne groupée et ne disputent aucune place aux lignes métier.
 
 **191 tests.**
+
+---
+
+# 6 octobre — D125 à D127, la lettre parle enfin d'un parcours
+
+Offre DIM, lingerie, site d'Autun, secteur `industrie_textile`. La lettre a
+raconté Le Mans Métropole Habitat et la valorisation de résidences HLM, sur six
+lignes, sans nommer TRIUMPH — usine de lingerie, `industrie_textile`, le même
+secteur. Quatre causes, dont trois sont des défauts et une est une consigne que
+j'avais écrite.
+
+## D125 — l'expérience n'était pas classée
+
+Le prompt affirmait depuis D100 : « l'expérience t'est imposée, c'est celle que
+le moteur a classée la plus proche de cette offre ». Le code écrivait :
+
+```ts
+const aRaconter = retenues[0] ?? null;
+```
+
+`retenues` vient de `selection.experiences`, construit par
+`donnees.experiences.map(…)` — **l'ordre du profil, c'est-à-dire l'ordre
+chronologique**. Aucun tri face à l'offre n'existait. L'expérience « classée la
+plus proche » était, à chaque lettre et quelle que soit l'annonce, *la plus
+récente qui porte une mission*.
+
+S'y ajoutait que rien, dans toute la chaîne de la lettre, ne lisait
+`secteur_code`.
+
+Les deux sont faits. La note d'une expérience est la somme des notes de ses
+missions, plus une prime sectorielle : **+40 à secteur identique, +15 en même
+famille**. Quarante points valent environ cinq missions parfaitement alignées —
+assez pour renverser un classement serré, pas assez pour qu'une expérience sans
+rapport passe devant une expérience qui répond mission par mission. Le test le
+vérifie dans les deux sens.
+
+Sur l'offre DIM, avec les données réelles :
+
+```
+ 62 =  22 missions + 40 secteur  │ TRIUMPH                          Industrie textile
+ 29 =  14 missions + 15 secteur  │ TECHNICAPS                       Industrie
+ 14 =  14 missions +  0 secteur  │ Le Mans Métropole Habitat (CDD)  Immobilier social
+ 10 =  10 missions +  0 secteur  │ Le Mans Métropole Habitat (alt.) Immobilier social
+```
+
+TRIUMPH gagnait déjà **sur les missions seules**, 22 contre 14. Le tri absent
+était donc le défaut dominant ; le secteur ne fait que rendre le résultat
+indiscutable.
+
+## D126 — aucune recherche entreprise ne partait
+
+`ficheOuRecherche` n'était appelée que depuis le bouton « Réanalyser ». Le
+chemin normal — ajouter une offre, elle s'analyse — ne l'appelait nulle part.
+En base, `recherches_entreprise` contenait **deux lignes**, du 2 et du
+4 octobre, et rien depuis : les dix-sept lettres écrites entre-temps avaient
+toutes un §2 sans matière, d'où les paragraphes de deux lignes.
+
+D118 avait sorti la recherche de la rédaction pour la mettre « à l'analyse » et
+ne l'avait rebranchée que sur la réanalyse. Ce n'était pas un réglage trop
+prudent, c'était un fil coupé.
+
+Et le panneau « ce que l'on sait de l'employeur » disparaissait entièrement
+quand il n'y avait ni fiche ni fait — c'est-à-dire exactement dans le cas où il
+fallait parler. Il annonçait par ailleurs une recherche « à la rédaction de la
+lettre » qui n'avait plus lieu depuis deux jours.
+
+## La consigne qui était de moi
+
+Le §3 disait, mot pour mot : « Tu racontes **UNE SEULE** situation, en entier.
+Un fait développé convainc ; quatre faits empilés sont le CV recopié. » Écrite
+quand la lettre récitait le CV, elle a basculé dans l'excès inverse.
+
+Le nouveau §3 impose : **deux employeurs nommés**, trois à quatre éléments
+concrets, **deux phrases au maximum sur un même élément**, un seul développé.
+Les mêmes règles valent pour les deux messages courts, plus un plafond : aucun
+message ne consacre plus de la moitié de sa longueur à une seule expérience.
+
+**La lettre d'exemple a été refaite**, et c'était la pièce décisive : elle
+démontrait une mission unique développée sur cinq phrases. Un modèle imite
+l'exemple avant d'obéir à la règle — changer la consigne en gardant l'ancien
+exemple n'aurait rien changé.
+
+Trois décisions tranchées par Taha le soir même : une qualité tolérée en
+clôture du §4 et nulle part ailleurs ; la spécialité de formation autorisée en
+ouverture du §1, sans établissement ni cumul de masters ; quatre paragraphes
+maintenus.
+
+## D127 — des contrôles qui jugent le fond, pas la tournure
+
+Les quatorze contrôles existants ne lisaient que le texte. Les défauts
+ci-dessus ne se voient qu'en comparant le texte produit à ce qui avait été
+fourni pour l'écrire. `verifierStyle` reçoit donc un contexte — les employeurs
+nommés, celui qui partage le secteur, l'existence d'une fiche — et cinq
+contrôles s'y ajoutent :
+
+- **Parcours étroit** — un seul employeur nommé alors que deux sont fournis ;
+- **Parcours déséquilibré** — plus de 75 % du paragraphe écoulé avant que le
+  second n'apparaisse ;
+- **Secteur partagé ignoré** — l'argument le moins cher du dossier, tu ;
+- **Entreprise muette, faute de matière** — distingue « rien à dire » de « rien
+  cherché », et renvoie vers la réanalyse plutôt que vers la réécriture ;
+- **Message déséquilibré** — le même plafond, appliqué aux deux messages.
+
+**200 tests.**

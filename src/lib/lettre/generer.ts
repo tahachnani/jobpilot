@@ -12,6 +12,7 @@ import { ErreurCV } from "@/lib/cv/generer";
 import { chargerDonneesCV } from "@/lib/cv/donnees";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import { choisirNiveau } from "@/lib/cv/compacite";
+import { classerExperiences } from "@/lib/lettre/experiences";
 import { classerSituations } from "@/lib/cv/situations";
 import { ficheEnTexte, lireFiche, type FicheLue } from "@/lib/entreprise/fiche";
 import { documentationEntreprise } from "@/lib/entreprise/documentee";
@@ -26,7 +27,11 @@ import { libelleOrigine } from "@/config/origines";
 import { moisAnnee, periodeExperience } from "@/lib/cv/dates";
 import { extraireJson } from "@/lib/extraction-json";
 import { verifierAncrage, type Ancrage } from "@/lib/lettre/ancrage";
-import { verifierStyle, type DefautStyle } from "@/lib/lettre/style";
+import {
+  verifierStyle,
+  type ContexteVerification,
+  type DefautStyle,
+} from "@/lib/lettre/style";
 import { formuleAppel } from "@/lib/lettre/destinataire";
 import { purgerAnciennesVersions, SCHEMA_SELECTION } from "@/lib/documents";
 import {
@@ -85,11 +90,13 @@ Tu ne décris aucune qualité de caractère ni aucune manière de travailler pr�
 
 Les mots de l'annonce décrivent l'entreprise visée, jamais rétroactivement le parcours. Si l'annonce parle de distribution et que le candidat vient de l'industrie, il vient de l'industrie.
 
-LA FORMATION. Tu n'écris jamais que le candidat détient deux masters, ni "double master", ni "mes deux formations" : le cumul de diplômes ne prouve rien et se lit comme une exhibition. Tu ne nommes aucun établissement, et en particulier jamais "Le Mans Université" — la recherche vise toute la France, et nommer une université régionale ancre le profil là où il ne veut pas être. Si la formation doit apparaître, c'est par sa spécialité seule : "de formation comptabilité contrôle audit".
+LA FORMATION. Tu peux l'annoncer en ouverture du §1, et par sa SPÉCIALITÉ SEULE : "de formation contrôle de gestion et audit", "titulaire d'un master contrôle de gestion et audit organisationnel". Jamais deux masters, jamais "double master", jamais "mes deux formations" : le cumul de diplômes ne prouve rien et se lit comme une exhibition. Jamais d'établissement, et en particulier jamais "Le Mans Université" — la recherche vise toute la France, et nommer une université régionale ancre le profil là où il ne veut pas être. Une fois dite au §1, la formation ne revient plus.
 
 LA DATE ET LA DISPONIBILITÉ. La date du jour t'est donnée : une expérience achevée se raconte au passé, jamais au présent. Si le dernier contrat est terminé, tu écris l'idée "disponible immédiatement" et rien d'autre sur le sujet — ni la date de fin, ni l'employeur, ni la nature du contrat. La date figure sur le CV ; la répéter ne fait que souligner l'intervalle écoulé. Si un contrat est en cours, alors seulement tu donnes sa date de fin.
 
-L'EXPÉRIENCE DU PARAGRAPHE 2 T'EST IMPOSÉE. Le message la nomme : c'est celle que le moteur a classée la plus proche de cette offre, sur les codes d'activité de l'annonce. Tu n'en choisis pas une autre parce qu'elle porte un chiffre plus frappant — un chiffre venu d'un autre métier ne prouve rien au recruteur qui lit, et le décalage se voit immédiatement.
+LES EXPÉRIENCES DU PARAGRAPHE 3 TE SONT IMPOSÉES, ET IL Y EN A DEUX. Le message les nomme : c'est le classement du moteur face à cette offre, qui pèse les codes d'activité de l'annonce ET la proximité de secteur. Tu n'en choisis pas une autre parce qu'elle porte un chiffre plus frappant — un chiffre venu d'un autre métier ne prouve rien au recruteur qui lit, et le décalage se voit immédiatement.
+
+LE SECTEUR SE DIT. Si le message signale que l'expérience classée première partage le secteur de l'entreprise visée, tu le nommes, et tôt. Un recruteur de la lingerie qui lit "dans une usine de lingerie" n'a plus besoin d'être convaincu que le candidat connaît son environnement : c'est l'argument le moins cher et le plus fort de la lettre, et le taire pour raconter une mission plus récente dans un autre univers est une faute.
 
 À vérité égale, retiens la formulation qui sert la candidature. Taire un détail sans intérêt n'est pas mentir ; l'inventer, si.
 
@@ -125,24 +132,41 @@ INTERDIT : les mots-valeurs. "Acteur reconnu", "valeurs d'excellence", "place l'
 
 SI LE MESSAGE DIT QU'AUCUNE INFORMATION N'EST DISPONIBLE, tu écris une phrase sur ce qui attire dans le métier ou le secteur tels que l'annonce les décrit, et tu passes. Tu n'inventes rien sur l'entreprise : c'est le premier endroit qu'un recruteur vérifie.
 
-§3 — LE CANDIDAT (environ 800 signes)
-C'est le paragraphe qui porte la lettre.
-L'EXPÉRIENCE T'EST IMPOSÉE : le message la nomme, c'est celle que le moteur a
-classée la plus proche de cette offre.
-LES SITUATIONS AUSSI SONT CLASSÉES : le message te donne les lignes de cette
-expérience dans l'ordre de leur pertinence face à cette annonce. Tu prends la
-PREMIÈRE, ou la deuxième si elle raconte mieux. Tu ne descends pas chercher au
-bas de la liste une anecdote plus plaisante : si l'annonce porte sur du
-contrôle de gestion, une histoire de gestion locative ne pèse rien, même bien
-racontée.
-Tu racontes UNE SEULE situation, en entier : ce qu'il y avait à régler, ce que
-le candidat a fait, ce que ça a donné. Un fait développé convainc ; quatre
-faits empilés sont le CV recopié, et le CV est joint.
-La phrase de résultat a le candidat pour sujet. "Ce constat a orienté les
-priorités" efface celui qui a fait le constat.
-Si la matière fournie porte un chiffre, la lettre le porte.
-Le lecteur doit pouvoir se représenter une scène. S'il ne peut pas, le
-paragraphe est raté.
+§3 — LE PARCOURS (environ 800 signes)
+C'est le paragraphe qui porte la lettre, et il parle d'un PARCOURS, pas d'une
+mission.
+
+DEUX EMPLOYEURS NOMMÉS. Le message te donne les expériences classées face à
+cette offre : la première avec ses situations détaillées, la seconde avec ses
+lignes principales. Tu nommes les deux. La première occupe plus de place que
+la seconde — pas toute la place.
+
+TROIS À QUATRE ÉLÉMENTS CONCRETS, pris dans ces deux expériences. Un élément
+tient en une proposition : "le contrôle mensuel du quittancement d'un
+patrimoine de 18 000 logements", "l'analyse des écarts entre charges
+prévisionnelles et quittancées". Ils ne sont pas présentés en liste : ils
+s'enchaînent dans des phrases.
+
+UN SEUL ÉLÉMENT EST DÉVELOPPÉ, et "développé" veut dire DEUX PHRASES : ce
+qu'il y avait à régler, ce que le candidat a fait. C'est celui que le
+classement met en tête. Les autres sont nommés en passant, une proposition
+chacun.
+
+DEUX PHRASES AU MAXIMUM SUR UN MÊME ÉLÉMENT. C'est la règle qui empêche le
+paragraphe de se refermer sur une seule anecdote. Si tu as besoin de quatre
+phrases pour faire comprendre une situation, c'est qu'elle est trop
+particulière pour cette lettre : prends-en une autre.
+
+LE CANDIDAT EST SUJET. "J'ai construit", "je contrôlais", "j'ai rapproché".
+Jamais "ce travail a permis" ni "ce constat a orienté les priorités" : ces
+tournures effacent celui qui a fait le travail.
+
+Si la matière fournie porte un chiffre, la lettre le porte. Un seul suffit.
+
+CE QUE CE PARAGRAPHE N'EST PAS : la liste des missions recopiée du CV, qui est
+joint. La différence tient à l'enchaînement — un parcours se raconte dans un
+ordre qui a un sens pour cette offre-là, un CV s'énumère. Et elle tient au
+nombre : trois ou quatre éléments, pas huit.
 
 §4 — LA PROJECTION ET L'ENTRETIEN (environ 400 signes)
 Ce que le candidat ferait dans ce poste, à partir des missions de l'annonce, et
@@ -161,23 +185,32 @@ Puis la disponibilité, et la demande d'entretien. Debout, sans la quémander.
 L'intérêt pour le poste se montre par la précision de ce qui précède, jamais
 par une déclaration d'enthousiasme.
 
+UNE SEULE QUALITÉ EST TOLÉRÉE, ET SEULEMENT ICI : une formule courte juste
+avant la demande d'entretien, à la manière de "méthodique et curieux". Trois
+adjectifs au plus, sans superlatif, sans "fort de", sans justification. C'est
+le seul endroit de la lettre où une qualité peut paraître, et elle ne reparaît
+nulle part ailleurs — ni au §1, ni au §3. Si rien ne vient naturellement, tu
+n'en mets pas : son absence ne manque à personne.
+
 ════════════════════════════════════════
 3. LA LETTRE QU'ON VISE
 ════════════════════════════════════════
 
-Voici ce que tout ce qui précède doit donner. L'offre : contrôleur de gestion opérationnel, groupe de bailleurs sociaux en constitution, 80 000 logements répartis sur 35 organismes, Île-de-France.
+Voici ce que tout ce qui précède doit donner. L'offre : contrôleur de gestion industriel, fabricant de textile, site de production.
 
-« Je vous adresse ma candidature au poste de Contrôleur de Gestion Opérationnel, publié sur HelloWork sous la référence 179510151W.
+« De formation contrôle de gestion et audit, je vous adresse ma candidature au poste de Contrôleur de Gestion Industriel, publié sur HelloWork sous la référence 179510151W.
 
-Vous réunissez 35 organismes et 80 000 logements sous une direction unique, et ce poste existe pour que cette échelle devienne comparable d'un organisme à l'autre. C'est le travail que je préfère : rendre des chiffres venus de sources différentes effectivement comparables.
+Vous produisez sur un site intégré, et ce poste existe pour que le coût de fabrication se lise jusqu'à l'atelier. C'est le travail qui m'intéresse : relier un écart à ce qui l'a produit.
 
-Chez Le Mans Métropole Habitat, je contrôlais chaque mois le quittancement d'un patrimoine de 18 000 logements : loyers, charges, nouvelles locations, vacance. En rapprochant les charges récupérables prévisionnelles de celles réellement quittancées, j'ai trouvé des écarts qui ne venaient pas des consommations mais du découpage : deux sous-groupes immobiliers voisins étaient régularisés sur des périmètres différents. J'ai harmonisé ce découpage et neutralisé les écarts d'exercice. Je n'ai plus eu à réexpliquer les mêmes anomalies à chaque régularisation.
+Mon parcours s'est fait entre l'industrie et le pilotage de la performance. Chez TECHNICAPS, j'ai audité les stocks d'un site de production par inventaire physique et rapprochement avec l'ERP SILOG : les écarts constatés ne venaient pas des quantités mais des mouvements non saisis, et j'ai fiabilisé les données de l'ERP pour que le reporting mensuel cesse de les reproduire. J'y ai aussi paramétré la comptabilité analytique. Chez Le Mans Métropole Habitat, j'ai contrôlé chaque mois le quittancement d'un patrimoine de 18 000 logements et calculé les indicateurs destinés au comité de direction à partir d'extractions retraitées.
 
-Dans ce poste, je consoliderais les remontées des 35 organismes et je construirais les tableaux qui comparent leurs coûts de gestion. Décomposer un écart jusqu'à sa cause est ce que j'ai fait chaque mois pendant dix-huit mois, et c'est exactement ce que demande une comparaison entre entités. Je travaille sous ULIS Sopra, Excel et Qlik Sense. Disponible immédiatement, je vous propose d'en parler de vive voix. »
+Dans ce poste, j'analyserais les écarts entre standards et réel et je construirais les tableaux de bord destinés aux opérationnels. Décomposer un écart jusqu'à sa cause est ce que j'ai fait sur deux sites de production et sur dix-huit mois de quittancement. Je travaille sous Excel, SILOG et Qlik Sense. Méthodique et curieux, disponible immédiatement, je vous propose d'en parler de vive voix. »
 
-Observe ce que cette lettre fait, et refais-le : un premier paragraphe plat et bref ; une seule phrase sur l'entreprise, adossée à un fait, puis le candidat ; un chiffre dans chaque paragraphe qui en porte un ; le candidat sujet de chaque phrase de résultat ; les conditionnels groupés dans le dernier paragraphe, sans mélange avec le présent ; des logiciels nommés. Aucune qualité revendiquée, aucune formule d'enthousiasme, et pourtant on sait ce que ce candidat sait faire.
+Observe ce que cette lettre fait, et refais-le. La formation en trois mots, sans établissement. Un premier paragraphe plat et bref. Une seule phrase sur l'entreprise, adossée à un fait, puis le candidat. ET SURTOUT LE §3 : deux employeurs nommés, quatre éléments concrets — l'audit d'inventaire, la fiabilisation de l'ERP, le paramétrage analytique, le quittancement et les indicateurs — dont UN SEUL développé en deux phrases, les autres nommés en passant. Le secteur dit d'entrée, parce que l'offre est industrielle et que l'expérience l'est aussi. Le candidat sujet de chaque verbe. Les conditionnels groupés dans le dernier paragraphe, sans mélange avec le présent. Des logiciels nommés. Une qualité, deux mots, juste avant l'entretien — et nulle part ailleurs.
 
-Cet exemple est construit sur un parcours de bailleur social. Le parcours que le message te donne peut être tout autre : tu en reprends la FORME et le DEGRÉ DE PRÉCISION, jamais les faits ni les tournures. En particulier, ne recopie aucune de ses phrases — « c'est le travail que je préfère », « jusqu'à sa cause » sont des formulations de cet exemple, pas des formules à réemployer.
+COMPTE LES PHRASES DU §3 AVANT DE RENDRE. Si plus de deux portent sur le même élément, le paragraphe est à refaire : c'est redevenu une anecdote, et c'est le défaut que cette version corrige.
+
+Cet exemple est construit sur un parcours industriel. Le parcours que le message te donne peut être tout autre, et les expériences qu'il te nomme peuvent être d'autres employeurs : tu en reprends la FORME et le DEGRÉ DE PRÉCISION, jamais les faits ni les tournures. En particulier, ne recopie aucune de ses phrases — « c'est le travail qui m'intéresse », « jusqu'à sa cause » sont des formulations de cet exemple, pas des formules à réemployer.
 
 ════════════════════════════════════════
 4. CE QUI FAIT QU'UNE LETTRE SONNE FABRIQUÉE
@@ -205,11 +238,13 @@ Beaucoup de plateformes ne demandent pas de lettre mais un champ de texte plafon
 
 UN MESSAGE N'EST PAS UNE LETTRE RACCOURCIE. Aucune formule d'appel, aucune formule de politesse, aucune signature, aucun objet : ces éléments n'ont pas de sens dans un champ de formulaire, et collés là ils signalent un texte recyclé. Le message commence directement par la première phrase utile et s'arrête à la dernière.
 
-Il garde en revanche tout le reste des règles : aucun fait inventé, l'expérience imposée, la situation la mieux classée, le candidat sujet des verbes, un chiffre s'il y en a un, et aucune des formules de la section 4.
+Il garde en revanche tout le reste des règles : aucun fait inventé, les expériences imposées et leur classement, le candidat sujet des verbes, un chiffre s'il y en a un, le secteur nommé quand il est partagé, et aucune des formules de la section 4.
 
-"court" — 380 à 450 signes. Trois phrases, au plus quatre. Il ne contient qu'une chose : le poste, UN fait du parcours qui y répond, la disponibilité. Rien sur l'entreprise : il n'y a pas la place, et une demi-phrase de contexte y serait du remplissage.
+"court" — 380 à 450 signes. Trois phrases, au plus quatre. Le poste, DEUX éléments du parcours pris dans DEUX EXPÉRIENCES DIFFÉRENTES, la disponibilité. Pas de récit : deux propositions suffisent, et c'est précisément ce que la contrainte de signes autorise. Rien sur l'entreprise : il n'y a pas la place.
 
-"moyen" — 800 à 900 signes, deux ou trois paragraphes. Le poste et ce qu'il demande, la situation racontée brièvement — problème, action, résultat — puis les outils et la disponibilité.
+"moyen" — 800 à 900 signes, deux ou trois paragraphes. Le poste et ce qu'il demande ; le parcours en trois à quatre éléments pris dans les deux expériences, dont UN SEUL développé en deux phrases ; les outils nommés ; la disponibilité.
+
+AUCUN DES DEUX MESSAGES NE CONSACRE PLUS DE LA MOITIÉ DE SA LONGUEUR À UNE SEULE EXPÉRIENCE. "Pendant six mois j'ai fait ceci, cela et cela encore" occupe toute la place avec un seul employeur et laisse croire que le reste du parcours est vide. Les règles de parcours du §3 valent ici entièrement : c'est le même candidat qui écrit, dans un format plus court.
 
 Les deux doivent pouvoir être collés tels quels. Compte les signes : un message qui dépasse sa cible oblige à couper à la main dans un formulaire, c'est-à-dire au pire moment.
 
@@ -456,13 +491,23 @@ async function rassemblerDossier(
    * été généré.
    */
   const donneesCV = await chargerDonneesCV(offre.volet, offreId);
-  const retenues =
+  const surLeCV =
     donneesCV.experiences.length > 0
       ? choisirNiveau(donneesCV, analyse, offre.volet).selection.experiences.filter(
           (e) => e.missions.length > 0
         )
       : [];
-  const aRaconter = retenues[0] ?? null;
+
+  /**
+   * Le classement, qui n'existait pas (D125).
+   *
+   * `selection.experiences` garde l'ordre du profil — l'ordre chronologique.
+   * Prendre `[0]` revenait donc à raconter la plus récente, toujours, quelle
+   * que soit l'offre. Le tri face à l'annonce est fait ici, secteur compris.
+   */
+  const classees = classerExperiences(surLeCV, analyse);
+  const aRaconter = classees[0] ?? null;
+  const enAppui = classees[1] ?? null;
 
   /**
    * Le corpus de cette expérience-là, et d'elle seule.
@@ -476,11 +521,25 @@ async function rassemblerDossier(
   // Classées face à l'annonce (D110) et non dans l'ordre de saisie : corriger
   // le choix de l'expérience sans classer ce qu'elle contient ne faisait que
   // déplacer le problème d'un cran.
+  const corpus = await chargerCorpus();
   const corpusDeLExperience = aRaconter
-    ? classerSituations(
-        (await chargerCorpus()).get(aRaconter.experience.id) ?? [],
-        analyse
-      ).map((l) => l.texte)
+    ? classerSituations(corpus.get(aRaconter.experience.id) ?? [], analyse).map(
+        (l) => l.texte
+      )
+    : [];
+
+  /**
+   * La seconde expérience, en appui (D125).
+   *
+   * Le §3 doit nommer deux employeurs : une lettre qui n'en nomme qu'un
+   * raconte une mission, pas un parcours. On ne lui donne que ses deux
+   * meilleures lignes — assez pour une proposition chacune, trop peu pour
+   * qu'elle prenne la place de la première.
+   */
+  const appuiLignes = enAppui
+    ? classerSituations(corpus.get(enAppui.experience.id) ?? [], analyse)
+        .map((l) => l.texte)
+        .slice(0, 2)
     : [];
 
   /**
@@ -639,16 +698,24 @@ async function rassemblerDossier(
     // il est meilleur qu'une intuition de rédaction.
     aRaconter
       ? [
-          "EXPÉRIENCE À RACONTER AU PARAGRAPHE 2 — CE N'EST PAS UN CHOIX :",
-          `${aRaconter.experience.titre ?? ""} — ${aRaconter.experience.entreprise} ` +
-            `(${aRaconter.experience.typeContrat})`,
-          "C'est l'expérience que le moteur a classée la plus proche de cette offre, " +
-            "sur les codes d'activité de l'annonce. Le paragraphe 2 raconte une situation " +
-            "vécue LÀ, et nulle part ailleurs.",
+          "LES DEUX EXPÉRIENCES DU PARAGRAPHE 3 — CE N'EST PAS UN CHOIX.",
+          "Elles sont classées face à cette annonce : notes des missions, plus la",
+          "proximité de secteur. Le §3 les nomme toutes les deux.",
           "",
-          "Ce que le CV en dit déjà — la lettre ne recopie pas ces phrases, elle " +
-            "raconte ce qu'il y avait autour : le problème, ce qui a été fait, ce que " +
-            "ça a donné :",
+          `PREMIÈRE — ${aRaconter.experience.titre ?? ""} — ${
+            aRaconter.experience.entreprise
+          } (${aRaconter.experience.typeContrat})${
+            aRaconter.secteur ? ` — secteur : ${aRaconter.secteur}` : ""
+          }`,
+          aRaconter.memeSecteur
+            ? "CETTE EXPÉRIENCE EST DANS LE MÊME SECTEUR QUE L'ENTREPRISE VISÉE. " +
+              "Dis-le, et dis-le tôt : devant un employeur de ce secteur, l'avoir " +
+              "pratiqué se nomme en trois mots et vaut un paragraphe d'arguments."
+            : "",
+          "C'est elle qui porte le paragraphe, et c'est d'elle que vient l'unique " +
+            "élément développé en deux phrases.",
+          "",
+          "Ce que le CV en dit déjà — la lettre ne recopie pas ces phrases :",
           ...aRaconter.missions.map((m) => `  • ${m.texte}`),
           corpusDeLExperience.length > 0
             ? "\nLe détail de cette expérience, d'où tirer le contexte et la situation " +
@@ -656,10 +723,25 @@ async function rassemblerDossier(
               corpusDeLExperience.map((t) => `  • ${t}`).join("\n")
             : "",
           "",
-          retenues[1]
-            ? `Si et seulement si cette expérience ne contient rien qui réponde à l'annonce, ` +
-              `prends ${retenues[1].experience.entreprise} — et dis-le en une phrase avant le JSON.`
-            : "",
+          enAppui
+            ? [
+                `SECONDE — ${enAppui.experience.titre ?? ""} — ${
+                  enAppui.experience.entreprise
+                } (${enAppui.experience.typeContrat})${
+                  enAppui.secteur ? ` — secteur : ${enAppui.secteur}` : ""
+                }`,
+                enAppui.memeSecteur
+                  ? "ELLE AUSSI EST DANS LE SECTEUR DE L'ENTREPRISE VISÉE."
+                  : "",
+                "Tu la nommes et tu en tires UNE proposition, pas davantage : elle " +
+                  "montre que le savoir-faire n'est pas né d'un seul poste.",
+                ...enAppui.missions.slice(0, 2).map((m) => `  • ${m.texte}`),
+                ...appuiLignes.map((t) => `  • ${t}`),
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : "UNE SEULE EXPÉRIENCE EXPLOITABLE : le §3 s'appuie sur elle seule, " +
+              "mais il en tire trois éléments distincts et n'en développe qu'un.",
         ]
           .filter(Boolean)
           .join("\n")
@@ -690,12 +772,31 @@ async function rassemblerDossier(
     ? STYLES[(lettrePrecedente?.version ?? 0) % STYLES.length]
     : "";
 
+  /**
+   * Ce que les contrôles de fond doivent savoir (D127).
+   *
+   * Les quatorze contrôles de style ne lisent que le texte rendu. Pour juger
+   * qu'une lettre ne nomme qu'un employeur, ou qu'elle tait un secteur
+   * partagé, il faut aussi ce qui lui avait été fourni — c'est ici qu'on le
+   * sait, et nulle part ailleurs.
+   */
+  const duSecteur = classees.find((c) => c.memeSecteur) ?? null;
+  const verification: ContexteVerification = {
+    employeurs: [aRaconter, enAppui]
+      .filter((c): c is NonNullable<typeof c> => Boolean(c))
+      .map((c) => c.experience.entreprise),
+    employeurDuSecteur: duSecteur?.experience.entreprise ?? null,
+    secteurPartage: duSecteur?.secteur ?? null,
+    ficheDisponible: Boolean(fiche?.fiche),
+  };
+
   return {
     offre,
     message,
     style,
     parcours,
     fiche,
+    verification,
     versionPrecedente: lettrePrecedente?.version ?? 0,
   };
 }
@@ -716,7 +817,7 @@ async function redigerLettre(
   changerDeStyle: boolean
 ): Promise<ResultatLettre> {
   const supabase = creerClientServeur();
-  const { offre, message, style, parcours, fiche } = await rassemblerDossier(
+  const { offre, message, style, parcours, fiche, verification } = await rassemblerDossier(
     offreId,
     changerDeStyle
   );
@@ -850,7 +951,10 @@ async function redigerLettre(
   // Style : ce que l'ancrage ne voit pas (D93). Formules d'appel et de
   // politesse exclues — elles ont leurs propres conventions, et « Madame,
   // Monsieur » n'est pas une phrase nominale à corriger.
-  const defautsStyle = verifierStyle(modele.paragraphes);
+  const defautsStyle = verifierStyle(modele.paragraphes, {
+    ...verification,
+    format: "lettre",
+  });
 
   const { data: derniere } = await supabase
     .from("documents")
@@ -1216,7 +1320,7 @@ export async function genererMessagesPourOffre(
 
 async function redigerMessages(offreId: string): Promise<ResultatMessages> {
   const supabase = creerClientServeur();
-  const { offre, message } = await rassemblerDossier(offreId, false);
+  const { offre, message, verification } = await rassemblerDossier(offreId, false);
 
   const reponse = await appelIA({
     modele: MODELE_EXTRACTION,
@@ -1251,7 +1355,10 @@ async function redigerMessages(offreId: string): Promise<ResultatMessages> {
 
   // Les deux messages sont contrôlés ensemble : un défaut dans l'un ou l'autre
   // se corrige à la main, et c'est le seul garde-fou sur le modèle bon marché.
-  const style = verifierStyle([messages.court, messages.moyen]);
+  const style = verifierStyle([messages.court, messages.moyen], {
+    ...verification,
+    format: "messages",
+  });
 
   const { data: derniere } = await supabase
     .from("documents")

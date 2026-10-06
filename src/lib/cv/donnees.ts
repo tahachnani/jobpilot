@@ -51,6 +51,8 @@ export interface ExperienceCV {
   typeContrat: string;
   titre: string | null;
   ordre: number;
+  /** Secteur de l'employeur, pour la proximité sectorielle (D125). */
+  secteurCode: string | null;
   /** Toutes les candidates : natives et empruntables mêlées. */
   missions: MissionCV[];
 }
@@ -159,7 +161,7 @@ export async function chargerDonneesCV(
         .from("experiences")
         .select(
           `id, entreprise, ville, pays, date_debut, date_fin, type_contrat,
-           ordre, visible_cdg, visible_compta, titre_cdg, titre_compta,
+           secteur_code, ordre, visible_cdg, visible_compta, titre_cdg, titre_compta,
            experience_periodes ( date_debut, date_fin, ordre ),
            missions ( id, activites_codes, contient_chiffre, ordre, actif,
                       pertinence_cdg, pertinence_compta,
@@ -238,6 +240,7 @@ export async function chargerDonneesCV(
         typeContrat: e.type_contrat as string,
         titre: (e[champTitre] as string | null) ?? null,
         ordre: (e.ordre as number) ?? 0,
+        secteurCode: (e.secteur_code as string | null) ?? null,
         missions,
       } satisfies ExperienceCV;
     })
