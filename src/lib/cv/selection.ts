@@ -1,5 +1,5 @@
 import type { OffreExtraite } from "@/lib/extraction-offre";
-import { correspond } from "@/lib/texte";
+import { correspond, normaliser } from "@/lib/texte";
 import type {
   CompetenceCV,
   DonneesCV,
@@ -94,6 +94,8 @@ export interface MissionRetenue extends MissionCV {
 export interface CompetenceRetenue extends CompetenceCV {
   note: number;
   motif: string;
+  /** L'exigence précise de l'annonce que cette ligne satisfait (D124). */
+  besoin: string | null;
 }
 
 export interface Selection {
@@ -202,86 +204,215 @@ function retenirPourExperience(
 }
 
 /**
- * Les grandes familles, que les offres nomment souvent telles quelles.
+ * Les grandes familles, et les formulations qui les **déclarent** (D124).
  *
  * Une annonce réclame « Contrôle de gestion » ou « Comptabilité » : un métier
  * entier, qu'aucune ligne de compétence ne contient littéralement. Sans ce
- * rattrapage, le cœur du métier passait derrière Excel et Power BI. Le barème
- * de l'étape 3 fait déjà ce rattrapage pour le score ; la sélection du CV le
- * fait maintenant pour l'ordre des lignes.
+ * rattrapage, le cœur du métier passait derrière Excel et Power BI.
+ *
+ * Le rattrapage s'est retourné contre lui-même le 5 octobre, sur l'offre
+ * EURENCO — contrôleur de gestion industriel. Le code cherchait le mot
+ * « Comptabilité » **à l'intérieur** des libellés de l'annonce ; celle-ci
+ * demandait « Comptabilité **analytique** », une compétence précise. Le test
+ * passait, et les sept lignes de la catégorie compta recevaient le bonus de
+ * famille : comptabilité générale, rapprochements bancaires, déclarations
+ * fiscales, clôtures, révision des comptes — toutes au-dessus d'« Analyse
+ * financière » et de « KPI industriels », pourtant nommément demandées.
+ * Six lignes de comptabilité sur huit, sur un CV de contrôle de gestion.
+ *
+ * Symétriquement, la famille `cdg` ne se déclenchait **jamais** : l'annonce
+ * n'écrit « contrôle de gestion » ni dans ses compétences ni nulle part où le
+ * code regardait — c'est dans l'intitulé du poste et les mots-clés ATS. Sur
+ * une offre de contrôleur de gestion : bonus pour la comptabilité, rien pour
+ * le contrôle de gestion. L'inversion était parfaite.
+ *
+ * Deux corrections, donc. La famille doit être **nommée en entier**, pas
+ * reconnue par un morceau de libellé ; et elle se lit aussi dans l'intitulé du
+ * poste et les mots-clés, là où un métier se déclare vraiment.
+ *
+ * Les formes de déclaration sont une liste fermée, comme la taxonomie : on
+ * reconnaît ce qu'on a écrit, on ne devine pas.
  */
-const FAMILLES: Record<string, string> = {
-  cdg: "Contrôle de gestion",
-  compta: "Comptabilité",
+const FAMILLES: Record<string, { nom: string; declarations: string[] }> = {
+  cdg: {
+    nom: "Contrôle de gestion",
+    declarations: [
+      "controle de gestion",
+      "controleur de gestion",
+      "controleuse de gestion",
+      "controle financier",
+      "business controller",
+      "controlling",
+      "fp a",
+    ],
+  },
+  compta: {
+    nom: "Comptabilité",
+    declarations: [
+      "comptabilite",
+      "comptabilite generale",
+      "comptable",
+      "collaborateur comptable",
+      "expertise comptable",
+    ],
+  },
 };
+
+/** Une famille déclarée par l'annonce, et l'endroit où elle l'est. */
+interface FamilleDeclaree {
+  ou: string;
+  exigee: boolean;
+}
+
+/**
+ * L'annonce déclare-t-elle ce métier, et avec quelle force ?
+ *
+ * Trois endroits, du plus fort au plus faible. Une **compétence de l'annonce
+ * qui est exactement la famille** — pas qui la contient : « Comptabilité
+ * analytique » n'est pas une déclaration du métier comptable, c'est une
+ * compétence précise, et elle sera notée comme telle plus bas. L'**intitulé du
+ * poste** ensuite, qui est la déclaration la plus franche qui soit : une
+ * annonce titrée « Contrôleur de gestion » réclame le métier, même si sa liste
+ * de compétences ne le répète pas. Les **mots-clés** enfin, qui valent
+ * indication et non exigence.
+ */
+function familleDeclaree(
+  categorie: string,
+  offre: OffreExtraite
+): FamilleDeclaree | null {
+  const famille = FAMILLES[categorie];
+  if (!famille) return null;
+
+  const formes = famille.declarations;
+  const estLaFamille = (libelle: string) => formes.includes(normaliser(libelle));
+
+  const nommee = offre.competences.find((c) => estLaFamille(c.libelle));
+  if (nommee) {
+    return { ou: nommee.libelle, exigee: nommee.caractere === "indispensable" };
+  }
+
+  // L'intitulé, lui, est une phrase : on y cherche la forme entière.
+  const intitule = normaliser(offre.intitule ?? "");
+  if (intitule && formes.some((f) => intitule.includes(f))) {
+    return { ou: offre.intitule as string, exigee: true };
+  }
+
+  const motCle = offre.mots_cles_ats.find((m) => {
+    const n = normaliser(m);
+    return formes.some((f) => n === f || n.includes(f));
+  });
+  if (motCle) return { ou: motCle, exigee: false };
+
+  return null;
+}
 
 /**
  * Note d'une compétence face à une offre.
  *
- * Une compétence du cœur de métier réclamé passe devant une compétence
- * nommément citée : sur une offre de contrôle de gestion, le contrôle de
- * gestion s'affiche avant Excel. Encore faut-il la tenir : une famille dont
- * Taha n'a que des notions ne double pas une exigence explicite qu'il
- * maîtrise. La note de famille est donc conditionnée au niveau acquis.
+ * **Ce que l'annonce nomme passe avant ce qu'elle implique** (D124). La
+ * famille est un rattrapage : elle fait remonter le cœur du métier au-dessus
+ * des outils et des mots-clés, qui sinon occupaient tout le bloc. Elle ne
+ * doit pas pour autant doubler une exigence écrite noir sur blanc.
+ *
+ * L'ordre inverse avait été essayé le 5 octobre, en corrigeant le périmètre
+ * de la famille : sur l'offre EURENCO, les huit lignes devenaient du contrôle
+ * de gestion générique et « Rigueur » et « Esprit critique » — deux
+ * indispensables de l'annonce — sortaient du CV. Un excès remplaçait l'autre.
+ *
+ * Encore faut-il tenir la famille : une famille dont Taha n'a que des notions
+ * ne double pas une exigence explicite qu'il maîtrise. La note de famille
+ * reste donc conditionnée au niveau acquis.
+ *
+ *   7  exigée nommément        4  cœur de métier attendu
+ *   6  souhaitée nommément     3  cœur de métier, niveau insuffisant
+ *   5  cœur de métier exigé    2  outil cité · 1  mot-clé · 0  rien
  */
 export function noterCompetence(
   competence: CompetenceCV,
   offre: OffreExtraite
-): { note: number; motif: string } {
+): { note: number; motif: string; besoin: string | null } {
   const cible = [competence.libelle, competence.codeNormalise].filter(Boolean);
   const teste = (libelle: string) => cible.some((c) => correspond(c, libelle));
 
-  const nomFamille = FAMILLES[competence.categorie];
   const tenue = competence.niveau >= 2;
+  const famille = familleDeclaree(competence.categorie, offre);
 
-  const familleExigee = nomFamille
-    ? offre.competences.find(
-        (c) =>
-          c.caractere === "indispensable" && correspond(nomFamille, c.libelle)
-      )
-    : undefined;
-
-  if (familleExigee && tenue) {
-    return {
-      note: 7,
-      motif: `Cœur de métier exigé par l'offre : ${familleExigee.libelle}.`,
-    };
-  }
+  /**
+   * `besoin` nomme l'exigence précise que cette ligne satisfait (D124).
+   *
+   * Il sert au dédoublonnage : l'annonce EURENCO demandait « Communication »
+   * une fois, et trois lignes du profil y répondaient — « Communication avec
+   * les opérationnels », « Relationnel et communication », « Sens de la
+   * communication et pédagogie ». Elles occupaient trois des huit places pour
+   * un seul besoin.
+   *
+   * Les notes de famille n'en portent pas : un métier réclamé mérite
+   * légitimement plusieurs lignes, c'est tout l'objet du rattrapage.
+   */
 
   const exigee = offre.competences.find(
     (c) => c.caractere === "indispensable" && teste(c.libelle)
   );
-  if (exigee) return { note: 6, motif: `Exigée par l'offre : ${exigee.libelle}.` };
-
-  const familleSouhaitee = nomFamille
-    ? offre.competences.find((c) => correspond(nomFamille, c.libelle))
-    : undefined;
-
-  if (familleSouhaitee && tenue) {
+  if (exigee) {
     return {
-      note: 5,
-      motif: `Cœur de métier attendu par l'offre : ${familleSouhaitee.libelle}.`,
+      note: 7,
+      motif: `Exigée par l'offre : ${exigee.libelle}.`,
+      besoin: normaliser(exigee.libelle),
     };
   }
 
   const souhaitee = offre.competences.find((c) => teste(c.libelle));
-  if (souhaitee)
-    return { note: 4, motif: `Souhaitée par l'offre : ${souhaitee.libelle}.` };
+  if (souhaitee) {
+    return {
+      note: 6,
+      motif: `Souhaitée par l'offre : ${souhaitee.libelle}.`,
+      besoin: normaliser(souhaitee.libelle),
+    };
+  }
 
-  if (familleExigee || familleSouhaitee) {
+  if (famille?.exigee && tenue) {
+    return {
+      note: 5,
+      motif: `Cœur de métier exigé par l'offre : ${famille.ou}.`,
+      besoin: null,
+    };
+  }
+
+  if (famille && tenue) {
+    return {
+      note: 4,
+      motif: `Cœur de métier attendu par l'offre : ${famille.ou}.`,
+      besoin: null,
+    };
+  }
+
+  if (famille) {
     return {
       note: 3,
       motif: `Cœur de métier de l'offre, mais niveau déclaré insuffisant pour passer devant.`,
+      besoin: null,
     };
   }
 
   const outil = offre.outils.find((o) => teste(o));
-  if (outil) return { note: 2, motif: `Outil cité par l'offre : ${outil}.` };
+  if (outil) {
+    return {
+      note: 2,
+      motif: `Outil cité par l'offre : ${outil}.`,
+      besoin: normaliser(outil),
+    };
+  }
 
   const motCle = offre.mots_cles_ats.find((m) => teste(m));
-  if (motCle) return { note: 1, motif: `Mot-clé ATS de l'offre : ${motCle}.` };
+  if (motCle) {
+    return {
+      note: 1,
+      motif: `Mot-clé ATS de l'offre : ${motCle}.`,
+      besoin: normaliser(motCle),
+    };
+  }
 
-  return { note: 0, motif: "Non réclamée par l'offre." };
+  return { note: 0, motif: "Non réclamée par l'offre.", besoin: null };
 }
 
 /**
@@ -305,7 +436,24 @@ const MAX_OUTILS_GROUPES = 6;
  */
 function grouperOutils(outils: CompetenceRetenue[]): CompetenceRetenue | null {
   if (outils.length === 0) return null;
-  const retenus = outils.slice(0, MAX_OUTILS_GROUPES);
+
+  /**
+   * Un besoin, une place — ici aussi (D124).
+   *
+   * Le CV du cabinet comptable sortait « Sage 100, ERP Sage, Pennylane,
+   * Sage X3, Excel, ULIS Sopra » : trois des six places pour le seul « Sage »
+   * que l'annonce demandait. La ligne doit couvrir six outils différents, pas
+   * répéter le même sous trois références.
+   */
+  const servis = new Set<string>();
+  const retenus = outils
+    .filter((o) => {
+      if (!o.besoin) return true;
+      if (servis.has(o.besoin)) return false;
+      servis.add(o.besoin);
+      return true;
+    })
+    .slice(0, MAX_OUTILS_GROUPES);
 
   // La précision suit son outil, où qu'il soit dans la liste. La première
   // version ne gardait que celle du premier : le jour où un nouvel outil est
@@ -388,10 +536,27 @@ export function selectionner(
 
   const ligneOutils = grouperOutils(notees.filter((c) => c.categorie === "outil"));
 
-  // La ligne d'outils occupe une place dans le bloc ; le reste va aux
-  // compétences métier, dans l'ordre du classement.
+  /**
+   * Un besoin de l'annonce ne prend qu'une place (D124).
+   *
+   * EURENCO demandait « Communication » une seule fois ; trois lignes du
+   * profil y répondaient et occupaient trois des huit places disponibles. Le
+   * bloc doit couvrir le plus d'exigences possible, pas répéter la même sous
+   * trois formulations. On garde la meilleure — le tri a déjà tranché — et on
+   * passe à l'exigence suivante.
+   *
+   * Les lignes sans besoin nommé (cœur de métier, ou rien du tout) ne sont pas
+   * concernées : un métier réclamé mérite plusieurs lignes.
+   */
+  const besoinsServis = new Set<string>();
   const metier = notees
     .filter((c) => c.categorie !== "outil")
+    .filter((c) => {
+      if (!c.besoin) return true;
+      if (besoinsServis.has(c.besoin)) return false;
+      besoinsServis.add(c.besoin);
+      return true;
+    })
     .slice(0, niveau.nbCompetences - (ligneOutils ? 1 : 0));
 
   const competences = (ligneOutils ? [...metier, ligneOutils] : metier).sort(

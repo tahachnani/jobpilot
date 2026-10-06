@@ -1036,3 +1036,91 @@ réapparaissent sans repasser par le modèle.
 Ce défaut appartient à la même famille que D119 : un travail fait, stocké et
 facturé, qu'aucun écran ne montrait. Le symptôme n'est pas une erreur, c'est
 un silence.
+
+---
+
+# 5 octobre — D124, « on dirait un CV comptable »
+
+Offre EURENCO, contrôleur de gestion industriel. Le CV sort avec quatre
+expériences titrées « Contrôleur de Gestion », des puces qui parlent écarts,
+TRS, coûts cachés, ERP SILOG, KPI CODIR — et un bloc COMPÉTENCES qui dit :
+
+```
+Comptabilité générale · Comptabilité analytique · Rapprochements bancaires et
+lettrage · Déclarations fiscales et sociales · Clôtures mensuelles et
+annuelles · Révision des comptes
+```
+
+Six lignes de comptabilité sur huit. Pendant que « Analyse financière » et
+« KPI industriels », **nommément demandées par l'annonce**, restaient dehors.
+
+## Trois règles liguées
+
+**1. La famille s'attrapait par sous-chaîne.** L'annonce demandait
+« Comptabilité **analytique** » — une compétence précise. Le code cherchait le
+mot « Comptabilité » *à l'intérieur* des libellés, le trouvait, et en concluait
+que l'offre réclamait le métier comptable. Les sept lignes de la catégorie
+compta recevaient alors le bonus de famille, au-dessus de tout ce qui n'était
+que « souhaité ».
+
+**2. La famille `cdg` ne se déclenchait jamais.** Le code ne lisait que la
+liste des compétences de l'annonce. EURENCO n'y écrit nulle part « contrôle de
+gestion » : c'est dans l'**intitulé du poste** et les mots-clés ATS. Sur une
+offre de contrôleur de gestion : bonus pour la comptabilité, rien pour le
+contrôle de gestion. L'inversion était parfaite.
+
+**3. D119 a allumé la mèche.** Avant l'ouverture des deux volets, les lignes
+compta n'étaient pas visibles côté CDG : le défaut existait sans pouvoir se
+voir. En passant de ~60 à **197 compétences en lice**, la règle fausse a eu de
+quoi s'exprimer. Le défaut est antérieur ; l'avoir exposé est de cette
+correction-là.
+
+## Et deux absurdités trouvées en vérifiant
+
+**« Réestimé, forecast et atterris*sage* » — souhaitée par l'offre : Sage.**
+`correspond` testait la sous-chaîne sans limite de mot. Troisième occurrence du
+même défaut : le `\b` manquant qui faisait correspondre « ma » à
+« management », « Comptabilité » reconnu dans « Comptabilité analytique », et
+maintenant « Sage » dans « atterrissage ». Une sous-chaîne n'est pas un mot.
+
+**« Sage 100, ERP Sage, Pennylane, Sage X3, Excel, ULIS Sopra »** : trois des
+six places de la ligne d'outils pour le seul « Sage » demandé.
+
+## Les corrections
+
+- la famille doit être **nommée en entier**, et se lit aussi dans l'intitulé du
+  poste et les mots-clés — liste fermée de formulations, comme la taxonomie ;
+- **ce que l'annonce nomme passe avant ce qu'elle implique**. L'ordre inverse a
+  été essayé : les huit lignes devenaient du contrôle de gestion générique et
+  « Rigueur » et « Esprit critique », deux indispensables, sortaient du CV. La
+  famille est un rattrapage — elle doit battre les outils et les mots-clés, pas
+  les exigences écrites ;
+- **un besoin de l'annonce ne prend qu'une place**, lignes métier et ligne
+  d'outils. « Communication », demandé une fois, occupait trois des huit
+  places ;
+- `correspond` compare désormais des **mots entiers**.
+
+## Vérifié sur les deux volets, avant livraison
+
+```
+CDG — EURENCO                        COMPTA — Cabinet d'expertise
+Rigueur et esprit d'analyse          Rigueur et esprit d'analyse
+Esprit critique                      Tenue comptable
+Analyse financière                   Comptabilité générale
+Comptabilité analytique              Comptabilité analytique
+Communication avec les opérationnels Rapprochements bancaires et lettrage
+KPI industriels                      Déclarations fiscales et sociales
+Contrôle budgétaire et suivi écarts  Clôtures mensuelles et annuelles
+Tableaux de bord / reporting         Révision des comptes
+
+Excel, Power Query, SAP, Power BI,   Sage 100, Pennylane, Excel, ULIS Sopra,
+ERP Sage, ULIS Sopra                 Microsoft Office, SILOG
+```
+
+Un test de la suite affirmait que le cœur de métier passe devant **l'outil
+exigé**. L'attente était fausse et a été réécrite : ce que la règle voulait,
+c'est que le métier ne soit pas enterré sous les outils que l'annonce *cite*.
+Et la comparaison ne se produit pas sur un CV — les outils partent sur leur
+ligne groupée et ne disputent aucune place aux lignes métier.
+
+**191 tests.**
