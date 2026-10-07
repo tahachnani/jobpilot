@@ -1390,11 +1390,11 @@ export default async function DetailOffre({
                 L&apos;annonce ne dit presque rien de l&apos;entreprise
                 {docEntreprise.faits.length > 0 &&
                   ` — seulement « ${docEntreprise.faits.join(" », « ")} »`}
-                , et <strong>aucune fiche n&apos;a été trouvée</strong>. La
-                recherche est lancée à l&apos;analyse ; si elle a échoué, le
-                bouton « Réanalyser » la relance. Sans fiche, le paragraphe sur
-                l&apos;entreprise sera court — et c&apos;est voulu : il
-                n&apos;inventera rien.
+                , et <strong>aucune fiche n&apos;est encore en base</strong>. Ce
+                n&apos;est pas bloquant : la rédaction de la lettre lancera la
+                recherche elle-même, dans le même clic, pour environ 2,7 ¢ — et
+                une seule fois pour cet employeur. Tu n&apos;as rien à faire
+                ici.
               </p>
             )}
           </div>

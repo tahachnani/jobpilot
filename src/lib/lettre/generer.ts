@@ -14,7 +14,12 @@ import { chargerCorpus } from "@/lib/cv/corpus";
 import { choisirNiveau } from "@/lib/cv/compacite";
 import { classerExperiences } from "@/lib/lettre/experiences";
 import { classerSituations } from "@/lib/cv/situations";
-import { ficheEnTexte, lireFiche, type FicheLue } from "@/lib/entreprise/fiche";
+import {
+  ficheEnTexte,
+  ficheOuRecherche,
+  lireFiche,
+  type FicheLue,
+} from "@/lib/entreprise/fiche";
 import { documentationEntreprise } from "@/lib/entreprise/documentee";
 import { referenceAnnonce } from "@/lib/offre/reference";
 import { sousVerrou } from "@/lib/verrou";
@@ -564,32 +569,50 @@ async function rassemblerDossier(
    * cas et demande deux lignes honnêtes plutôt qu'un paragraphe inventé.
    */
   /**
-   * La fiche est LUE, jamais cherchée ici (D118).
+   * La fiche entreprise, cherchée ici si et seulement si elle manque (D128).
    *
-   * Le 4 octobre, la requête de rédaction a été tuée par Vercel après soixante
-   * secondes : `504 Task timed out`. La recherche entreprise en consommait dix
-   * à elle seule, avant même que la rédaction ne commence — et dix secondes
-   * sur soixante, c'est le sixième d'un budget déjà trop court.
+   * Trois états se sont succédé, et le troisième est le bon.
    *
-   * La recherche appartient à l'analyse de l'offre, pas à la rédaction : on
-   * analyse une fois, on rédige parfois plusieurs fois, et la fiche ne change
-   * pas entre deux versions. La déplacer là où elle est faite une seule fois
-   * rend chaque rédaction plus courte, et le prix ne bouge pas puisque la
-   * fiche était déjà mise en cache par employeur.
+   * D108 cherchait à chaque rédaction. D118 a tout déplacé vers l'analyse
+   * après un `504 Task timed out` : la recherche consommait vingt des
+   * soixante secondes de la requête. Mais la rédaction s'est mise à lire une
+   * fiche qui, pour toute offre ajoutée avant D126, n'existait pas — d'où des
+   * §2 de deux lignes, et une lettre payée 5,8 ¢ pour rien avant de payer une
+   * réanalyse puis une seconde lettre.
+   *
+   * La règle est celle que Taha a formulée le 7 octobre, et elle est juste :
+   * « les infos sans la lettre ne valent rien et vice versa, donc les deux
+   * d'un seul clic ». Assez d'infos dans l'annonce → rédaction directe ; pas
+   * assez → recherche, puis rédaction.
+   *
+   * Les vingt secondes de D118 étaient celles de Sonnet avec deux requêtes
+   * web. La recherche tourne depuis sur le modèle d'extraction avec une seule
+   * requête, et la lettre est passée de 19,6 ¢ à 5,8 ¢ — donc d'environ un
+   * tiers de sa longueur. La durée est désormais journalisée : si
+   * l'enchaînement approche des soixante secondes, on le verra dans
+   * `appels_ia.duree_ms` au lieu de l'apprendre par un 504.
+   *
+   * Le verrou par employeur (D115) protège déjà contre la double recherche,
+   * et un échec n'interrompt rien : la lettre sait écrire un §2 sans fiche.
    */
   let fiche: FicheLue | null = null;
   try {
-    const { fiche: enBase, origine, ageJours } = await lireFiche(offre.entreprise);
-    fiche = {
-      fiche: enBase,
-      origine: origine === "annonce" ? "annonce" : enBase ? "web" : "absente",
-      reutilisee: true,
-      documentation: documentationEntreprise(offre.contenu_brut),
-      coutUsd: 0,
-      ageJours,
-    };
+    fiche = await ficheOuRecherche(offre.entreprise, offre.contenu_brut, offreId);
   } catch (e) {
-    console.error(`[lettre] fiche entreprise illisible : ${String(e)}`);
+    console.error(`[lettre] fiche entreprise indisponible : ${String(e)}`);
+    try {
+      const { fiche: enBase, origine, ageJours } = await lireFiche(offre.entreprise);
+      fiche = {
+        fiche: enBase,
+        origine: origine === "annonce" ? "annonce" : enBase ? "web" : "absente",
+        reutilisee: true,
+        documentation: documentationEntreprise(offre.contenu_brut),
+        coutUsd: 0,
+        ageJours,
+      };
+    } catch {
+      fiche = null;
+    }
   }
 
   /**

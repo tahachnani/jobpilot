@@ -287,6 +287,11 @@ export default async function Lettre({
         </div>
 
         <p className="mt-2 text-xs leading-relaxed text-ardoise-400">
+          Si l&apos;annonce ne dit pas assez de l&apos;entreprise, la recherche
+          web part d&apos;abord, dans le même clic : environ 2,7 ¢, une seule
+          fois pour cet employeur, réutilisée ensuite par toutes ses offres et
+          par la préparation d&apos;entretien. Si l&apos;annonce suffit, rien
+          n&apos;est cherché et rien n&apos;est facturé.{" "}
           Rédiger la lettre produit aussi les deux messages courts, pour environ
           6 ¢. Les messages seuls coûtent environ 1,4 ¢ — même dossier en entrée,
           mais une sortie huit fois plus courte et le modèle d&apos;extraction.
@@ -489,7 +494,7 @@ export default async function Lettre({
                   ? "Le paragraphe sur l'entreprise s'appuie sur une recherche web"
                   : source.type === "annonce"
                     ? "Le paragraphe sur l'entreprise s'appuie uniquement sur l'annonce"
-                    : "Aucune information sur l'entreprise n'était disponible"}
+                    : "La recherche n'a rien rapporté sur cette entreprise"}
               </p>
 
               {source.faits.length > 0 && (
@@ -521,7 +526,7 @@ export default async function Lettre({
                   ? "Vérifie ces faits avant un entretien : ils datent du jour de la recherche."
                   : source.type === "annonce"
                     ? "Rien n'a été cherché sur internet, et rien n'a été facturé : l'annonce en disait assez."
-                    : "Le paragraphe ne doit donc rien affirmer de l'entreprise. S'il le fait, c'est inventé — supprime-le."}
+                    : "La recherche a bien été lancée — c'est le propre du bouton de rédaction depuis D128 — et elle n'a rien trouvé d'exploitable. Le paragraphe ne doit donc rien affirmer de l'entreprise : s'il le fait, c'est inventé, supprime-le."}
               </p>
             </div>
           )}

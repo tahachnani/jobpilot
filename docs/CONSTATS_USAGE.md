@@ -1260,3 +1260,63 @@ n'en garde donc que les déclarations sans `extends`.
 Vérifié en réintroduisant le défaut : le détecteur le nomme. Un outil qui rate
 la panne qui l'a motivé ne vaut rien — la leçon est la même qu'en D117, où le
 premier détecteur cherchait le nom dans le chemin du module.
+
+---
+
+# 7 octobre — D128, un seul clic, et la durée enfin mesurée
+
+« Pourquoi je dois payer pour une lettre sans infos pour ensuite payer
+réanalyser pour les infos ? » La question est juste et la réponse est qu'il n'y
+avait aucune bonne raison.
+
+Les coûts réels, tirés du journal :
+
+```
+lettre_motivation      5,8 ¢   (moyenne sur 135 appels)
+extraction_offre       1,0 ¢
+recherche_entreprise   2,7 ¢   (modèle d'extraction, une seule requête web)
+```
+
+Le gâchis n'était pas la réanalyse — 3,7 ¢, soit 1 ¢ de plus que la recherche
+seule. C'était **la lettre payée deux fois** : 5,8 ¢ pour un texte dont
+l'application savait d'avance que le §2 serait vide, puis 5,8 ¢ pour la refaire.
+
+## La règle, telle que Taha l'a formulée
+
+> Assez d'infos pour rédiger un paragraphe : sans recherche ⇒ rédaction.
+> Pas assez d'infos ⇒ recherche ⇒ rédaction.
+
+C'est ce que fait désormais le bouton de rédaction. Troisième état de cette
+mécanique, et le bon :
+
+- **D108** cherchait à chaque rédaction — donc plusieurs fois pour le même
+  employeur ;
+- **D118** a tout déplacé vers l'analyse après un `504 Task timed out`, la
+  recherche consommant vingt des soixante secondes. Mais la rédaction s'est
+  mise à **lire** une fiche qui, pour toute offre antérieure à D126, n'existait
+  pas ;
+- **D128** cherche depuis la rédaction, *si et seulement si* l'annonce ne
+  suffit pas, et le résultat reste en cache par employeur.
+
+Les vingt secondes de D118 étaient celles de Sonnet avec deux requêtes web.
+Depuis, la recherche tourne sur le modèle d'extraction avec une seule requête,
+et la lettre est passée de 19,6 ¢ à 5,8 ¢ — donc à environ un tiers de sa
+longueur.
+
+## Et la mesure qui manquait depuis le début
+
+`const debut = Date.now()` existait dans `anthropic.ts` depuis le premier jour,
+suivi vingt lignes plus bas d'un **`void debut;`** : la durée était prise et
+jetée.
+
+Deux décisions d'architecture ont pourtant été arbitrées sur des durées —
+sortir la recherche de la rédaction, puis l'y remettre — et la seule mesure
+dont on disposait venait de l'écart entre deux lignes du journal, consécutives
+par chance.
+
+`appels_ia.duree_ms` est désormais rempli à chaque appel, succès comme échec.
+Si l'enchaînement approche des soixante secondes, on le verra dans le journal
+au lieu de l'apprendre par un 504.
+
+Les offres déjà envoyées ne sont pas reprises : décision de Taha, « je corrige
+pour les offres à venir ».

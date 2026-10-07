@@ -160,7 +160,7 @@ export async function appelIA(options: {
       }
     }
   } catch (e) {
-    await journaliser(options, null, false, String(e));
+    await journaliser(options, null, false, String(e), Date.now() - debut);
     throw new ErreurIA("Impossible de joindre l'API Anthropic.");
   }
 
@@ -175,7 +175,13 @@ export async function appelIA(options: {
     } else if (reponse.status === 429) {
       message = "Trop d'appels d'un coup. Réessaie dans quelques secondes.";
     }
-    await journaliser(options, null, false, `${reponse.status} ${corps.slice(0, 300)}`);
+    await journaliser(
+      options,
+      null,
+      false,
+      `${reponse.status} ${corps.slice(0, 300)}`,
+      Date.now() - debut
+    );
     throw new ErreurIA(message);
   }
 
@@ -259,7 +265,8 @@ export async function appelIA(options: {
       resultat,
       false,
       `réponse sans texte — blocs : ${types} — ${cause} — ` +
-        `${donnees.usage.output_tokens} jetons produits`
+        `${donnees.usage.output_tokens} jetons produits`,
+      Date.now() - debut
     );
     throw new ErreurIA(
       `Le modèle n'a renvoyé aucun texte (blocs reçus : ${types} ; ${cause}). ` +
@@ -270,16 +277,26 @@ export async function appelIA(options: {
     );
   }
 
-  await journaliser(options, resultat, true, null);
-  void debut;
+  await journaliser(options, resultat, true, null, Date.now() - debut);
   return resultat;
 }
 
+/**
+ * La durée est journalisée (D128).
+ *
+ * `const debut = Date.now()` existait depuis le début, suivi vingt lignes plus
+ * bas d'un `void debut;` : la mesure était prise et jetée. Deux décisions
+ * d'architecture ont pourtant été arbitrées sur des durées estimées — sortir
+ * la recherche entreprise de la rédaction le 4 octobre après un `504 Task
+ * timed out`, puis l'y remettre le 7. La seule mesure dont on disposait venait
+ * de l'écart entre deux lignes du journal, par chance consécutives.
+ */
 async function journaliser(
   options: { tache: string; modele: string; offreId?: string | null },
   resultat: Reponse | null,
   succes: boolean,
-  erreur: string | null
+  erreur: string | null,
+  dureeMs: number | null = null
 ) {
   try {
     const supabase = creerClientServeur();
@@ -290,6 +307,7 @@ async function journaliser(
       tokens_entree: resultat?.tokensEntree ?? null,
       tokens_sortie: resultat?.tokensSortie ?? null,
       cout_usd: resultat?.coutUsd ?? 0,
+      duree_ms: dureeMs,
       succes,
       erreur,
     });
