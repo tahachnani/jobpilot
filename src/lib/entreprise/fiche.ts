@@ -187,7 +187,7 @@ async function resoudreFiche(
   offreId?: string | null,
   forcer = false
 ): Promise<FicheLue> {
-  const documentation = documentationEntreprise(contenuAnnonce);
+  const documentation = documentationEntreprise(contenuAnnonce, entreprise);
 
   if (!entreprise?.trim()) {
     return {

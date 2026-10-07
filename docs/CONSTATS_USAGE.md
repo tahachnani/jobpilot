@@ -1320,3 +1320,91 @@ au lieu de l'apprendre par un 504.
 
 Les offres déjà envoyées ne sont pas reprises : décision de Taha, « je corrige
 pour les offres à venir ».
+
+---
+
+# 7 octobre — D129, payer pour apprendre ce qu'on savait
+
+« Toutes ces infos pour rédiger deux lignes qu'on pouvait dire sans recherche
+web ? » La recherche sur DIM a rapporté six faits — rachat par Regent LP,
+renommage en Dim Brands International, cinq marques européennes, partenariat de
+marque. Le §2 produit :
+
+> « Fondée à Autun en 1953, DIM y conserve aujourd'hui son siège social
+> historique et son atelier de fabrication. »
+
+Deux lignes, bâties sur le seul fait que l'annonce portait déjà.
+
+## L'annonce contenait tout, et mieux
+
+Vérifié en base : `contenu_brut` contient **1953**, **Autun**, **historique**,
+et aussi **Regent**, **HanesBrands**, **Nur Die**, **Lovable**, **Abanderado**,
+**Bellinda**, **Fressange**. Le paragraphe d'entreprise de l'annonce dit :
+
+> « DBI commercialise de nombreuses marques réputées (Dim, Nur Die, Lovable,
+> Playtex) et opère dans plus de dix pays. […] à Autun (71) se trouve notre
+> siège social historique, où sont répartis la fabrication, le contrôle de la
+> qualité et la logistique. […] plus de 5 milliards de collants confectionnés
+> depuis la création de la marque DIM en 1953. »
+
+Passé dans le test de suffisance :
+
+```
+suffisante : false   ·   section « à propos » : false   ·   faits chiffrés : 0
+```
+
+**Zéro, sur un paragraphe qui en porte trois.** Les motifs échouaient chacun
+pour une raison bête :
+
+| ce que l'annonce dit | pourquoi le motif rate |
+|---|---|
+| « plus de **dix** pays » | le nombre est écrit en lettres |
+| « 5 milliards de **collants** » | « collants » n'était dans aucune liste fermée |
+| « depuis **la création de la marque en** 1953 » | le motif exigeait l'année collée à « depuis » |
+
+Et la détection de section ne cherchait que « À propos » ou « Qui sommes-nous »,
+titres qu'une annonce LinkedIn n'a jamais.
+
+## Ce qu'on mesure maintenant
+
+Ce qu'une annonce porte sur son employeur n'est presque jamais un chiffre
+isolé : c'est un **paragraphe de prose**. On le reconnaît comme tel — quatre
+mots de présentation distincts au moins, dans un bloc d'au moins 180 signes qui
+parle à la première personne du pluriel ou nomme l'entreprise. Les motifs
+chiffrés restent en complément, élargis aux nombres écrits en lettres et à
+n'importe quelle unité après un ordre de grandeur.
+
+**Calibré sur les 121 annonces de la base : 24 obtiennent un paragraphe
+reconnu**, soit un cinquième. Les quatre autres cinquièmes déclenchent toujours
+la recherche.
+
+Trois faux positifs sont apparus au calibrage, et chacun aurait supprimé la
+recherche sur une annonce muette :
+
+- **le pied de page du site d'emploi** — « Afficher plus d'offres · Découvrez
+  d'autres services web · Réussir son CV » : six mots de présentation, zéro mot
+  sur l'entreprise ;
+- **la description de poste tutoyante** — « Tes missions : … » : le garde-fou
+  ne connaissait que le vouvoiement ;
+- **le cabinet de recrutement qui se présente** — « ŌDAS Conseil recrute pour le
+  compte de l'un de ses clients » : une présentation, mais pas celle de
+  l'employeur.
+
+Les trois ont leur test, et le seuil est retombé de 31 à 24.
+
+## Et le §2 cesse d'être plafonné
+
+La consigne disait « UNE SEULE PHRASE SI C'EST TOUT CE QU'ON SAIT » et
+« 400 signes est un plafond, jamais un objectif » — écrite quand aucune fiche
+n'existait jamais, pour empêcher le remplissage. Avec six faits en main, elle
+produisait toujours deux lignes.
+
+La longueur suit désormais la matière **dans les deux sens** : une phrase s'il
+n'y a qu'un fait, deux ou trois s'il y en a plusieurs. Et la hiérarchie est
+écrite : ce qui façonne le travail à faire — périmètre, marques, sites, pays,
+structure du groupe, changement d'actionnaire — avant les ordres de grandeur,
+et l'histoire en dernier. Une date de fondation ne dit rien d'un poste de
+contrôle de gestion industriel ; « cinq marques dans dix pays » et « sortie du
+groupe en 2022 » lui disent tout.
+
+**206 tests.**

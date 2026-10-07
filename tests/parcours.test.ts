@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { verifierStyle } from "@/lib/lettre/style";
+import { documentationEntreprise } from "@/lib/entreprise/documentee";
 import { classerExperiences } from "@/lib/lettre/experiences";
 import type { ExperienceCV } from "@/lib/cv/donnees";
 import type { MissionRetenue } from "@/lib/cv/selection";
@@ -209,4 +210,57 @@ test("un message qui ne parle que d'une expérience est signalé", () => {
     d.some((x) => x.tournure === "Message 1 — parcours étroit"),
     JSON.stringify(d.map((x) => x.tournure))
   );
+});
+
+/**
+ * D129 — le test de suffisance de l'annonce.
+ *
+ * Offre DIM du 7 octobre : l'annonce portait un paragraphe entier sur
+ * l'employeur, et le test a rendu « 0 fait chiffré, insuffisante ». La
+ * recherche web est partie, a coûté 2,7 ¢, et a rapporté ce que l'annonce
+ * disait déjà.
+ */
+
+const DIM = `DBI ( Dim Brands International ) est un leader du sous-vêtement européen qui commercialise de nombreuses marques réputées ( Dim, Nur Die, Lovable, Playtex ) et opère dans plus de dix pays. Porté par son savoir-faire et son programme d'innovation, DBI développe des produits essentiels du quotidien qui s'adressent à l'ensemble des publics. Notre siège européen se situe à Rueil-Malmaison (92), et à Autun (71), en Bourgogne, se trouve notre siège social historique, où sont répartis divers services tels que la fabrication, le contrôle de la qualité et la logistique. Grâce à cet atelier de fabrication dans le centre de la France, plus de 5 milliards de collants ont déjà été confectionnés depuis la création de la marque DIM en 1953 !`;
+
+test("un paragraphe de présentation dispense de chercher", () => {
+  const d = documentationEntreprise(DIM, "DIM");
+  assert.equal(d.suffisante, true);
+  assert.ok(d.paragraphe, "le paragraphe doit être reconnu");
+});
+
+test("les trois faits que les anciens motifs rataient sont attrapés", () => {
+  const d = documentationEntreprise(DIM, "DIM");
+  const tous = d.faits.join(" | ");
+  // Nombre écrit en lettres.
+  assert.match(tous, /dix pays/i);
+  // Unité absente de toute liste fermée — aucune ne contiendra « collants ».
+  assert.match(tous, /milliards de collants/i);
+  // L'année ne suit pas immédiatement « depuis ».
+  assert.match(tous, /1953/);
+});
+
+test("le pied de page d'un site d'emploi n'est pas une présentation", () => {
+  const chrome = `Afficher plus d'offres Découvrez d'autres services web Réussir son CV et sa lettre de motivation Suscitez l'intérêt du recruteur et donnez-lui envie de vous rencontrer. B.A.BA Entretien Apprenez à préparer votre prochain entretien avec nos conseils métier, secteur et marché. Notre réseau de clients et nos agences vous accompagnent.`;
+  assert.equal(documentationEntreprise(chrome, "Antin Résidences").paragraphe, null);
+});
+
+test("une description de poste tutoyante n'est pas une présentation", () => {
+  const poste = `Tes missions : Dans le cadre du développement de notre activité, nous recherchons un contrôleur travaux HTB. Concrètement, tes missions seront réparties entre la supervision sur nos sites, le suivi client, la coordination avec nos agences et le reporting métier auprès du groupe. Tu seras rattaché au responsable de secteur.`;
+  assert.equal(documentationEntreprise(poste, "AtlantiC Ingénierie").paragraphe, null);
+});
+
+test("le cabinet qui recrute pour un client ne présente pas l'employeur", () => {
+  const intermediaire = `A propos ODAS CONSEIL : Le talent juste, au bon endroit, au bon moment. Parce que le bon profil au bon endroit change tout, ŌDAS Conseil, expert du recrutement en Expertise Comptable et Paie, recrute pour le compte de l'un de ses clients, un cabinet implanté depuis 30 ans, présent sur plusieurs sites et reconnu sur son marché.`;
+  assert.equal(
+    documentationEntreprise(intermediaire, "Cabinet d'expertise comptable").paragraphe,
+    null
+  );
+});
+
+test("une annonce sans rien sur l'employeur reste insuffisante", () => {
+  const maigre = `Nous recherchons un contrôleur de gestion. Vous serez en charge du suivi budgétaire, de l'analyse des écarts et de la production du reporting mensuel. Vous êtes titulaire d'un master et justifiez d'une première expérience réussie sur un poste similaire. Le poste est à pourvoir immédiatement.`;
+  const d = documentationEntreprise(maigre, "Société X");
+  assert.equal(d.suffisante, false);
+  assert.equal(d.paragraphe, null);
 });

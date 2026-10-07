@@ -123,15 +123,21 @@ une. Rien d'autre : ni argument, ni enthousiasme, ni "a retenu mon attention".
 Exemple de ton : "Je vous adresse ma candidature au poste de Contrôleur de
 Gestion Opérationnel, publié sur HelloWork sous la référence 2026-132550."
 
-§2 — L'ENTREPRISE (environ 400 signes, UNE SEULE PHRASE SI C'EST TOUT CE QU'ON SAIT)
+§2 — L'ENTREPRISE (jusqu'à 450 signes)
 Pourquoi celle-là. Tu t'appuies UNIQUEMENT sur ce que le message te donne : la fiche entreprise si elle est présente, sinon les faits que l'annonce porte sur elle.
 
 CE PARAGRAPHE NE PARLE PAS DU CANDIDAT. C'est la règle entière, et elle n'a pas d'exception.
-Le §3 démontre ce qu'il sait faire, avec une situation vécue. Si le §2 l'annonce — "c'est l'exercice que j'ai mené dans mes expériences précédentes", "ce type de mission m'est familier", "mon parcours m'y a préparé" — il promet sans preuve ce que le paragraphe suivant va prouver, et il affaiblit les deux. Ces phrases sont INTERDITES.
+Le §3 démontre ce qu'il sait faire. Si le §2 l'annonce — "c'est l'exercice que j'ai mené dans mes expériences précédentes", "ce type de mission m'est familier", "mon parcours m'y a préparé" — il promet sans preuve ce que le paragraphe suivant va prouver, et il affaiblit les deux. Ces phrases sont INTERDITES.
 
-LA LONGUEUR S'ADAPTE À LA MATIÈRE, ELLE NE SE REMPLIT PAS.
-Si tu disposes d'un seul fait sur l'entreprise, tu écris UNE phrase et tu passes au §3. Un paragraphe court est honnête ; un paragraphe étiré avec une affirmation sur le candidat est du remplissage, et c'est exactement ce que le lecteur repère.
-400 signes est un plafond, jamais un objectif à atteindre.
+LA LONGUEUR SUIT LA MATIÈRE, DANS LES DEUX SENS.
+Un seul fait disponible : UNE phrase, et tu passes au §3. Un paragraphe court est honnête ; un paragraphe étiré est du remplissage, et le lecteur le repère.
+Mais plusieurs faits disponibles : DEUX OU TROIS PHRASES, et tu les utilises. Écrire deux lignes quand le message t'en donne six, c'est gâcher la seule chose qui distingue cette candidature des autres — et la recherche qui les a réunis a été payée.
+
+CHOISIS LES FAITS QUI PORTENT SUR LE POSTE, PAS LES PLUS PITTORESQUES.
+Dans cet ordre : ce qui façonne le travail à faire — périmètre, nombre de marques, de sites ou de pays, structure du groupe, changement d'actionnaire ou d'organisation récent — puis les ordres de grandeur, puis seulement, s'il reste de la place, l'histoire.
+Une date de fondation ne dit rien du poste. "Cinq marques dans dix pays" et "sortie du groupe en 2022, l'entreprise construit son autonomie" disent à un contrôleur de gestion exactement ce qui l'attend. Le 7 octobre, une lettre pour un fabricant de lingerie a reçu six faits — rachat par un fonds, renommage, cinq marques européennes, dix pays, partenariat de marque — et n'a retenu que "fondée en 1953", qui était déjà dans l'annonce.
+
+UN FAIT DÉJÀ PRÉSENT DANS L'ANNONCE reste utilisable, mais il n'apprend rien au recruteur qui l'a écrite. À matière égale, préfère ce qu'il ne s'attend pas à te voir savoir.
 
 INTERDIT : les mots-valeurs. "Acteur reconnu", "valeurs d'excellence", "place l'humain au cœur de sa stratégie" sont du texte de plaquette ; un recruteur les lit cinquante fois par semaine et ils ne distinguent rien.
 
@@ -606,7 +612,7 @@ async function rassemblerDossier(
         fiche: enBase,
         origine: origine === "annonce" ? "annonce" : enBase ? "web" : "absente",
         reutilisee: true,
-        documentation: documentationEntreprise(offre.contenu_brut),
+        documentation: documentationEntreprise(offre.contenu_brut, offre.entreprise),
         coutUsd: 0,
         ageJours,
       };

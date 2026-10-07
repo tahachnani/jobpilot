@@ -261,7 +261,10 @@ export default async function DetailOffre({
   const { fiche: ficheEntreprise, ageJours: ficheAge } = await lireFiche(
     offre.entreprise as string | null
   );
-  const docEntreprise = documentationEntreprise(offre.contenu_brut as string | null);
+  const docEntreprise = documentationEntreprise(
+    offre.contenu_brut as string | null,
+    offre.entreprise as string | null
+  );
   const reference = referenceAnnonce(offre.contenu_brut as string | null);
 
   const lettres = tousDocuments.filter((d) => d.type === "lettre");
