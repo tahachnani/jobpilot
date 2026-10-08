@@ -1518,3 +1518,93 @@ neutralisant : ils tombent sans elle.
 > 17h01 a donc été produit par l'ancien code. Un défaut qui « persiste » après
 > correction mérite toujours qu'on regarde d'abord la date du dernier
 > déploiement.
+
+---
+
+## D131 — le profil cesse d'appartenir à un volet
+
+**Constat du 8 octobre.** Troisième aller-retour en deux jours sur le même
+mécanisme. « Pourquoi quand je masque une compétence de mon volet profil elle
+ne s'efface pas sur le nouveau CV ? », puis : « Tous les volets doivent être en
+commun entre la compta et le CDG, c'est pas logique d'avoir la taxonomie que
+pour la compta ou bien le profil que pour le CDG ? »
+
+### La cause, en une ligne de code
+
+```ts
+const volet: CodeVolet = searchParams.volet === "compta" ? "compta" : "cdg";
+```
+
+Le lien « Mon profil » de la barre latérale pointait sur `/profil`, sans volet.
+La page ne trouvait rien dans l'URL et retombait sur `cdg`, simplement parce
+qu'il est le premier des deux. Et dans le menu, « Mon profil » est rangé **hors**
+des blocs Contrôle de gestion et Comptabilité, avec Taxonomie et Paramètres :
+présenté comme commun, il l'était par son contenu et ne l'était pas par ses
+boutons. Le bouton, lui, disait « Masquer » — jamais « de quel volet ».
+
+Trois clics ont été donnés comme ça, sur « Comptabilité fournisseurs », puis
+« Comptabilité clients », puis « Immobilisations et amortissements ». Chaque
+fois la ligne a quitté le CV de contrôle de gestion, chaque fois elle est restée
+sur les CV comptables qui partaient derrière, et chaque fois il a fallu
+régénérer.
+
+### Ce que le double volet sert, et ce qu'il ne sert pas
+
+Mesuré avant de décider quoi que ce soit.
+
+| | les deux volets | compta seul | **cdg seul** |
+|---|---|---|---|
+| compétences visibles | 197 | 6 | **0** |
+| expériences | 4 | 1 | **0** |
+
+Zéro. **La visibilité par volet des compétences n'a jamais servi à rien
+d'autre qu'à produire ces erreurs** : les six « compta seulement » sont les six
+clics manqués, pas six choix. Elle disparaît.
+
+La visibilité des **expériences**, elle, se justifie : le stage en cabinet
+(Amouri / Ficomek) n'a rien à faire sur un CV de contrôle de gestion, et son
+`titre_cdg` est vide. Elle reste — mais écrite en toutes lettres.
+
+Et le reste du double volet est massivement utilisé, il ne bouge pas :
+
+- **127 formulations de missions**, 95 en cdg et 32 en compta ;
+- **4 intitulés de poste sur 5** diffèrent — TECHNICAPS est « Contrôleur de
+  Gestion » d'un côté, « Comptable Fournisseurs » de l'autre ;
+- **20 missions sur 43** ont une pertinence différente d'un volet à l'autre ;
+- deux accroches, une par volet.
+
+La taxonomie, elle, était déjà commune : aucun volet nulle part dedans.
+
+### Ce qui change
+
+1. **Compétences : plus de volet.** « Masquer » devient « Retirer du profil »,
+   et retire des deux CV. Migration `0020` : les six lignes en désaccord sont
+   alignées sur l'intention — retirée d'un volet, retirée des deux. Après :
+   197 visibles partout, 80 retirées, **0 en désaccord**.
+2. **Expériences : un menu, pas un bouton.** *Sur les deux CV · CV contrôle de
+   gestion seulement · CV comptable seulement · Sur aucun CV.* L'état courant
+   est affiché, donc un clic dans le mauvais onglet n'existe plus.
+3. **L'écran de profil montre toutes les expériences**, y compris celles qui ne
+   sortent pas sur le CV du volet affiché. Elles étaient filtrées en amont :
+   une expérience retirée du volet CDG devenait invisible depuis l'onglet CDG,
+   c'est-à-dire exactement là où on allait pour la remettre. L'ancienneté
+   continue de ne compter que les expériences du volet.
+4. **« Mon profil » emporte le volet où l'on se trouve.** Les écrans d'offres
+   portent déjà le slug dans leur chemin, il suffisait de le relire.
+5. **Une phrase en haut de l'écran** dit ce que les onglets contrôlent
+   réellement : l'accroche, les intitulés et les formulations. Rien d'autre.
+
+### Le test qui a servi à quelque chose
+
+La portée se convertit dans les deux sens — deux colonnes vers un menu, un menu
+vers deux colonnes — et c'est le genre d'aller-retour où une inversion ne se
+voit pas : on lit « CV comptable seulement », on valide sans rien changer, et
+l'expérience bascule. Les deux sens vivent donc dans `lib/profil/portee.ts`, et
+un test les parcourt en rond.
+
+Il a immédiatement attrapé autre chose. La garde s'écrivait `valeur in
+VISIBILITES` ; `in` remonte la chaîne de prototypes, et **« toString » répondait
+vrai**. Une valeur forgée passait la garde, et le code partait écrire une
+fonction là où il attend deux booléens. Corrigé en `hasOwnProperty`.
+
+**219 tests.**

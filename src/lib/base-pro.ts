@@ -40,6 +40,8 @@ export interface Experience {
   secteur_code: string | null;
   titre: string | null;
   visible: boolean;
+  /** Les CV sur lesquels cette expérience figure (D131). */
+  portee: { cdg: boolean; compta: boolean };
   duree_mois_forcee: number | null;
   ordre: number;
   missions: Mission[];
@@ -120,8 +122,17 @@ export async function chargerBasePro(volet: CodeVolet) {
         .maybeSingle(),
     ]);
 
+  /**
+   * Toutes les expériences, y compris celles qui ne figurent pas sur le CV de
+   * ce volet (D131).
+   *
+   * Elles étaient écartées ici, et l'écran de profil ne les montrait donc pas :
+   * une expérience retirée du volet CDG devenait invisible depuis l'onglet CDG,
+   * c'est-à-dire précisément là où on allait pour la remettre. Le sélecteur de
+   * portée a besoin de les voir toutes ; `visible` dit celles qui sortent sur
+   * le CV de ce volet, et l'ancienneté continue de ne compter que celles-là.
+   */
   const experiences: Experience[] = (exps.data ?? [])
-    .filter((e: Record<string, unknown>) => e[champVisible] === true)
     .map((e: Record<string, unknown>) => {
       const missionsBrutes = (e.missions as Record<string, unknown>[]) ?? [];
       const missions: Mission[] = missionsBrutes
@@ -160,15 +171,28 @@ export async function chargerBasePro(volet: CodeVolet) {
         type_contrat: e.type_contrat as string,
         secteur_code: e.secteur_code as string | null,
         titre: e[champTitre] as string | null,
-        visible: true,
+        visible: e[champVisible] === true,
+        portee: {
+          cdg: e.visible_cdg === true,
+          compta: e.visible_compta === true,
+        },
         duree_mois_forcee: e.duree_mois_forcee as number | null,
         ordre: (e.ordre as number) ?? 0,
         missions,
       };
     });
 
+  /**
+   * Les compétences n'ont plus de visibilité par volet (D131) : une ligne est
+   * dans le profil ou elle n'y est pas. Les deux colonnes sont toujours
+   * écrites ensemble ; exiger les deux ici fait qu'une ligne restée dans un
+   * état mi-visible ne sort nulle part, plutôt que dans un volet sur deux.
+   */
   const competences: Competence[] = (comps.data ?? [])
-    .filter((c: Record<string, unknown>) => c[champVisible] === true)
+    .filter(
+      (c: Record<string, unknown>) =>
+        c.visible_cdg === true && c.visible_compta === true
+    )
     .map((c: Record<string, unknown>) => ({
       id: c.id as string,
       libelle: c.libelle as string,
@@ -191,7 +215,7 @@ export async function chargerBasePro(volet: CodeVolet) {
     langues: langues.data ?? [],
     interets: interets.data ?? [],
     accroche: (accroche.data as { id: string; texte: string } | null) ?? null,
-    ancienneteMois: experiences.reduce((total, e) => {
+    ancienneteMois: experiences.filter((e) => e.visible).reduce((total, e) => {
       const coef = e.type_contrat === "stage" ? 0.5 : 1;
       return total + dureeMois(e) * coef;
     }, 0),

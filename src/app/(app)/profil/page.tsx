@@ -7,11 +7,14 @@ import {
 } from "@/config/activites";
 import { chargerTaxonomie, codesActifs, libelleDe } from "@/lib/taxonomie";
 import { chargerBasePro, dureeMois } from "@/lib/base-pro";
+import { LIBELLES_PORTEE, porteeDe } from "@/lib/profil/portee";
 import { chargerCorpus } from "@/lib/cv/corpus";
 import {
   basculerVisibilite,
   modifierCompetence,
   retablirCompetence,
+  retirerCompetence,
+  porteeExperience,
   deplacer,
   modifierAccroche,
   modifierFormulation,
@@ -91,6 +94,69 @@ function BoutonMasquer({
   );
 }
 
+/**
+ * Retire une compétence du profil — des deux CV (D131).
+ *
+ * L'ancien bouton « Masquer » agissait sur le volet de l'onglet ouvert, sans
+ * que rien ne le dise. Comme la page s'ouvre sur le contrôle de gestion par
+ * défaut, quatre lignes retirées cette semaine sont restées sur les CV
+ * comptables. Le libellé dit maintenant ce que le clic fait.
+ */
+function BoutonRetirer({ id, volet }: { id: string; volet: CodeVolet }) {
+  return (
+    <form action={retirerCompetence}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="volet" value={volet} />
+      <button
+        type="submit"
+        className="rounded border border-ardoise-200 px-2.5 py-1 text-xs text-ardoise-500 hover:bg-rose-50 hover:text-rose-700"
+      >
+        Retirer du profil
+      </button>
+    </form>
+  );
+}
+
+/** Sur quels CV une expérience figure (D131). Le choix est écrit, pas déduit. */
+function SelecteurPortee({
+  id,
+  portee,
+  volet,
+}: {
+  id: string;
+  portee: { cdg: boolean; compta: boolean };
+  volet: CodeVolet;
+}) {
+  const valeur = porteeDe({
+    visible_cdg: portee.cdg,
+    visible_compta: portee.compta,
+  });
+
+  return (
+    <form action={porteeExperience} className="flex items-center gap-1">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="volet" value={volet} />
+      <select
+        name="portee"
+        defaultValue={valeur}
+        className="rounded border border-ardoise-200 px-2 py-1 text-xs text-ardoise-600"
+      >
+        {Object.entries(LIBELLES_PORTEE).map(([code, libelle]) => (
+          <option key={code} value={code}>
+            {libelle}
+          </option>
+        ))}
+      </select>
+      <button
+        type="submit"
+        className="rounded border border-ardoise-200 px-2 py-1 text-xs text-ardoise-500 hover:bg-ardoise-50"
+      >
+        Appliquer
+      </button>
+    </form>
+  );
+}
+
 export default async function Profil({
   searchParams,
 }: {
@@ -117,14 +183,15 @@ export default async function Profil({
   const annees = Math.floor(base.ancienneteMois / 12);
   const mois = Math.round(base.ancienneteMois % 12);
 
-  // Les compétences masquées ou écartées dans ce volet : elles n'apparaissent
-  // nulle part ailleurs, et un refus depuis une offre devenait irréversible.
+  // Les compétences retirées du profil : elles n'apparaissent nulle part
+  // ailleurs, et un refus depuis une offre devenait irréversible. Une ligne
+  // retirée l'est des deux volets depuis D131 ; on liste donc tout ce qui
+  // n'est pas visible partout, y compris une ligne restée à mi-chemin.
   const supabaseProfil = creerClientServeur();
-  const champVisible = volet === "cdg" ? "visible_cdg" : "visible_compta";
   const { data: masqueesBrutes } = await supabaseProfil
     .from("competences")
     .select("id, libelle, categorie, niveau, origine, precision")
-    .eq(champVisible, false)
+    .or("visible_cdg.eq.false,visible_compta.eq.false")
     .order("libelle");
   const masquees = (masqueesBrutes ?? []) as {
     id: string;
@@ -180,8 +247,16 @@ export default async function Profil({
     <>
       <TitrePage
         titre="👤 Mon profil"
-        sousTitre="Base professionnelle unique — affichage filtré par volet"
+        sousTitre="Base professionnelle unique, commune aux deux volets"
       />
+
+      <p className="mb-3 rounded-lg border border-ardoise-200 bg-white px-4 py-2.5 text-xs leading-relaxed text-ardoise-600">
+        Les compétences et les expériences ci-dessous sont{" "}
+        <strong className="font-medium text-ardoise-800">communes aux deux CV</strong>.
+        Les onglets ne changent que l&apos;accroche, les intitulés de poste et les
+        formulations de missions — les trois choses qui se disent vraiment
+        autrement d&apos;un métier à l&apos;autre.
+      </p>
 
       <div className="mb-6 flex gap-2">
         {LISTE_VOLETS.map((v) => (
@@ -315,6 +390,11 @@ export default async function Profil({
               <div>
                 <p className="font-medium text-ardoise-900">
                   {e.titre ?? "—"} · {e.entreprise}
+                  {!e.visible && (
+                    <span className="ml-2 rounded bg-ardoise-100 px-1.5 py-0.5 text-[10px] font-medium text-ardoise-500">
+                      pas sur le CV {config.nomCourt}
+                    </span>
+                  )}
                 </p>
                 <p className="mt-0.5 text-sm text-ardoise-500">
                   {periode(e.date_debut, e.date_fin)} ·{" "}
@@ -330,7 +410,7 @@ export default async function Profil({
               <div className="flex items-center gap-1">
                 <BoutonOrdre table="experiences" id={e.id} sens="haut" />
                 <BoutonOrdre table="experiences" id={e.id} sens="bas" />
-                <BoutonMasquer table="experiences" id={e.id} volet={volet} />
+                <SelecteurPortee id={e.id} portee={e.portee} volet={volet} />
               </div>
             </div>
 
@@ -732,7 +812,7 @@ export default async function Profil({
                         {c.origine}
                       </span>
                     )}
-                    <BoutonMasquer table="competences" id={c.id} volet={volet} />
+                    <BoutonRetirer id={c.id} volet={volet} />
                   </span>
                   </div>
 

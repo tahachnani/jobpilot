@@ -13,7 +13,7 @@ import Link from "next/link";
  */
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LISTE_VOLETS } from "@/config/volets";
+import { LISTE_VOLETS, voletDepuisSlug } from "@/config/volets";
 
 interface Lien {
   href: string;
@@ -28,15 +28,33 @@ export default function Navigation({ email }: { email: string }) {
 
   const liensHaut: Lien[] = [{ href: "/", libelle: "Tableau de bord", emoji: "🏠" }];
 
+  /**
+   * « Mon profil » emporte le volet où l'on se trouve (D131).
+   *
+   * Le lien pointait sur `/profil` tout court, et la page retombait sur le
+   * contrôle de gestion faute de paramètre. Comme le lien est rangé hors des
+   * deux blocs de volets, avec Taxonomie et Paramètres, la page avait l'air
+   * commune et choisissait un volet en silence : trois allers-retours en deux
+   * jours sont partis de là. Les écrans d'offres portent déjà le slug du
+   * volet dans leur chemin ; il suffit de le relire.
+   */
+  const voletCourant = voletDepuisSlug(chemin.split("/")[1] ?? "");
+  const lienProfil = voletCourant
+    ? `/profil?volet=${voletCourant.code}`
+    : "/profil";
+
   const liensBas: Lien[] = [
     { href: "/marche-cache", libelle: "Marché caché", emoji: "🕵️" },
-    { href: "/profil", libelle: "Mon profil", emoji: "👤" },
+    { href: lienProfil, libelle: "Mon profil", emoji: "👤" },
     { href: "/taxonomie", libelle: "Taxonomie", emoji: "🧭" },
     { href: "/parametres", libelle: "Paramètres", emoji: "⚙️" },
   ];
 
-  const estActif = (href: string) =>
-    href === "/" ? chemin === "/" : chemin.startsWith(href);
+  // Le lien du profil porte désormais une requête : on compare les chemins.
+  const estActif = (href: string) => {
+    const base = href.split("?")[0];
+    return base === "/" ? chemin === "/" : chemin.startsWith(base);
+  };
 
   const classeLien = (href: string) =>
     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${

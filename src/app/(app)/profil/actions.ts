@@ -4,6 +4,7 @@ import { chargerTaxonomie } from "@/lib/taxonomie";
 import { creerClientServeur } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { VISIBILITES, estPortee } from "@/lib/profil/portee";
 
 const TABLES_VISIBILITE = ["experiences", "competences", "formations"] as const;
 const TABLES_ORDRE = [
@@ -162,6 +163,60 @@ export async function modifierCompetence(formData: FormData) {
       niveau: Math.min(3, Math.max(0, niveau)),
     })
     .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/**
+ * Retire une compétence du profil, des deux volets à la fois (D131).
+ *
+ * La visibilité par volet des compétences existait depuis le premier jour, et
+ * la mesure du 8 octobre a montré qu'elle n'avait jamais servi : sur 203
+ * compétences visibles, 197 l'étaient dans les deux volets, six en comptabilité
+ * seulement, et **aucune en contrôle de gestion seulement**. Les six n'étaient
+ * pas des choix : c'étaient six clics donnés depuis l'onglet CDG — celui que la
+ * page ouvre par défaut — alors que Taha voulait retirer la ligne de son profil.
+ * La fonction n'a servi qu'à produire des erreurs, trois jours de suite.
+ *
+ * Les deux colonnes sont conservées : elles portent encore la visibilité des
+ * expériences et des formations, qui, elle, se justifie. Pour les compétences,
+ * elles sont désormais toujours écrites ensemble — comme le fait déjà
+ * `retablirCompetence` depuis D119.
+ */
+export async function retirerCompetence(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (!id) return;
+
+  const supabase = creerClientServeur();
+  await supabase
+    .from("competences")
+    .update({ visible_cdg: false, visible_compta: false })
+    .eq("id", id);
+
+  revalidatePath("/profil");
+  redirect(`/profil?volet=${volet}`);
+}
+
+/**
+ * Choisit sur quels CV une expérience apparaît (D131).
+ *
+ * Contrairement aux compétences, la portée par volet d'une expérience se
+ * justifie : le stage en cabinet n'a rien à faire sur un CV de contrôle de
+ * gestion, et il est aujourd'hui le seul à n'être visible qu'en comptabilité.
+ * Ce qui ne se justifiait pas, c'est un bouton « Masquer » dont l'effet
+ * dépendait de l'onglet ouvert sans que rien ne l'indique. Le choix est donc
+ * écrit en toutes lettres, et chaque option dit ce qu'elle fait.
+ */
+export async function porteeExperience(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const portee = String(formData.get("portee") ?? "");
+  const volet = String(formData.get("volet") ?? "cdg");
+  if (!id || !estPortee(portee)) return;
+
+  const supabase = creerClientServeur();
+  await supabase.from("experiences").update(VISIBILITES[portee]).eq("id", id);
 
   revalidatePath("/profil");
   redirect(`/profil?volet=${volet}`);
