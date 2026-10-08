@@ -416,6 +416,95 @@ export function noterCompetence(
 }
 
 /**
+ * Les métiers qui se déclinent, et qui n'ont droit qu'à une ligne (D130).
+ *
+ * Le CV compta du 7 octobre portait huit lignes, dont « Comptabilité
+ * générale », « Comptabilité analytique » et, en huitième place,
+ * « Comptabilité fournisseurs ». L'annonce ne demandait pas la compta
+ * fournisseurs : la ligne est entrée par la note de famille, qui vaut pour
+ * toute la catégorie compta. Trois fois le même métier, décliné.
+ *
+ * Une tête n'est pas un premier mot : « Esprit critique » et « Esprit
+ * d'initiative » sont deux qualités distinctes, « Gestion des stocks » et
+ * « Gestion de la paie » deux métiers distincts. Les retenir pour une
+ * déclinaison coûterait une ligne vraie pour en économiser une fausse. La
+ * liste est donc fermée et calibrée sur le profil réel, comme la taxonomie et
+ * les formes de déclaration de D124 : on reconnaît ce qu'on a écrit.
+ *
+ * `controle de gestion` est volontairement pris en entier. « Contrôle
+ * budgétaire », « Contrôle interne » et « Contrôle de gestion industriel » ne
+ * sont pas trois variantes d'une même ligne, et la tête `controle` seule les
+ * aurait réduits à une.
+ */
+const TETES_DECLINAISON = [
+  "comptabilite",
+  "controle de gestion",
+  "revision",
+  "elaboration",
+  "reporting",
+  "normes",
+  "declarations",
+  "outils",
+  "travail",
+  "analyse",
+] as const;
+
+/**
+ * La tête de déclinaison d'un libellé, ou `null` s'il n'en porte pas.
+ *
+ * La tête doit **commencer** le libellé : « Comptabilité fournisseurs » est
+ * une comptabilité, « Logiciels comptables » est un outil. La plus longue
+ * l'emporte, pour que `controle de gestion` ne soit jamais coiffée par une
+ * tête plus courte qu'on ajouterait un jour.
+ */
+export function teteDeclinee(libelle: string): string | null {
+  const n = normaliser(libelle);
+  let trouvee: string | null = null;
+
+  for (const tete of TETES_DECLINAISON) {
+    if (n !== tete && !n.startsWith(`${tete} `)) continue;
+    if (!trouvee || tete.length > trouvee.length) trouvee = tete;
+  }
+
+  return trouvee;
+}
+
+/**
+ * Écarte les déclinaisons d'un métier déjà servi (D130).
+ *
+ * Deux garde-fous. **Une ligne nommée par l'annonce n'est jamais écartée** :
+ * si l'offre demande la comptabilité fournisseurs, elle l'obtient, et le fait
+ * que la comptabilité générale soit déjà là n'y change rien. Et la liste étant
+ * triée avant d'arriver ici, la ligne conservée pour chaque tête est la
+ * meilleure — « Analyse financière », pas « Analyse de données ».
+ *
+ * Une ligne nommée occupe quand même la tête : c'est le cas qui a déclenché la
+ * règle, « Comptabilité générale » exigée bloquant « Comptabilité
+ * fournisseurs » générique.
+ */
+const NOTE_MERITEE = 4;
+
+function sansDeclinaisons<T extends { libelle: string; note: number }>(
+  lignes: T[]
+): T[] {
+  const tetesServies = new Set<string>();
+
+  return lignes.filter((ligne) => {
+    const tete = teteDeclinee(ligne.libelle);
+    if (!tete) return true;
+
+    if (ligne.note >= NOTE_MERITEE) {
+      tetesServies.add(tete);
+      return true;
+    }
+
+    if (tetesServies.has(tete)) return false;
+    tetesServies.add(tete);
+    return true;
+  });
+}
+
+/**
  * Nombre d'outils listés sur la ligne qui leur est consacrée.
  * Au-delà, la ligne passe sur deux lignes composées et le gain disparaît.
  */
@@ -446,14 +535,14 @@ function grouperOutils(outils: CompetenceRetenue[]): CompetenceRetenue | null {
    * répéter le même sous trois références.
    */
   const servis = new Set<string>();
-  const retenus = outils
-    .filter((o) => {
+  const retenus = sansDeclinaisons(
+    outils.filter((o) => {
       if (!o.besoin) return true;
       if (servis.has(o.besoin)) return false;
       servis.add(o.besoin);
       return true;
     })
-    .slice(0, MAX_OUTILS_GROUPES);
+  ).slice(0, MAX_OUTILS_GROUPES);
 
   // La précision suit son outil, où qu'il soit dans la liste. La première
   // version ne gardait que celle du premier : le jour où un nouvel outil est
@@ -549,15 +638,16 @@ export function selectionner(
    * concernées : un métier réclamé mérite plusieurs lignes.
    */
   const besoinsServis = new Set<string>();
-  const metier = notees
-    .filter((c) => c.categorie !== "outil")
-    .filter((c) => {
-      if (!c.besoin) return true;
-      if (besoinsServis.has(c.besoin)) return false;
-      besoinsServis.add(c.besoin);
-      return true;
-    })
-    .slice(0, niveau.nbCompetences - (ligneOutils ? 1 : 0));
+  const metier = sansDeclinaisons(
+    notees
+      .filter((c) => c.categorie !== "outil")
+      .filter((c) => {
+        if (!c.besoin) return true;
+        if (besoinsServis.has(c.besoin)) return false;
+        besoinsServis.add(c.besoin);
+        return true;
+      })
+  ).slice(0, niveau.nbCompetences - (ligneOutils ? 1 : 0));
 
   const competences = (ligneOutils ? [...metier, ligneOutils] : metier).sort(
     comparerCompetences

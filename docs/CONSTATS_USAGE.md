@@ -1408,3 +1408,113 @@ contrôle de gestion industriel ; « cinq marques dans dix pays » et « sortie 
 groupe en 2022 » lui disent tout.
 
 **206 tests.**
+
+---
+
+## D130 — une ligne par métier dans le bloc de compétences
+
+**Constat du 7 octobre.** « J'ai enlevé compta fournisseurs de mon profil et je
+la vois dans le CV. Je suis parti à la taxonomie, j'ai décoché le "en service",
+et toujours présente. J'ai compta générale, analytique, frs — on va pas citer
+toutes les comptas dans compétences quand même. »
+
+Trois choses distinctes se cachaient derrière une seule plainte.
+
+### Ce que « en service » ne fait pas
+
+`activites.actif` pilote les codes proposés pour coder les missions et pour le
+score. Le bloc COMPÉTENCES du CV ne lit jamais cette table : il lit
+`competences`, qui est une liste à part. `generer.ts` le dit même en toutes
+lettres — toute la taxonomie est passée au générateur, codes retirés du service
+compris, parce qu'un métier retiré reste un métier. Décocher là n'a donc aucun
+effet sur le CV, et n'en aura jamais. **Rien à corriger : deux objets portent
+des noms voisins, c'est tout.**
+
+### Le masquage marchait, mais pas dans le volet regardé
+
+La ligne est bien passée à `visible_cdg = false` à 15h35. Son `visible_compta`
+est resté vrai, et les trois CV générés à 15h40, 15h42 et 15h44 étaient des CV
+**compta**. La visibilité est par volet depuis le premier jour ; le clic a été
+donné depuis l'onglet cdg. **Rien à corriger non plus.**
+
+### Ce qui, en revanche, était un vrai défaut
+
+L'annonce GIE GCCL exigeait « Comptabilité générale ». Cette exigence est l'une
+des formes de déclaration de la famille `compta` (D124) : elle déclare donc le
+**métier comptable entier** exigé, et chaque ligne de la catégorie reçoit une
+note de famille. « Comptabilité fournisseurs », que l'annonce ne demande nulle
+part, entre ainsi en huitième position, derrière « Comptabilité générale » et
+« Comptabilité analytique ». Trois fois le même mot en tête de bloc.
+
+**La note de famille est un rattrapage de métier ; elle ne devait pas devenir
+un droit de tirage sur toutes les déclinaisons du métier.**
+
+### La règle
+
+Une compétence dont la **tête de déclinaison** est déjà servie par une ligne
+retenue ne complète plus le bloc — **sauf si elle a mérité sa place par
+elle-même**, c'est-à-dire si l'annonce la nomme (notes 6 et 7) ou si elle est
+tenue au cœur du métier (notes 4 et 5). Autrement dit, ne cède sa place que la
+ligne qui n'était là **que** par le rattrapage de famille de D124. La liste
+triée arrive avant le filtre : la ligne gardée pour chaque tête est donc
+toujours la meilleure.
+
+Le seuil n'était pas dans la première version, et le 8 octobre l'a montré.
+L'offre FIDUCIAL « Assistant comptable » exige la comptabilité générale et ne
+nomme ni l'analytique ni les fournisseurs : la règle sans seuil écartait les
+**deux**, et rendait la place à « Tenue comptable », au niveau notions. Elle
+sacrifiait une compétence maîtrisée pour en remonter une qui ne l'est pas, au
+seul motif que la première partageait sa tête et la seconde non. Avec le seuil,
+« Comptabilité analytique » reste et « Comptabilité fournisseurs » sort — ce
+qui était la demande, mot pour mot.
+
+La tête n'est pas un premier mot. « Esprit critique » et « Esprit d'initiative »
+sont deux qualités, « Gestion des stocks » et « Gestion de la paie » deux
+métiers : les réduire à une ligne coûterait une vraie ligne pour en économiser
+une fausse. La liste est fermée et calibrée sur le profil réel, comme la
+taxonomie et comme les formes de déclaration de D124 :
+
+```
+comptabilite · controle de gestion · revision · elaboration · reporting
+normes · declarations · outils · travail · analyse
+```
+
+`controle de gestion` est pris en entier à dessein. « Contrôle budgétaire »,
+« Contrôle interne » et « Contrôle de gestion industriel » ne sont pas trois
+variantes d'une même ligne, et la tête `controle` seule les aurait fondues.
+
+### Ce que ça change, mesuré sur les CV déjà produits
+
+Sur les **195 CV** en base au 8 octobre, **156 portent au moins un doublon de
+tête**, pour **186 lignes dépensées deux fois**. Le gros du gâchis n'est pas la
+comptabilité :
+
+| tête | CV touchés | lignes en double | dont la perdante est au niveau notions |
+|---|---|---|---|
+| analyse | 115 | 129 | 15 |
+| comptabilite | 38 | 52 | 14 |
+| reporting | 2 | 3 | 1 |
+| normes | 1 | 1 | 1 |
+| revision | 1 | 1 | 1 |
+
+Presque tous les CV de contrôle de gestion depuis le 9 septembre portent
+« Analyse financière » **et** « Analyse de marges et rentabilité » ; certains y
+ajoutent « Analyse » tout court, ou « Analyse et interprétation de données
+financières ».
+
+La dernière colonne est ce que la règle **avec seuil** récupère : une trentaine
+de lignes, celles qui n'étaient là que par défaut. Les autres doublons sont des
+paires de compétences toutes deux tenues — « Analyse financière » et « Analyse
+de marges et rentabilité » en sont le cas dominant — et la règle les laisse
+passer. Les écarter demanderait de trancher qu'une ligne tenue de plus sur le
+même métier ne vaut rien ; c'est une décision à part, pas un effet de bord à
+prendre au passage.
+
+**215 tests.** Les trois qui tiennent la règle ont été vérifiés en la
+neutralisant : ils tombent sans elle.
+
+> **Rappel de déploiement.** La passe 27 n'est partie ni le 7 ni le 8 au matin :
+> la production est restée sur D129 jusqu'au 8 octobre, et le CV FIDUCIAL de
+> 17h01 a donc été produit par l'ancien code. Un défaut qui « persiste » après
+> correction mérite toujours qu'on regarde d'abord la date du dernier
+> déploiement.
