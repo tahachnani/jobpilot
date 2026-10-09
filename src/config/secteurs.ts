@@ -51,6 +51,22 @@ const FAMILLES: Record<string, string[]> = {
   public: ["public", "association", "sante", "immobilier_social"],
 };
 
+/**
+ * Le secteur de l'offre appartient-il à cette famille (D132) ?
+ *
+ * Sert aux libellés de compétence qui revendiquent un secteur : « Contrôle de
+ * gestion industriel » n'a de sens que face à une offre de la famille
+ * `industrie`. Un secteur absent ou inconnu répond non — on ne revendique pas
+ * une spécialité que l'annonce n'a pas réclamée.
+ */
+export function secteurDansFamille(
+  code: string | null | undefined,
+  famille: string
+): boolean {
+  if (!code) return false;
+  return (FAMILLES[famille] ?? []).includes(code);
+}
+
 /** Secteurs qui recrutent tous les profils, donc jamais vraiment éloignés. */
 const TRANSVERSES = ["conseil", "expertise_comptable", "services"];
 

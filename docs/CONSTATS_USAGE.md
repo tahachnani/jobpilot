@@ -1608,3 +1608,80 @@ vrai**. Une valeur forgée passait la garde, et le code partait écrire une
 fonction là où il attend deux booléens. Corrigé en `hasOwnProperty`.
 
 **219 tests.**
+
+---
+
+## D132 — une compétence ne revendique pas un secteur que l'annonce n'a pas demandé
+
+**Constat du 9 octobre.** CV pour le Groupe Delcourt, éditeur de bandes
+dessinées. Deuxième ligne du bloc : « Contrôle de gestion industriel ».
+« Mettre le contrôle de gestion industriel dans une offre d'une entreprise qui
+produit les bandes dessinées ? »
+
+### C'est l'alphabet qui a choisi
+
+L'annonce exige « **Contrôle de gestion** », tout court. Trois lignes du profil
+contiennent cette expression :
+
+```
+Contrôle de gestion industriel      note 7   besoin = controle de gestion
+Contrôle de gestion opérationnel    note 7   besoin = controle de gestion
+Contrôle de gestion sociale         note 7   besoin = controle de gestion
+```
+
+Même note, même besoin satisfait : la déduplication de D124 n'en garde qu'une.
+Le départage descend les critères — note égale, puis niveau (« sociale » est à
+notions, elle sort), puis ordre, identique — et finit sur l'**ordre
+alphabétique du libellé**. « industriel » passe avant « opérationnel ».
+
+Ce n'est pas un classement, c'est un tri de secours qui n'avait jamais eu à
+trancher quelque chose d'important.
+
+### Mesuré sur les CV produits
+
+« Contrôle de gestion industriel » est sortie **cinq fois**, et pas une seule
+sur une offre industrielle :
+
+| Groupe Delcourt | édition |
+| D.M PARISIEN | BTP |
+| Adecia | expertise comptable |
+| Hôpital CASH Nanterre | santé |
+| Sodexo Live ! | services |
+
+À l'inverse, les libellés immobiliers — Comptabilité copropriété, Comptabilité
+immobilière, Gestion locative et copropriété — sont sortis **sept fois, et les
+sept fois sur des offres immobilières**. Le mécanisme n'est donc pas cassé en
+général : le défaut est qu'un libellé sectoriel peut gagner un départage qu'il
+ne devrait pas disputer.
+
+### La règle
+
+Un libellé qui nomme un secteur ne garde sa place que si l'annonce est de ce
+secteur. Liste fermée de mots, et les familles existent déjà dans
+`config/secteurs.ts` : `industrie` regroupe industrie, textile, agroalimentaire
+et énergie ; `immobilier` regroupe immobilier, immobilier social et BTP.
+
+Deux recevabilités, pas une. Le **secteur de l'offre** appartient à la famille —
+le cas normal, et les secteurs sont renseignés sur 128 des 142 offres
+analysées. Ou bien l'**annonce emploie le mot elle-même**, dans son intitulé,
+ses compétences ou ses mots-clés : une offre « Collaborateur comptable
+immobilier » dont l'extraction de secteur aurait échoué réclame bien de
+l'immobilier, et la ligne doit sortir. Un secteur absent ne vaut jamais
+autorisation : on ne revendique pas une spécialité qu'on ne nous demande pas.
+
+### L'ordre des filtres est le correctif
+
+La règle passe **avant** la déduplication par besoin, et c'est tout le point. Si
+elle passait après, « Contrôle de gestion industriel » aurait déjà éliminé
+« opérationnel » au titre du même besoin, et écarter l'industriel laisserait le
+besoin sans réponse — on perdrait la ligne au lieu de la remplacer. Placée
+avant, elle rend la place à celle qui dit la même chose sans la revendication.
+
+Sur Delcourt, le bloc passe de « Contrôle de gestion industriel » à « Contrôle
+de gestion opérationnel ». Même note, même exigence couverte, aucune usine.
+
+**226 tests.** Les deux qui tiennent la règle ont été vérifiés en la
+neutralisant. Les quatre autres sont des contre-épreuves : l'offre industrielle
+garde sa mention, toute la famille `industrie` compte, les libellés immobiliers
+sortent sur l'immobilier, et une annonce qui emploie le mot l'emporte sur un
+secteur manquant.

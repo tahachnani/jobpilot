@@ -1,5 +1,6 @@
 import type { OffreExtraite } from "@/lib/extraction-offre";
 import { correspond, normaliser } from "@/lib/texte";
+import { secteurDansFamille } from "@/config/secteurs";
 import type {
   CompetenceCV,
   DonneesCV,
@@ -505,6 +506,106 @@ function sansDeclinaisons<T extends { libelle: string; note: number }>(
 }
 
 /**
+ * Les libellés qui revendiquent un secteur, et la famille qu'ils visent (D132).
+ *
+ * L'annonce Groupe Delcourt — un éditeur de bandes dessinées — exigeait
+ * « Contrôle de gestion », tout court. Trois lignes du profil contiennent cette
+ * expression : industriel, opérationnel, sociale. Toutes trois notées 7, toutes
+ * trois répondant au même besoin ; la déduplication de D124 n'en garde qu'une,
+ * et le départage descend jusqu'à l'**ordre alphabétique du libellé**.
+ * « industriel » passe avant « opérationnel ». L'alphabet a mis un contrôleur
+ * de gestion industriel sur un CV pour un éditeur.
+ *
+ * Vérifié sur les CV produits : la ligne est sortie cinq fois, sur l'édition,
+ * le BTP, un cabinet d'expertise comptable, un hôpital et Sodexo Live. Zéro
+ * offre industrielle. Les libellés immobiliers, eux, sont sortis sept fois et
+ * les sept fois sur des offres immobilières : le mécanisme n'est pas cassé en
+ * général, c'est le départage qu'un libellé sectoriel ne devrait pas disputer.
+ *
+ * Liste fermée, comme partout ailleurs. Les mots sont donnés normalisés.
+ */
+const REVENDICATIONS_SECTEUR: { mots: string[]; famille: string }[] = [
+  {
+    mots: ["industriel", "industriels", "industrielle", "industrielles"],
+    famille: "industrie",
+  },
+  {
+    mots: [
+      "immobilier",
+      "immobiliere",
+      "immobilieres",
+      "copropriete",
+      "coproprietes",
+      "locative",
+      "locatives",
+      "bailleur",
+    ],
+    famille: "immobilier",
+  },
+];
+
+/** La famille revendiquée par un libellé, ou `null` s'il n'en revendique aucune. */
+export function secteurRevendique(libelle: string): string | null {
+  const mots = normaliser(libelle).split(" ");
+  for (const { mots: revendicateurs, famille } of REVENDICATIONS_SECTEUR) {
+    if (mots.some((m) => revendicateurs.includes(m))) return famille;
+  }
+  return null;
+}
+
+/**
+ * La revendication est-elle recevable face à cette offre ?
+ *
+ * Deux façons de l'être. Le **secteur de l'offre** appartient à la famille —
+ * c'est le cas normal, et les secteurs sont renseignés sur 128 des 142 offres
+ * analysées. Ou bien l'annonce **emploie le mot elle-même**, dans son intitulé,
+ * ses compétences ou ses mots-clés : une offre « Comptable Immobilier » dont
+ * l'extraction de secteur aurait échoué réclame bien de l'immobilier, et la
+ * ligne doit sortir.
+ */
+function revendicationRecevable(
+  famille: string,
+  offre: OffreExtraite
+): boolean {
+  if (secteurDansFamille(offre.secteur_code, famille)) return true;
+
+  const revendicateurs =
+    REVENDICATIONS_SECTEUR.find((r) => r.famille === famille)?.mots ?? [];
+
+  const textes = [
+    offre.intitule ?? "",
+    ...offre.competences.map((c) => c.libelle),
+    ...offre.mots_cles_ats,
+  ];
+
+  return textes.some((t) =>
+    normaliser(t)
+      .split(" ")
+      .some((m) => revendicateurs.includes(m))
+  );
+}
+
+/**
+ * Écarte les lignes qui revendiquent un secteur étranger à l'offre (D132).
+ *
+ * Elle passe **avant** la déduplication par besoin, et c'est tout le point : si
+ * elle passait après, « Contrôle de gestion industriel » aurait déjà éliminé
+ * « opérationnel » au titre du même besoin, et écarter l'industriel laisserait
+ * le besoin sans réponse. En la plaçant avant, la place revient à la ligne
+ * neutre qui dit la même chose.
+ */
+function sansRevendicationHorsSujet<T extends { libelle: string }>(
+  lignes: T[],
+  offre: OffreExtraite
+): T[] {
+  return lignes.filter((ligne) => {
+    const famille = secteurRevendique(ligne.libelle);
+    if (!famille) return true;
+    return revendicationRecevable(famille, offre);
+  });
+}
+
+/**
  * Nombre d'outils listés sur la ligne qui leur est consacrée.
  * Au-delà, la ligne passe sur deux lignes composées et le gain disparaît.
  */
@@ -639,8 +740,10 @@ export function selectionner(
    */
   const besoinsServis = new Set<string>();
   const metier = sansDeclinaisons(
-    notees
-      .filter((c) => c.categorie !== "outil")
+    sansRevendicationHorsSujet(
+      notees.filter((c) => c.categorie !== "outil"),
+      offre
+    )
       .filter((c) => {
         if (!c.besoin) return true;
         if (besoinsServis.has(c.besoin)) return false;
